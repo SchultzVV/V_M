@@ -10,24 +10,28 @@
             background-image: url('/static/bg.png');
             background-size: cover;
             background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
             color: white;
             text-align: center;
+            overflow-y: scroll;
         }
         .container {
-            padding: 80px 20px;
-            background-color: rgba(0, 0, 0, 0.5);
-            margin: 100px auto;
-            max-width: 600px;
+            padding: 40px 20px;
+            background-color: rgba(0, 0, 0, 0.6);
+            margin: 60px auto;
+            max-width: 700px;
             border-radius: 20px;
         }
         button {
             background-color: #ff4b5c;
             border: none;
             padding: 15px 30px;
-            font-size: 1.2em;
+            font-size: 1.1em;
             color: white;
             border-radius: 12px;
             cursor: pointer;
+            margin: 10px;
         }
         button:hover {
             background-color: #e84350;
@@ -37,10 +41,13 @@
 <body>
     <div class="container">
         <h1>Bem-vindo à V&M</h1>
-        <p>Descubra produtos incríveis escolhidos com muito bom gosto!</p>
-        <a href="https://br.shp.ee/a6hM34H" target="_blank">
-            <button>Comprar agora na Shopee</button>
-        </a>
+        <p>Produtos PROMOCIONAIS escolhidos com muito bom gosto — clique e aproveite:</p>
+
+        {% for product in products %}
+            <a href="{{ product.url }}" target="_blank">
+                <button>{{ product.name }}</button>
+            </a><br/>
+        {% endfor %}
     </div>
 </body>
 </html>

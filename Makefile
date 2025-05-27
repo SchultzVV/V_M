@@ -1,21 +1,24 @@
 # Variáveis configuráveis
-include .env
+include .env  # Para targets de desenvolvimento
+include .env.prd  # Para targets de produção
 export
 
-ID ?= 1
-REGISTRY = registry.gitea.seuservidor.com
-USER = seu-usuario
-IMAGE_NAME = $(REGISTRY)/$(USER)/site
-TAG = latest
+TAG ?= latest
+GHCR_USER = $(GITHUB_USERNAME)
+GHCR_TOKEN = $(GITHUB_TOKEN)
+IMAGE_NAME = ghcr.io/$(GHCR_USER)/site:$(TAG)
 
 COMPOSE = docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml --env-file .env
 
 up:
-	$(COMPOSE) up --build -d
+	$(COMPOSE) up --build
+
 down:
 	$(COMPOSE) down -v
+
 prd-up:
 	docker-compose -f docker-compose.yaml -f docker-compose.prd.yaml --env-file .env.prd up -d
+
 prd-down:
 	docker-compose -f docker-compose.yaml -f docker-compose.prd.yaml --env-file .env.prd down -v
 
@@ -29,8 +32,6 @@ serve-ngrok:
 	@sleep 3
 	@echo "🌐 URL pública gerada:"
 	@curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
-
-
 
 restart-site:
 	$(COMPOSE) restart site
@@ -47,14 +48,36 @@ logs-site:
 prdlogs-site:
 	docker-compose -f docker-compose.yaml -f docker-compose.prd.yaml --env-file .env.prd logs -f site
 
-build-prd-site:
-	docker build -t $(IMAGE_NAME):$(TAG) ./services/site
+docker-login:
+	echo $(GHCR_TOKEN) | docker login ghcr.io -u $(GHCR_USER) --password-stdin
 
-push-gitea-site: build-prd-site
-	docker push $(IMAGE_NAME):$(TAG)
+build-prd-site:
+	docker build -t $(IMAGE_NAME) ./services/site
+
+push-ghcr-site: docker-login build-prd-site
+	docker push $(IMAGE_NAME)
+
+pull-prd-ghcr:
+	docker pull $(IMAGE_NAME)
+
+prd-up-ghcr:
+	@echo "🛑 Parando containers antigos..."
+	docker-compose -f docker-compose.yaml -f docker-compose.prd.yaml --env-file .env.prd down || true
+	@echo "📥 Dando pull da imagem do GitHub Container Registry..."
+	docker pull $(IMAGE_NAME)
+	@echo "🚀 Subindo site com imagem em produção (GHCR)..."
+	docker-compose -f docker-compose.yaml -f docker-compose.prd.yaml --env-file .env.prd up -d
+	@echo "🛑 Encerrando ngrok anterior..."
+	-pkill ngrok || true
+	@echo "🌐 Iniciando túnel com ngrok..."
+	@nohup ngrok http 5000 > /dev/null 2>&1 &
+	@sleep 3
+	@curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url' | xargs echo "🌍 URL pública gerada:"
 
 local-tests: test-unit test-integration
+
 test-unit:
 	PYTHONPATH=. pytest tests/unit --disable-warnings -v
+
 test-integration:
 	PYTHONPATH=. pytest tests/integration --disable-warnings -v

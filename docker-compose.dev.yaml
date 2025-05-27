@@ -3,22 +3,11 @@ services:
     build: ./services/site
     container_name: site-dev
     environment:
+      - FLASK_ENV=development
       - LOG_LEVEL=DEBUG
     env_file: .env
     volumes:
       - ./services/site:/app
-      - ./services:/app/services
-      - ./videos:/app/videos
-      - ./outputs:/app/outputs
-      - ./tests:/app/tests
     networks:
       - backend
-    ports:
-      - "5000:5000"
-
-    entrypoint: ["/bin/bash", "-c"]
-    command: ["echo '🧪 Modo DEV ativo com log extendido' && python main.py"]
-
-networks:
-  backend:
-    driver: bridge
+    command: ["python", "main.py"]

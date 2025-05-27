@@ -1,2 +1,5 @@
-# Add dependencies here
 flask
+boto3
+playwright
+beautifulsoup4
+requests
