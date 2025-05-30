@@ -1,5 +1,4 @@
 flask
-boto3
+sqlalchemy
+psycopg2-binary
 playwright
-beautifulsoup4
-requests

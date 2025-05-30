@@ -1,7 +1,17 @@
 # Variáveis configuráveis
-include .env  # Para targets de desenvolvimento
-include .env.prd  # Para targets de produção
+include .env  # base dev por padrão
 export
+
+ifeq ($(MAKECMDGOALS),prd-up)
+include .env.prd
+endif
+ifeq ($(MAKECMDGOALS),prd-down)
+include .env.prd
+endif
+ifeq ($(MAKECMDGOALS),prd-up-ghcr)
+include .env.prd
+endif
+
 
 TAG ?= latest
 GHCR_USER = $(GITHUB_USERNAME)
@@ -81,3 +91,11 @@ test-unit:
 
 test-integration:
 	PYTHONPATH=. pytest tests/integration --disable-warnings -v
+
+run-site-db:
+	DATABASE_URL=postgresql://user:password@localhost:5432/produtos_db \
+	FLASK_ENV=development \
+	python services/site/main.py
+
+psql:
+	docker exec -it postgres psql -U user -d produtos_db

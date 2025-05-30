@@ -1,3 +1,4 @@
+version: "3.8"
 services:
   site:
     build: ./services/site
@@ -7,21 +8,23 @@ services:
       - ./services/site:/app
     ports:
       - "5000:5000"
+    depends_on:
+      - db
     networks:
       - backend
 
-  minio:
-    image: minio/minio:latest
-    container_name: minio
+  db:
+    image: postgres:15
+    container_name: postgres
+    restart: always
     environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio123
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: produtos_db
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "5432:5432"
     volumes:
-      - minio_data:/data
-    command: server --console-address ":9001" /data
+      - pgdata:/var/lib/postgresql/data
     networks:
       - backend
 
@@ -30,4 +33,4 @@ networks:
     driver: bridge
 
 volumes:
-  minio_data:
+  pgdata:
