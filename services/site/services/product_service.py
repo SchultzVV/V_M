@@ -18,7 +18,16 @@ def save_product(title, price, old_price, image, link):
         db.flush()
         db.refresh(product)
         db.commit()
-        return product
+        # return product
+        return {
+            "id": product.id,
+            "title": product.title,
+            "price": product.price,
+            "old_price": product.old_price,
+            "image": product.image,
+            "link": product.link
+        }
+
     except Exception as e:
         db.rollback()
         raise e

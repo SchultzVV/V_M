@@ -58,6 +58,28 @@
         }
     </style>
 </head>
+<script>
+function nextImage(btn) {
+    const carousel = btn.closest(".carousel");
+    const images = carousel.querySelectorAll(".carousel-image");
+    let index = parseInt(carousel.dataset.index);
+    images[index].classList.add("hidden");
+    index = (index + 1) % images.length;
+    images[index].classList.remove("hidden");
+    carousel.dataset.index = index;
+}
+
+function prevImage(btn) {
+    const carousel = btn.closest(".carousel");
+    const images = carousel.querySelectorAll(".carousel-image");
+    let index = parseInt(carousel.dataset.index);
+    images[index].classList.add("hidden");
+    index = (index - 1 + images.length) % images.length;
+    images[index].classList.remove("hidden");
+    carousel.dataset.index = index;
+}
+</script>
+
 <body>
     <div class="container">
         <h1>Bem-vindo à V&M</h1>
@@ -69,14 +91,21 @@
             <input type="number" step="0.01" name="max_price" placeholder="Preço máximo" value="{{ request.args.get('max_price', '') }}">
             <button type="submit">Filtrar</button>
         </form>
-        
         {% for product in products %}
             <div class="product">
-                <img src="{{ product.image }}" alt="{{ product.title }}"><br/>
+                <div class="carousel" data-index="0">
+                    {% for img in product.image_list %}
+                        <img src="{{ img }}" alt="{{ product.title }}" class="carousel-image {% if not loop.first %}hidden{% endif %}">
+                    {% endfor %}
+                    {% if product.image_list | length > 1 %}
+                        <button class="carousel-btn left" onclick="prevImage(this)">‹</button>
+                        <button class="carousel-btn right" onclick="nextImage(this)">›</button>
+                    {% endif %}
+                </div>
                 <div class="product-title">{{ product.title }}</div>
                 <span class="product-price">{{ product.price }}</span>
                 {% if product.discount %}
-                    <div style="color: yellow;">{{ product.discount }}% OFF</div>
+                    <div style="color: yellow;">{{ product.discount }}% De desconto!</div>
                 {% endif %}
                 {% if product.old_price %}
                     <span class="product-old-price">{{ product.old_price }}</span>
@@ -85,6 +114,8 @@
                     <button>Ver Produto</button>
                 </a>
             </div>
+    
+        
         {% endfor %}
     </div>
 </body>

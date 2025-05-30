@@ -1,6 +1,9 @@
-from flask import Blueprint, request, jsonify, render_template, url_for
-from services.product_service import save_product, get_all_products, scrape_shopee_product
+import json
+from flask import Blueprint, request, jsonify, render_template
+from services.product_service import save_product, get_all_products
 import os
+from werkzeug.utils import secure_filename
+import shutil
 
 product_bp = Blueprint("product_bp", __name__)
 
@@ -17,14 +20,12 @@ def home():
         if name_filter and name_filter not in p.title.lower():
             continue
 
-        # remove "R$" e substitui vírgula por ponto
         try:
             price_val = float(p.price.replace("R$", "").replace(",", ".").strip())
             old_val = float(p.old_price.replace("R$", "").replace(",", ".").strip()) if p.old_price else None
         except:
             continue
 
-        # Filtros de preço
         if min_price:
             try:
                 if price_val < float(min_price):
@@ -39,17 +40,16 @@ def home():
             except:
                 pass
 
-        # Cálculo da % de desconto
         if old_val and old_val > price_val:
             p.discount = round((1 - price_val / old_val) * 100)
         else:
             p.discount = None
 
-        # Ajuste no caminho da imagem caso venha absoluta
-        if os.path.isabs(p.image):
-            # transforma em relativo ao /static/
-            rel_path = os.path.relpath(p.image, os.path.join(os.getcwd(), "services", "site", "static"))
-            p.image = rel_path.replace("\\", "/")  # suporte Windows/Linux
+        # suporte a múltiplas imagens
+        try:
+            p.image_list = json.loads(p.image) if p.image.startswith("[") else [p.image]
+        except:
+            p.image_list = [p.image]
 
         filtered.append(p)
 
@@ -59,37 +59,36 @@ def home():
 @product_bp.route("/add_product", methods=["POST"])
 def add_product():
     data = request.json
-    required_fields = ["title", "price", "oldPrice", "image", "link"]
+    required_fields = ["title", "price", "oldPrice", "images", "link"]
 
     if not all(field in data for field in required_fields):
         return jsonify({"error": "Campos obrigatórios faltando"}), 400
 
-    image_path = data["image"]
-    if os.path.isabs(image_path):
+    image_paths = []
+    for img_path in data["images"]:
+        if not os.path.isfile(img_path):
+            return jsonify({"error": f"Imagem não encontrada: {img_path}"}), 400
+
+        filename = secure_filename(os.path.basename(img_path))
+        dest_dir = os.path.join("static", "images")
+        os.makedirs(dest_dir, exist_ok=True)
+        dest_path = os.path.join(dest_dir, filename)
+
         try:
-            rel_path = os.path.relpath(image_path, os.path.join(os.getcwd(), "services", "site", "static"))
-            image_path = rel_path.replace("\\", "/")
+            shutil.copy(img_path, dest_path)
         except Exception as e:
-            return jsonify({"error": f"Erro ao processar caminho da imagem: {str(e)}"}), 400
+            return jsonify({"error": f"Erro ao copiar imagem: {str(e)}"}), 500
+
+        image_paths.append(f"/static/images/{filename}")
 
     try:
         product = save_product(
             title=data["title"],
             price=data["price"],
             old_price=data["oldPrice"],
-            image=image_path,
+            image=json.dumps(image_paths),  # salva como JSON no campo `image`
             link=data["link"]
         )
-        return jsonify({
-            "message": "Produto salvo com sucesso!",
-            "product": {
-                "id": product.id,
-                "title": product.title,
-                "price": product.price,
-                "old_price": product.old_price,
-                "image": product.image,
-                "link": product.link
-            }
-        }), 201
+        return jsonify({"message": "Produto salvo com sucesso!", "product": product}), 201
     except Exception as e:
         return jsonify({"error": f"Erro ao salvar produto: {str(e)}"}), 500

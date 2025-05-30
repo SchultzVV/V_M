@@ -99,3 +99,6 @@ run-site-db:
 
 psql:
 	docker exec -it postgres psql -U user -d produtos_db
+
+stage:
+	python3 scripts/stage_products.py
