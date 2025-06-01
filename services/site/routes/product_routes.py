@@ -56,6 +56,42 @@ def home():
     return render_template("index.html", products=filtered)
 
 
+# @product_bp.route("/add_product", methods=["POST"])
+# def add_product():
+#     data = request.json
+#     required_fields = ["title", "price", "oldPrice", "images", "link"]
+
+#     if not all(field in data for field in required_fields):
+#         return jsonify({"error": "Campos obrigatórios faltando"}), 400
+
+#     image_paths = []
+#     for img_path in data["images"]:
+#         if not os.path.isfile(img_path):
+#             return jsonify({"error": f"Imagem não encontrada: {img_path}"}), 400
+
+#         filename = secure_filename(os.path.basename(img_path))
+#         dest_dir = os.path.join("static", "images")
+#         os.makedirs(dest_dir, exist_ok=True)
+#         dest_path = os.path.join(dest_dir, filename)
+
+#         try:
+#             shutil.copy(img_path, dest_path)
+#         except Exception as e:
+#             return jsonify({"error": f"Erro ao copiar imagem: {str(e)}"}), 500
+
+#         image_paths.append(f"/static/images/{filename}")
+
+#     try:
+#         product = save_product(
+#             title=data["title"],
+#             price=data["price"],
+#             old_price=data["oldPrice"],
+#             image=json.dumps(image_paths),  # salva como JSON no campo `image`
+#             link=data["link"]
+#         )
+#         return jsonify({"message": "Produto salvo com sucesso!", "product": product}), 201
+#     except Exception as e:
+#         return jsonify({"error": f"Erro ao salvar produto: {str(e)}"}), 500
 @product_bp.route("/add_product", methods=["POST"])
 def add_product():
     data = request.json
@@ -64,22 +100,12 @@ def add_product():
     if not all(field in data for field in required_fields):
         return jsonify({"error": "Campos obrigatórios faltando"}), 400
 
+    # Validação simples das imagens (opcional)
     image_paths = []
     for img_path in data["images"]:
-        if not os.path.isfile(img_path):
-            return jsonify({"error": f"Imagem não encontrada: {img_path}"}), 400
-
-        filename = secure_filename(os.path.basename(img_path))
-        dest_dir = os.path.join("static", "images")
-        os.makedirs(dest_dir, exist_ok=True)
-        dest_path = os.path.join(dest_dir, filename)
-
-        try:
-            shutil.copy(img_path, dest_path)
-        except Exception as e:
-            return jsonify({"error": f"Erro ao copiar imagem: {str(e)}"}), 500
-
-        image_paths.append(f"/static/images/{filename}")
+        if not isinstance(img_path, str) or not img_path.startswith("/imagens/"):
+            return jsonify({"error": f"Caminho de imagem inválido: {img_path}"}), 400
+        image_paths.append(img_path)
 
     try:
         product = save_product(

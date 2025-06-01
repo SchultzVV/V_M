@@ -1,38 +1,31 @@
+# 📦 Imagem base otimizada
 FROM python:3.10-slim
 
-# Instalações básicas
+# 🧱 Dependências do sistema para PostgreSQL + Playwright
 RUN apt-get update && apt-get install -y \
-    libpq-dev gcc curl unzip && \
-    rm -rf /var/lib/apt/lists/*
+    libpq-dev gcc curl unzip \
+    wget fonts-liberation libnss3 libatk-bridge2.0-0 libxss1 \
+    libasound2 libgtk-3-0 libx11-xcb1 libxcomposite1 libxdamage1 \
+    libxrandr2 xdg-utils libgbm1 \
+    && rm -rf /var/lib/apt/lists/*
 
+# 🧪 Instala Playwright e os browsers
 RUN pip install playwright && playwright install --with-deps
 
+# 📁 Define o diretório da aplicação
 WORKDIR /app
 
+# 🗂️ Copia os arquivos para dentro do container
 COPY . .
 
-RUN pip install --no-cache-dir -r requirements.txt
+# 📦 Argumento para alternar entre requirements-dev.txt e requirements.txt
+ARG REQUIREMENTS=requirements.txt
 
+# 📦 Instala dependências da aplicação
+RUN pip install --no-cache-dir -r $REQUIREMENTS
+
+# 🔌 Porta exposta pela aplicação Flask
 EXPOSE 5000
 
+# 🚀 Comando padrão de inicialização
 CMD ["python", "main.py"]
-
-
-# FROM python:3.10-slim
-
-# # Instala dependências do sistema para o Chromium
-# RUN apt-get update && apt-get install -y \
-#     wget curl unzip fonts-liberation libnss3 libatk-bridge2.0-0 libxss1 \
-#     libasound2 libgtk-3-0 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 \
-#     xdg-utils libgbm1 && rm -rf /var/lib/apt/lists/*
-
-# WORKDIR /app
-
-# COPY . .
-
-# RUN pip install --no-cache-dir -r requirements.txt
-# RUN pip install playwright && playwright install --with-deps
-
-# EXPOSE 5000
-
-# CMD ["python", "main.py"]

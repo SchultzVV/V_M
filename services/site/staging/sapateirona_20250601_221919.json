@@ -1,0 +1,12 @@
+{
+  "platform": "shopee",
+  "title": "Sapateirona",
+  "price": "R$ 19",
+  "oldPrice": "R$ 50",
+  "images_local": [
+    "uploads/a.png",
+    "uploads/b.png"
+  ],
+  "images": [],
+  "link": "https://br.shp.ee/a6hM34H"
+}

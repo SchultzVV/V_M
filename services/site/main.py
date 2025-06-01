@@ -21,11 +21,12 @@ else:
 # agora importa o restante
 from flask import Flask
 from routes.product_routes import product_bp
+from routes.media_routes import media_bp
 from models import Base
 
 app = Flask(__name__)
 app.register_blueprint(product_bp)
-
+app.register_blueprint(media_bp)
 # Cria as tabelas
 Base.metadata.create_all(bind=engine)
 
