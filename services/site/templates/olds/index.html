@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>V&M - Lojinha</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background-image: url('/static/bg.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            color: white;
+            text-align: center;
+            overflow-y: scroll;
+        }
+        .container {
+            padding: 40px 20px;
+            background-color: rgba(0, 0, 0, 0.6);
+            margin: 60px auto;
+            max-width: 700px;
+            border-radius: 20px;
+        }
+        .product {
+            margin-bottom: 30px;
+        }
+        .product img {
+            width: 200px;
+            border-radius: 12px;
+        }
+        .product-title {
+            font-size: 1.2em;
+            margin: 10px 0 5px 0;
+        }
+        .product-price {
+            color: #00ff99;
+            font-weight: bold;
+        }
+        .product-old-price {
+            color: #ff9999;
+            text-decoration: line-through;
+            margin-left: 10px;
+        }
+        button {
+            background-color: #ff4b5c;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1em;
+            color: white;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #e84350;
+        }
+        .carousel-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 2em;
+            position: relative;
+            top: -100px;
+            cursor: pointer;
+            z-index: 10;
+        }
+        .carousel-image.hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bem-vindo à V&M</h1>
+        <p>Produtos PROMOCIONAIS escolhidos com muito bom gosto — clique e aproveite:</p>
+
+        <div id="products-container"></div>
+    </div>
+
+<script>
+function createProductCard(product) {
+    const card = document.createElement("div");
+    card.className = "product";
+
+    const carousel = document.createElement("div");
+    carousel.className = "carousel";
+    carousel.dataset.index = 0;
+
+    product.images.forEach((img, idx) => {
+        const imgEl = document.createElement("img");
+        imgEl.src = img;
+        imgEl.alt = product.title;
+        imgEl.className = "carousel-image" + (idx === 0 ? "" : " hidden");
+        carousel.appendChild(imgEl);
+    });
+
+    if (product.images.length > 1) {
+        const btnPrev = document.createElement("button");
+        btnPrev.innerHTML = "‹";
+        btnPrev.className = "carousel-btn left";
+        btnPrev.onclick = () => prevImage(btnPrev);
+
+        const btnNext = document.createElement("button");
+        btnNext.innerHTML = "›";
+        btnNext.className = "carousel-btn right";
+        btnNext.onclick = () => nextImage(btnNext);
+
+        carousel.appendChild(btnPrev);
+        carousel.appendChild(btnNext);
+    }
+
+    const title = document.createElement("div");
+    title.className = "product-title";
+    title.innerText = product.title;
+
+    const price = document.createElement("span");
+    price.className = "product-price";
+    price.innerText = product.price;
+
+    const discount = document.createElement("div");
+    if (product.oldPrice && parseFloat(product.oldPrice.replace("R$", "").replace(",", ".")) > parseFloat(product.price.replace("R$", "").replace(",", "."))) {
+        const discountVal = Math.round((1 - parseFloat(product.price.replace("R$", "").replace(",", ".")) / parseFloat(product.oldPrice.replace("R$", "").replace(",", "."))) * 100);
+        discount.style.color = "yellow";
+        discount.innerText = discountVal + "% De desconto!";
+    }
+
+    const oldPrice = document.createElement("span");
+    if (product.oldPrice) {
+        oldPrice.className = "product-old-price";
+        oldPrice.innerText = product.oldPrice;
+    }
+
+    const link = document.createElement("a");
+    link.href = product.link;
+    link.target = "_blank";
+    const button = document.createElement("button");
+    button.innerText = "Ver Produto";
+    link.appendChild(button);
+
+    card.appendChild(carousel);
+    card.appendChild(title);
+    card.appendChild(price);
+    if (discount.innerText) card.appendChild(discount);
+    if (oldPrice.innerText) card.appendChild(oldPrice);
+    card.appendChild(document.createElement("br"));
+    card.appendChild(link);
+
+    return card;
+}
+
+function nextImage(btn) {
+    const carousel = btn.closest(".carousel");
+    const images = carousel.querySelectorAll(".carousel-image");
+    let index = parseInt(carousel.dataset.index);
+    images[index].classList.add("hidden");
+    index = (index + 1) % images.length;
+    images[index].classList.remove("hidden");
+    carousel.dataset.index = index;
+}
+
+function prevImage(btn) {
+    const carousel = btn.closest(".carousel");
+    const images = carousel.querySelectorAll(".carousel-image");
+    let index = parseInt(carousel.dataset.index);
+    images[index].classList.add("hidden");
+    index = (index - 1 + images.length) % images.length;
+    images[index].classList.remove("hidden");
+    carousel.dataset.index = index;
+}
+
+// ⬇️ Chamada à API com header que remove o aviso ngrok
+fetch("/api/products", {
+    headers: {
+        "ngrok-skip-browser-warning": "true"
+    }
+})
+.then(res => res.json())
+.then(products => {
+    const container = document.getElementById("products-container");
+    products.forEach(p => {
+        const card = createProductCard(p);
+        container.appendChild(card);
+    });
+})
+.catch(err => {
+    console.error("Erro ao carregar produtos:", err);
+});
+</script>
+</body>
+</html>

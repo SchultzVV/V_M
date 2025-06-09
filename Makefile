@@ -64,6 +64,18 @@ serve-ngrok:  ## Inicia túnel ngrok para acessar localmente via web
 	@echo "🌐 URL pública gerada:"
 	@curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
 
+definitive-serve-ngrok:  ## Inicia túnel ngrok (modo gratuito, link aleatório)
+	@echo "🛑 Encerrando ngrok anterior, se existir..."
+	@pkill ngrok || true
+	@echo "🔧 Subindo containers Docker..."
+	@$(COMPOSE) up -d
+	@echo "🚀 Iniciando túnel ngrok (porta $(PORT))..."
+	@ngrok http $(PORT) > /dev/null &
+	@sleep 3
+	@echo "🌐 URL pública gerada:"
+	@curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+
+
 # =====================
 # 🚀 Produção
 # =====================
@@ -129,7 +141,7 @@ run-site-db:  ## Executa manualmente o site com PostgreSQL local
 	python services/site/main.py
 
 psql:  ## Abre terminal psql no container
-	docker exec -it postgres psql -U user -d produtos_db
+	docker exec -it postgres-dev psql -U user -d produtos_db
 
 stage_old: ## Executa script de staging dentro do container
 	docker exec -it site python3 scripts/stage_products.py

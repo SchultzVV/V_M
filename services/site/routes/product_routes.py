@@ -1,11 +1,15 @@
-import json
-from flask import Blueprint, request, jsonify, render_template
-from services.product_service import save_product, get_all_products
+# routes/product_routes.py
+
 import os
-from werkzeug.utils import secure_filename
+import json
 import shutil
+from flask import Blueprint, request, jsonify, render_template
+from werkzeug.utils import secure_filename
+from models.product import Product
+from services.product_service import save_product, get_all_products
 
 product_bp = Blueprint("product_bp", __name__)
+
 
 @product_bp.route("/")
 def home():
@@ -45,7 +49,6 @@ def home():
         else:
             p.discount = None
 
-        # suporte a múltiplas imagens
         try:
             p.image_list = json.loads(p.image) if p.image.startswith("[") else [p.image]
         except:
@@ -56,42 +59,6 @@ def home():
     return render_template("index.html", products=filtered)
 
 
-# @product_bp.route("/add_product", methods=["POST"])
-# def add_product():
-#     data = request.json
-#     required_fields = ["title", "price", "oldPrice", "images", "link"]
-
-#     if not all(field in data for field in required_fields):
-#         return jsonify({"error": "Campos obrigatórios faltando"}), 400
-
-#     image_paths = []
-#     for img_path in data["images"]:
-#         if not os.path.isfile(img_path):
-#             return jsonify({"error": f"Imagem não encontrada: {img_path}"}), 400
-
-#         filename = secure_filename(os.path.basename(img_path))
-#         dest_dir = os.path.join("static", "images")
-#         os.makedirs(dest_dir, exist_ok=True)
-#         dest_path = os.path.join(dest_dir, filename)
-
-#         try:
-#             shutil.copy(img_path, dest_path)
-#         except Exception as e:
-#             return jsonify({"error": f"Erro ao copiar imagem: {str(e)}"}), 500
-
-#         image_paths.append(f"/static/images/{filename}")
-
-#     try:
-#         product = save_product(
-#             title=data["title"],
-#             price=data["price"],
-#             old_price=data["oldPrice"],
-#             image=json.dumps(image_paths),  # salva como JSON no campo `image`
-#             link=data["link"]
-#         )
-#         return jsonify({"message": "Produto salvo com sucesso!", "product": product}), 201
-#     except Exception as e:
-#         return jsonify({"error": f"Erro ao salvar produto: {str(e)}"}), 500
 @product_bp.route("/add_product", methods=["POST"])
 def add_product():
     data = request.json
@@ -100,21 +67,38 @@ def add_product():
     if not all(field in data for field in required_fields):
         return jsonify({"error": "Campos obrigatórios faltando"}), 400
 
-    # Validação simples das imagens (opcional)
     image_paths = []
     for img_path in data["images"]:
-        if not isinstance(img_path, str) or not img_path.startswith("/imagens/"):
+        if not isinstance(img_path, str) or not img_path.startswith("http"):
             return jsonify({"error": f"Caminho de imagem inválido: {img_path}"}), 400
         image_paths.append(img_path)
 
+    # image_paths = []
+    # for img_path in data["images"]:
+    #     if not isinstance(img_path, str) or not img_path.startswith("/imagens/"):
+    #         return jsonify({"error": f"Caminho de imagem inválido: {img_path}"}), 400
+    #     image_paths.append(img_path)
+
     try:
         product = save_product(
+            id=data.get("id"),
             title=data["title"],
             price=data["price"],
             old_price=data["oldPrice"],
-            image=json.dumps(image_paths),  # salva como JSON no campo `image`
+            image=json.dumps(image_paths),
             link=data["link"]
         )
+        # return jsonify({"message": "Produto salvo com sucesso!", "product": product.to_dict()}), 201
         return jsonify({"message": "Produto salvo com sucesso!", "product": product}), 201
+
     except Exception as e:
         return jsonify({"error": f"Erro ao salvar produto: {str(e)}"}), 500
+
+
+@product_bp.route("/api/products")
+def api_products():
+    try:
+        products = get_all_products()
+        return jsonify([p.to_dict() for p in products])
+    except Exception as e:
+        return jsonify({"error": f"Erro ao obter produtos: {str(e)}"}), 500

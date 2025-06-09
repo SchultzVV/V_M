@@ -8,6 +8,7 @@ flask>=2.3,<3.0
 # ==============================
 sqlalchemy>=2.0,<3.0
 psycopg2-binary>=2.9,<3.0
+flask_sqlalchemy
 
 # ==============================
 # 📦 Armazenamento em objetos (MinIO)

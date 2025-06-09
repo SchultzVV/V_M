@@ -41,7 +41,7 @@ services:
       - backend
 
   minio:
-    image: minio/minio
+    image: minio/minio:latest
     container_name: minio-dev
     ports:
       - "9000:9000"
