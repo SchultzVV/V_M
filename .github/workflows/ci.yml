@@ -1,0 +1,43 @@
+# .github/workflows/deploy.yml
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_USERNAME: ${{ github.actor }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install deps
+        run: |
+          pip install -r services/site/requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        run: make local-tests
+
+  push-image:
+    needs: build-test
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_USERNAME: ${{ github.actor }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Push to GHCR
+        run: make push-ghcr-site

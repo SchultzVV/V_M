@@ -1,0 +1,26 @@
+# ==============================
+# 🌐 Web framework
+# ==============================
+flask>=2.3,<3.0
+
+# ==============================
+# 🛢️ Banco de dados relacional
+# ==============================
+sqlalchemy>=2.0,<3.0
+psycopg2-binary>=2.9,<3.0
+flask_sqlalchemy
+
+# ==============================
+# 📦 Armazenamento em objetos (MinIO)
+# ==============================
+minio>=7.1,<8.0
+
+# ==============================
+# 🤖 Scraping e automação
+# ==============================
+playwright>=1.42,<2.0
+
+# ==============================
+# 🌐 Servidor de produção (opcional)
+# ==============================
+# gunicorn>=21.0,<22.0  # Ative se quiser usar Gunicorn no lugar do `python main.py`

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>V&M - Lojinha</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background-image: url('/static/bg.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            color: white;
+            text-align: center;
+            overflow-y: scroll;
+        }
+        .container {
+            padding: 40px 20px;
+            background-color: rgba(0, 0, 0, 0.6);
+            margin: 60px auto;
+            max-width: 700px;
+            border-radius: 20px;
+        }
+        .product {
+            margin-bottom: 30px;
+        }
+        .product img {
+            width: 200px;
+            border-radius: 12px;
+        }
+        .product-title {
+            font-size: 1.2em;
+            margin: 10px 0 5px 0;
+        }
+        .product-price {
+            color: #00ff99;
+            font-weight: bold;
+        }
+        .product-old-price {
+            color: #ff9999;
+            text-decoration: line-through;
+            margin-left: 10px;
+        }
+        button {
+            background-color: #ff4b5c;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1em;
+            color: white;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #e84350;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bem-vindo à V&M</h1>
+        <p>Produtos PROMOCIONAIS escolhidos com muito bom gosto — clique e aproveite:</p>
+
+        {% for product in products %}
+            <div class="product">
+                <img src="{{ product.image }}" alt="{{ product.title }}"><br/>
+                <div class="product-title">{{ product.title }}</div>
+                <span class="product-price">{{ product.price }}</span>
+                {% if product.old_price %}
+                    <span class="product-old-price">{{ product.old_price }}</span>
+                {% endif %}<br/>
+                <a href="{{ product.link }}" target="_blank">
+                    <button>Ver Produto</button>
+                </a>
+            </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

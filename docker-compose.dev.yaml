@@ -1,24 +1,64 @@
+version: "3.8"
+
 services:
   site:
-    build: ./services/site
+    build:
+      context: ./services/site
+      dockerfile: Dockerfile
+      args:
+        REQUIREMENTS: requirements-dev.txt
     container_name: site-dev
     environment:
+      - FLASK_ENV=development
       - LOG_LEVEL=DEBUG
+      - DATABASE_URL=postgresql://user:password@db:5432/produtos_db
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minio
+      - MINIO_SECRET_KEY=minio123
     env_file: .env
     volumes:
       - ./services/site:/app
-      - ./services:/app/services
-      - ./videos:/app/videos
-      - ./outputs:/app/outputs
-      - ./tests:/app/tests
+    command: ["python", "main.py"]
+    depends_on:
+      - db
+      - minio
     networks:
       - backend
-    ports:
-      - "5000:5000"
 
-    entrypoint: ["/bin/bash", "-c"]
-    command: ["echo '🧪 Modo DEV ativo com log extendido' && python main.py"]
+  db:
+    image: postgres:15
+    container_name: postgres-dev
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: produtos_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio-dev
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - backend
 
 networks:
   backend:
     driver: bridge
+
+volumes:
+  pgdata:
+  minio_data:

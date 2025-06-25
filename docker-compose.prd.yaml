@@ -1,14 +1,36 @@
+version: "3.8"
+
 services:
   site:
-    image: registry.gitea.seuservidor.com/seu-usuario/site:latest
-    container_name: site
-    restart: unless-stopped
+    image: ghcr.io/<seu_usuario_github>/site:latest
     env_file: .env.prd
-    volumes:
-      - ./services/site:/app
-    networks:
-      - backend
+    restart: unless-stopped
+    ports:
+      - "80:5000"
+    depends_on:
+      - db
+      - minio
 
-networks:
-  backend:
-    driver: bridge
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: produtos_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio
+    restart: always
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  pgdata:
+  minio_data:

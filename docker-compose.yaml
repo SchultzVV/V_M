@@ -1,13 +1,56 @@
+version: "3.8"
+
 services:
   site:
-    build: ./services/site
+    build:
+      context: ./services/site
+      dockerfile: Dockerfile
     container_name: site
     env_file: .env
     volumes:
       - ./services/site:/app
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+      - minio
+    networks:
+      - backend
+
+  db:
+    image: postgres:15
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: produtos_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
     networks:
       - backend
 
 networks:
   backend:
     driver: bridge
+
+volumes:
+  pgdata:
+  minio_data:

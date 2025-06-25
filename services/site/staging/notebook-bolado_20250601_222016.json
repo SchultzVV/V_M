@@ -1,0 +1,12 @@
+{
+  "platform": "amazon",
+  "title": "Notebook Bolado",
+  "price": "R$ 1200",
+  "oldPrice": "R$ 1525",
+  "images_local": [
+    "uploads/nb1.png",
+    "uploads/nb2.png"
+  ],
+  "images": [],
+  "link": "https://www.amazon.com/Dell-X1W6W-Latitude-i7-7820HQ-Windows/dp/B06X9TP8C3/ref=sr_1_41?crid=13NE22V2XCT8W&dib=eyJ2IjoiMSJ9.ULV7hLfmV-aVgsrbwtNP1QyxbAPjbPrfcv7YumXJSgWwNziksTk-Br0AvIB6ALTnkho9nqsy9YZKSJRFon-ihhmPM_ujpX3DaXLTqHYI9FV7sCS6-b8FDVdEue0zYVtNhm59tbfRooI7iThQnFNUoc8r4f61tgTPt3S8rDAMTro6ta2wrm8KvpCj1dj0LH7WvfN5RGk8zeWYRNbt2ttDOZZSsKTl3TOVZBRr4UHvv6V-uhV6PQhDKCbInoWwKzGf1Ljq4FJTf_BED5YHEiSZVkNpowSMc16iTsDYdbJ-bS8.azCSxbIzNqRkP3MMkEebxffeMpGyuN5EeKfOt27fj5k&dib_tag=se&keywords=notebook&qid=1748810802&refinements=p_36%3A150000-&rnid=386479011&sprefix=noteboo%2Caps%2C346&sr=8-41"
+}
