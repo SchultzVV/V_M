@@ -19,7 +19,7 @@ WORKDIR /app
 COPY . .
 
 # 📦 Argumento para alternar entre requirements-dev.txt e requirements.txt
-ARG REQUIREMENTS=requirements.txt
+ARG REQUIREMENTS=requirements-dev.txt
 
 # 📦 Instala dependências da aplicação
 RUN pip install --no-cache-dir -r $REQUIREMENTS
