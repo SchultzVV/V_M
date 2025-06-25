@@ -18,38 +18,18 @@ else:
     print("❌ Falha ao conectar no banco de dados.")
     exit(1)
 
-# agora importa o restante
-# from flask import Flask
-# from routes.product_routes import product_bp
-# from routes.media_routes import media_bp
-# from sqlalchemy.orm import declarative_base
-
-# Base = declarative_base()
-
-
-# app = Flask(__name__)
-# app.register_blueprint(product_bp)
-# app.register_blueprint(media_bp)
-# # Cria as tabelas
-# Base.metadata.create_all(bind=engine)
-
-# if __name__ == "__main__":
-#     app.run(host="0.0.0.0", port=5000)
-# main.py
 import os
 from flask import Flask
 from routes.product_routes import product_bp
 from models.product import db, Product
-from database import engine
 from models import Base
 from routes.media_routes import media_bp
 from routes.ai_routes import ai_bp
 
 app = Flask(__name__)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://user:password@postgres-dev:5432/mydatabase'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 # Cria as tabelas no banco de dados (se ainda não existirem)
 Base.metadata.create_all(bind=engine)
