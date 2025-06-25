@@ -43,6 +43,7 @@ from models.product import db, Product
 from database import engine
 from models import Base
 from routes.media_routes import media_bp
+from routes.ai_routes import ai_bp
 
 app = Flask(__name__)
 
@@ -54,6 +55,7 @@ db.init_app(app)
 Base.metadata.create_all(bind=engine)
 app.register_blueprint(product_bp)
 app.register_blueprint(media_bp)
+app.register_blueprint(ai_bp)
 
 with app.app_context():
     db.create_all()  # ✅ Cria a tabela 'products' se não existir

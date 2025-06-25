@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Demo IA</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #messages { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: auto; }
+        #messages div { margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+<h1>Integração com IA</h1>
+<form id="ingest-form">
+    <input type="text" id="url-input" placeholder="Cole a URL" size="50" required>
+    <button type="submit">Ingerir URL</button>
+</form>
+<p id="ingest-status"></p>
+<hr>
+<div id="chat">
+    <div id="messages"></div>
+    <input type="text" id="question-input" placeholder="Digite sua pergunta" size="50">
+    <button id="send-btn">Enviar</button>
+</div>
+<script>
+const statusEl = document.getElementById('ingest-status');
+
+document.getElementById('ingest-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const url = document.getElementById('url-input').value;
+    const res = await fetch('/ingest-url', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url})});
+    const data = await res.json();
+    statusEl.textContent = data.message || data.error || 'OK';
+};
+
+document.getElementById('send-btn').onclick = async () => {
+    const input = document.getElementById('question-input');
+    const question = input.value.trim();
+    if(!question) return;
+    addMessage('Você: ' + question);
+    input.value = '';
+    const res = await fetch('/query', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({question})});
+    const data = await res.json();
+    addMessage('Bot: ' + (data.answer || JSON.stringify(data)));
+};
+
+function addMessage(text){
+    const div = document.createElement('div');
+    div.textContent = text;
+    document.getElementById('messages').appendChild(div);
+    const messages = document.getElementById('messages');
+    messages.scrollTop = messages.scrollHeight;
+}
+</script>
+</body>
+</html>

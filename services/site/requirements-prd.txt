@@ -19,6 +19,7 @@ minio>=7.1,<8.0
 # 🤖 Scraping e automação
 # ==============================
 playwright>=1.42,<2.0
+requests>=2.31,<3.0
 
 # ==============================
 # 🌐 Servidor de produção (opcional)
