@@ -107,13 +107,17 @@ prd-up-ghcr:  ## Sobe produção usando imagem do GHCR
 # 📦 Docker Hub / GHCR
 # =====================
 
+# 🔐 Login no GitHub Container Registry
+docker-login-ghcr:
+	# echo "$$GITHUB_TOKEN" | docker login ghcr.io -u $$GITHUB_USERNAME --password-stdin
+
 docker-login:  ## Login no GitHub Container Registry (GHCR)
 	echo $(GHCR_TOKEN) | docker login ghcr.io -u $(GHCR_USER) --password-stdin
 
 build-prd-site:  ## Build da imagem de produção
 	docker build -t $(IMAGE_NAME) ./services/site
 
-push-ghcr-site: docker-login build-prd-site  ## Push da imagem para GHCR
+push-ghcr-site: docker-login-ghcr build-prd-site  ## Push da imagem para GHCR
 	docker push $(IMAGE_NAME)
 
 pull-prd-ghcr:  ## Puxa a imagem de produção do GHCR
