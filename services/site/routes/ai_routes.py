@@ -5,8 +5,10 @@ import os
 ai_bp = Blueprint('ai_bp', __name__)
 
 # Endpoints dos microserviços
-INGESTION_URL = os.getenv('INGESTION_SERVICE_URL', 'http://localhost:5003/ingest_from_url')
-RETRIEVAL_URL = os.getenv('RETRIEVAL_SERVICE_URL', 'http://localhost:5004/query')
+INGESTION_URL = 'http://ingestion_service:5003/ingest_from_url'
+RETRIEVAL_URL = 'http://retrieval_service:5004/query'
+
+
 
 # Futuras melhorias:
 # - Substituir requests por gRPC para comunicação mais performática
@@ -23,14 +25,14 @@ def ai_page():
 
 def forward_to_ingestion_service(url: str):
     """Encaminha URL para o microserviço de ingesão."""
-    resp = requests.post(INGESTION_URL, json={'url': url}, timeout=5)
+    resp = requests.post(INGESTION_URL, json={'url': url}, timeout=150)
     resp.raise_for_status()
     return resp.json()
 
 
 def forward_to_retrieval_service(question: str):
     """Encaminha pergunta para o microserviço de consulta."""
-    resp = requests.post(RETRIEVAL_URL, json={'question': question}, timeout=5)
+    resp = requests.post(RETRIEVAL_URL, json={'question': question}, timeout=150)
     resp.raise_for_status()
     return resp.json()
 

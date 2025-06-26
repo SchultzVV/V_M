@@ -1,4 +1,4 @@
-version: "3.8"
+version: "3.9"
 
 services:
   site:
@@ -22,6 +22,10 @@ services:
     depends_on:
       - db
       - minio
+      - ingestion_service
+      - retrieval_service
+    ports:
+      - "5000:5000"
     networks:
       - backend
 
@@ -55,10 +59,64 @@ services:
     networks:
       - backend
 
-networks:
-  backend:
-    driver: bridge
+  vector_db:
+    image: qdrant/qdrant
+    container_name: vector_db
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./vector_db:/qdrant/storage
+    restart: always
+    networks:
+      - backend
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: always
+    networks:
+      - backend
+
+  ingestion_service:
+    image: ghcr.io/schultzvv/hsmart-ingestion_service:latest
+    container_name: ingestion_service
+    ports:
+      - "5003:5003"
+    volumes:
+      - ./shared:/app/shared
+    depends_on:
+      - vector_db
+      - redis
+    restart: always
+    env_file: .env
+    environment:
+      - DEBUG=${DEBUG}
+    networks:
+      - backend
+
+  retrieval_service:
+    image: ghcr.io/schultzvv/hsmart-retrieval_service:latest
+    container_name: retrieval_service
+    ports:
+      - "5004:5004"
+    volumes:
+      - ./shared:/app/shared
+    depends_on:
+      - vector_db
+      - redis
+    restart: always
+    env_file: .env
+    environment:
+      - DEBUG=${DEBUG}
+    networks:
+      - backend
 
 volumes:
   pgdata:
   minio_data:
+
+networks:
+  backend:
+    driver: bridge
