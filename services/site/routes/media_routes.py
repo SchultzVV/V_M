@@ -37,10 +37,22 @@ minio_client = Minio(
 @media_bp.route("/media/<path:filename>")
 def serve_image(filename):
     token = request.args.get("token")
-    if token != "secreto123":
+    if token != ACCESS_TOKEN:
         return abort(403)
 
-    bucket = "amazon"
+    try:
+        obj = minio_client.get_object(MINIO_BUCKET, filename)
+        return send_file(io.BytesIO(obj.read()), download_name=filename, mimetype="image/png")
+    except S3Error:
+        return abort(404)
+
+
+@media_bp.route("/imagens/<bucket>/<path:filename>")
+def serve_image_bucket(bucket, filename):
+    token = request.args.get("token")
+    if token != ACCESS_TOKEN:
+        return abort(403)
+
     try:
         obj = minio_client.get_object(bucket, filename)
         return send_file(io.BytesIO(obj.read()), download_name=filename, mimetype="image/png")

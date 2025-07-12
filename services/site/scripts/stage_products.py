@@ -13,7 +13,9 @@ API_ENDPOINT = "http://localhost:5000/add_product"
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minio")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minio123")
-MINIO_PUBLIC_ENDPOINT = os.getenv("MINIO_PUBLIC_ENDPOINT", f"http://{MINIO_ENDPOINT}")
+
+# Caminho base para servir as imagens via proxy do site
+MEDIA_PROXY_BASE = os.getenv("MEDIA_PROXY_BASE", "http://localhost:5000")
 
 minio_client = Minio(
     MINIO_ENDPOINT,
@@ -63,7 +65,9 @@ def upload_images(bucket_name, local_paths):
 
         try:
             minio_client.fput_object(bucket_name, object_name, path)
-            public_url = f"{MINIO_PUBLIC_ENDPOINT}/{bucket_name}/{object_name}"
+
+            public_url = f"{MEDIA_PROXY_BASE}/imagens/{bucket_name}/{object_name}"
+
             urls.append(public_url)
             print(f"✅ Upload: {public_url}")
         except S3Error as e:

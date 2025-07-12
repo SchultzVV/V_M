@@ -38,6 +38,15 @@ curl -X POST http://localhost:5000/query -H 'Content-Type: application/json' -d 
 make test-unit
 ```
 
+### Proxy de imagens
+
+O script `stage_products.py` agora gera URLs de imagens que passam pelas rotas
+`/media` ou `/imagens` do próprio site. O caminho base utilizado para construir
+esses links é definido pela variável `MEDIA_PROXY_BASE` no `.env`. Em ambientes
+de produção configure-a com o domínio público da aplicação para evitar o uso de
+`localhost` nas URLs. O nome do bucket utilizado em cada upload vem do arquivo
+JSON gerado pelo script `generate_staging_json.py`.
+
 ### Escalabilidade futura
 
 - Substituir `requests` por **gRPC** para comunicação entre serviços.
