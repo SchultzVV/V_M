@@ -180,3 +180,14 @@ help: ## Mostra esta ajuda
 
 check-stage:
 	@$(MAKE) run-py script=scripts/check_stage_images.py
+
+prune:clean-images
+	docker system prune -f --volumes
+
+clean-images:
+	@if [ -n "$$(docker images -q)" ]; then \
+		echo "🔴 Removendo todas as imagens Docker..."; \
+		docker rmi -f $$(docker images -q); \
+	else \
+		echo "✅ Nenhuma imagem para remover."; \
+	fi

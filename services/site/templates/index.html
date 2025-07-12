@@ -130,6 +130,8 @@
   <div class="grid" id="products-container"></div>
 
   <script>
+    const FALLBACK_IMG = "http://localhost:9000/fallbacks/19370112.jpg";
+
     function createProductCard(product) {
       const card = document.createElement("div");
       card.className = "card";
@@ -143,6 +145,13 @@
         imgEl.src = img;
         imgEl.alt = product.title;
         imgEl.className = "carousel-image" + (idx === 0 ? "" : " hidden");
+
+        // Adiciona fallback
+        imgEl.onerror = () => {
+          console.warn("Imagem falhou, aplicando fallback:", img);
+          imgEl.src = FALLBACK_IMG;
+        };
+
         carousel.appendChild(imgEl);
       });
 
@@ -228,6 +237,7 @@
     })
     .then(res => res.json())
     .then(products => {
+      console.log("🔍 Produtos recebidos:", products);
       const container = document.getElementById("products-container");
       products.forEach(p => {
         const card = createProductCard(p);

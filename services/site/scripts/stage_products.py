@@ -1,5 +1,3 @@
-# scripts/stage_products.py
-
 import os
 import json
 import requests
@@ -24,6 +22,25 @@ minio_client = Minio(
     secure=False
 )
 
+# Permissão pública: política do tipo download
+DOWNLOAD_POLICY = {
+    "Version": "2012-10-17",
+    "Statement": [{
+        "Effect": "Allow",
+        "Principal": {"AWS": ["*"]},
+        "Action": ["s3:GetObject"],
+        "Resource": ["arn:aws:s3:::{bucket}/*"]
+    }]
+}
+
+def set_bucket_public(bucket_name):
+    policy = json.dumps(DOWNLOAD_POLICY).replace("{bucket}", bucket_name)
+    try:
+        minio_client.set_bucket_policy(bucket_name, policy)
+        print(f"🔓 Bucket `{bucket_name}` agora é público (download)")
+    except S3Error as e:
+        print(f"⚠️  Falha ao definir política pública: {e}")
+
 def upload_images(bucket_name, local_paths):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     urls = []
@@ -31,6 +48,7 @@ def upload_images(bucket_name, local_paths):
     try:
         if not minio_client.bucket_exists(bucket_name):
             minio_client.make_bucket(bucket_name)
+            set_bucket_public(bucket_name)
     except S3Error as e:
         print(f"[ERRO] Bucket: {e}")
         return []
@@ -53,7 +71,29 @@ def upload_images(bucket_name, local_paths):
 
     return urls
 
-# Leitura de arquivos processados
+def ensure_fallback_bucket():
+    fallback_dir = "services/site/uploads/fallback_img"
+    bucket = "fallbacks"
+
+    try:
+        if not minio_client.bucket_exists(bucket):
+            minio_client.make_bucket(bucket)
+            set_bucket_public(bucket)
+
+        for img in os.listdir(fallback_dir):
+            path = os.path.join(fallback_dir, img)
+            if os.path.isfile(path):
+                try:
+                    minio_client.fput_object(bucket, img, path)
+                    print(f"✅ Fallback enviado: {bucket}/{img}")
+                except S3Error as e:
+                    print(f"❌ Falha fallback {img}: {e}")
+    except Exception as e:
+        print(f"⚠️  Erro ao preparar bucket fallback: {e}")
+
+# --- Execução principal ---
+ensure_fallback_bucket()
+
 if os.path.exists(PROCESSED_FILE):
     with open(PROCESSED_FILE, "r") as f:
         processed_files = set(f.read().splitlines())
@@ -72,21 +112,18 @@ for filename in os.listdir(STAGING_DIR):
         with open(path, "r") as f:
             data = json.load(f)
 
-        # Valida e coleta info
         platform = data["platform"]
         local_imgs = data.get("images_local", [])
 
-        # Upload imagens
         urls = upload_images(platform, local_imgs)
 
         if not urls:
             print(f"[ERRO] Sem imagens válidas: {filename}")
             continue
 
-        data["images"] = urls  # Substitui campo
+        data["images"] = urls
         data.pop("images_local", None)
 
-        # Envia para o endpoint
         resp = requests.post(API_ENDPOINT, json=data)
 
         if resp.status_code == 201:
@@ -98,7 +135,6 @@ for filename in os.listdir(STAGING_DIR):
     except Exception as e:
         print(f"[FALHA] {filename}: {str(e)}")
 
-# Atualiza .processed
 if newly_processed:
     with open(PROCESSED_FILE, "a") as f:
         for name in newly_processed:

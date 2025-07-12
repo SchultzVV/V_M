@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String
+from sqlalchemy import Column, String, Text
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -10,5 +10,5 @@ class Product(Base):
     title = Column(String)
     price = Column(String)
     old_price = Column(String)
-    image = Column(String)
-    link = Column(String)
+    image = Column(Text)
+    link = Column(Text)

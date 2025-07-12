@@ -73,12 +73,6 @@ def add_product():
             return jsonify({"error": f"Caminho de imagem inválido: {img_path}"}), 400
         image_paths.append(img_path)
 
-    # image_paths = []
-    # for img_path in data["images"]:
-    #     if not isinstance(img_path, str) or not img_path.startswith("/imagens/"):
-    #         return jsonify({"error": f"Caminho de imagem inválido: {img_path}"}), 400
-    #     image_paths.append(img_path)
-
     try:
         product = save_product(
             id=data.get("id"),
@@ -102,3 +96,35 @@ def api_products():
         return jsonify([p.to_dict() for p in products])
     except Exception as e:
         return jsonify({"error": f"Erro ao obter produtos: {str(e)}"}), 500
+
+
+@product_bp.route("/admin")
+def admin_panel():
+    return render_template("admin.html")
+
+
+from models.product import db
+
+@product_bp.route("/api/list_ids", methods=["GET"])
+def list_product_ids():
+    try:
+        products = get_all_products()
+        data = [{"id": p.id, "title": p.title, "price": p.price} for p in products]
+        return jsonify(data), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@product_bp.route("/api/delete/<product_id>", methods=["DELETE"])
+def delete_product(product_id):
+    try:
+        product = Product.query.get(product_id)
+        if not product:
+            return jsonify({"error": "Produto não encontrado"}), 404
+
+        db.session.delete(product)
+        db.session.commit()
+        return jsonify({"message": f"Produto {product_id} removido com sucesso."}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"Erro ao deletar: {str(e)}"}), 500
