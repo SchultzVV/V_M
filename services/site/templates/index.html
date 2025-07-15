@@ -143,15 +143,20 @@
       product.images.forEach((img, idx) => {
         const imgEl = document.createElement("img");
 
-        try {
-          const url = new URL(img);
-          const parts = url.pathname.split("/").filter(Boolean);
-          const bucket = parts[0];
-          const filename = parts.slice(1).join("/");
-          imgEl.src = `/media/${bucket}/${filename}`;
-        } catch (e) {
-          console.warn("URL inválida:", img);
-          imgEl.src = FALLBACK_IMG;
+        if (img.startsWith("/media/")) {
+          // Imagem já está no formato proxied
+          imgEl.src = img;
+        } else {
+          try {
+            const url = new URL(img, window.location.origin);
+            const parts = url.pathname.split("/").filter(Boolean);
+            const bucket = parts[0];
+            const filename = parts.slice(1).join("/");
+            imgEl.src = `/media/${bucket}/${filename}`;
+          } catch (e) {
+            console.warn("URL inválida:", img);
+            imgEl.src = FALLBACK_IMG;
+          }
         }
 
         imgEl.alt = product.title;
