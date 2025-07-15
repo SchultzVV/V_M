@@ -12,3 +12,6 @@ class Product(Base):
     old_price = Column(String)
     image = Column(Text)
     link = Column(Text)
+
+
+    
