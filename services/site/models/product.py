@@ -1,14 +1,14 @@
-# models/product.py
 import uuid
-from flask_sqlalchemy import SQLAlchemy
 import json
+from flask_sqlalchemy import SQLAlchemy
+from urllib.parse import urlparse
+import os
 
 db = SQLAlchemy()
 
 class Product(db.Model):
     __tablename__ = "products"
 
-    # id = db.Column(db.Integer, primary_key=True)
     id = db.Column(db.String(50), primary_key=True, default=lambda: str(uuid.uuid4()))
     title = db.Column(db.String(255), nullable=False)
     price = db.Column(db.String(50), nullable=False)
@@ -17,31 +17,36 @@ class Product(db.Model):
     link = db.Column(db.Text, nullable=False)
 
     def to_dict(self):
-        from os import getenv
-        token = getenv("MEDIA_TOKEN", "secreto123")
+        token = os.getenv("MEDIA_TOKEN", "secreto123")
         try:
-            # Corrige caso seja string JSON ou lista já desserializada
+            # Garante que é uma lista de strings
             images = json.loads(self.image) if isinstance(self.image, str) else self.image
             if not isinstance(images, list):
                 images = [images]
         except Exception as e:
             print(f"[to_dict] erro ao carregar imagens: {e}")
             images = []
-        # try:
-        #     images = json.loads(self.image)
-        # except:
-        #     images = [self.image]
-    
+
         safe_images = []
-        # # for img_url in images:
-        # #     filename = img_url.split("/")[-1]
-        # #     safe_images.append(f"/media/{filename}?token={token}")
-    
+        for img_url in images:
+            try:
+                parsed = urlparse(img_url)
+                parts = parsed.path.strip("/").split("/", 1)
+                if len(parts) != 2:
+                    print(f"[to_dict] URL inválida: {img_url}")
+                    continue
+                bucket, filename = parts
+                proxy_url = f"/media/{bucket}/{filename}?token={token}"
+                safe_images.append(proxy_url)
+            except Exception as e:
+                print(f"[to_dict] erro ao processar imagem: {e}")
+                continue
+
         return {
             "id": self.id,
             "title": self.title,
             "price": self.price,
             "oldPrice": self.old_price,
             "link": self.link,
-            "images": images
+            "images": safe_images
         }

@@ -3,7 +3,8 @@
 import os
 import json
 import shutil
-from flask import Blueprint, request, jsonify, render_template
+import requests
+from flask import Blueprint, request, jsonify, render_template, Response
 from werkzeug.utils import secure_filename
 from models.product import Product
 from services.product_service import save_product, get_all_products
@@ -97,6 +98,17 @@ def api_products():
     except Exception as e:
         return jsonify({"error": f"Erro ao obter produtos: {str(e)}"}), 500
 
+@product_bp.route("/minio_proxy/<bucket>/<path:filename>")
+def minio_proxy(bucket, filename):
+    url = f"http://localhost:9000/{bucket}/{filename}"
+    try:
+        response = requests.get(url, stream=True, timeout=5)
+        response.raise_for_status()
+        content_type = response.headers.get("Content-Type", "image/jpeg")
+        return Response(response.content, content_type=content_type)
+    except Exception as e:
+        print(f"❌ Erro ao buscar imagem do MinIO: {e}")
+        return Response("Imagem não encontrada", status=404)
 
 @product_bp.route("/admin")
 def admin_panel():
