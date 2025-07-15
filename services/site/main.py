@@ -28,7 +28,7 @@ from routes.ai_routes import ai_bp
 
 app = Flask(__name__)
 
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("POSTGRES_URI") or os.environ.get("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 # Cria as tabelas no banco de dados (se ainda não existirem)
