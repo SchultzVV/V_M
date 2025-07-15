@@ -72,7 +72,7 @@ def upload_images(bucket_name, local_paths):
     return urls
 
 def ensure_fallback_bucket():
-    fallback_dir = "services/site/uploads/fallback_img"
+    fallback_dir = "uploads/fallback_img"
     bucket = "fallbacks"
 
     try:
