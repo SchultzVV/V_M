@@ -1,3 +1,5 @@
 .env
 .env.*
 vector_db/
+__pycache__
+/services/site/__pycache__/
