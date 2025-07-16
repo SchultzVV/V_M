@@ -35,6 +35,10 @@
       border-radius: 16px;
       background: #111;
       transition: transform 0.3s;
+      height: 300px; /* Altura fixa para manter as imagens uniformes */
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between; /* Garante que o botão fique fora da imagem */
     }
 
     .card:hover {
@@ -105,8 +109,10 @@
     }
 
     a.button {
+      margin: 10px auto 15px auto;
+      max-width: 90%;
       display: block;
-      margin: 10px;
+      /* margin: 10px; */
       text-align: center;
       background: #ff4b5c;
       color: white;
@@ -130,6 +136,8 @@
   <div class="grid" id="products-container"></div>
 
   <script>
+    const FALLBACK_IMG = "/media/fallbacks/aa.png";
+
     function createProductCard(product) {
       const card = document.createElement("div");
       card.className = "card";
@@ -138,18 +146,41 @@
       carousel.className = "carousel";
       carousel.dataset.index = 0;
 
-      const fallbackImg = "http://127.0.0.1:9000/fallbacks/19370112.jpg";
-
       product.images.forEach((img, idx) => {
         const imgEl = document.createElement("img");
-        imgEl.src = img;
+
+        // try {
+        //   const url = new URL(img);
+        //   const parts = url.pathname.split("/").filter(Boolean);
+        //   const bucket = parts[0];
+        //   const filename = parts.slice(1).join("/");
+        //   imgEl.src = `/media/${bucket}/${filename}`;
+        // } catch (e) {
+        //   console.warn("URL inválida:", img);
+        //   imgEl.src = FALLBACK_IMG;
+        // }
+        if (img.startsWith("/media/")) {
+          // Imagem já está no formato proxied
+          imgEl.src = img;
+        } else {
+          try {
+            const url = new URL(img, window.location.origin);
+            const parts = url.pathname.split("/").filter(Boolean);
+            const bucket = parts[0];
+            const filename = parts.slice(1).join("/");
+            imgEl.src = `/media/${bucket}/${filename}`;
+          } catch (e) {
+            console.warn("URL inválida:", img);
+            imgEl.src = FALLBACK_IMG;
+          }
+        }
+
         imgEl.alt = product.title;
         imgEl.className = "carousel-image" + (idx === 0 ? "" : " hidden");
 
-        // Fallback se imagem não carregar
         imgEl.onerror = () => {
-          console.warn(`🔁 Fallback ativado para imagem: ${img}`);
-          imgEl.src = fallbackImg;
+          console.warn("Imagem falhou, aplicando fallback:", imgEl.src);
+          imgEl.src = FALLBACK_IMG;
         };
 
         carousel.appendChild(imgEl);
@@ -201,7 +232,7 @@
       link.href = product.link;
       link.target = "_blank";
       link.className = "button";
-      link.innerText = "Comprar";
+      link.innerText = "Ver Produto";
 
       card.appendChild(carousel);
       card.appendChild(overlay);
@@ -237,6 +268,7 @@
     })
     .then(res => res.json())
     .then(products => {
+      console.log("🔍 Produtos recebidos:", products);
       const container = document.getElementById("products-container");
       products.forEach(p => {
         const card = createProductCard(p);

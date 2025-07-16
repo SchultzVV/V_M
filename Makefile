@@ -58,11 +58,23 @@ serve-ngrok:  ## Inicia túnel ngrok para acessar localmente via web
 	@pkill ngrok || true
 	@echo "🔧 Subindo containers Docker..."
 	@$(COMPOSE) up -d
-	@echo "🚀 Iniciando túnel com ngrok..."
-	@ngrok http 5000 > /dev/null &
+	@echo "🚀 Iniciando túnel com ngrok (sem tela de aviso)..."
+	@ngrok http --request-header-add="ngrok-skip-browser-warning:true" 5000 > /dev/null &
 	@sleep 3
 	@echo "🌐 URL pública gerada:"
 	@curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+
+
+# serve-ngrok:  ## Inicia túnel ngrok para acessar localmente via web
+# 	@echo "🛑 Encerrando ngrok anterior, se existir..."
+# 	@pkill ngrok || true
+# 	@echo "🔧 Subindo containers Docker..."
+# 	@$(COMPOSE) up -d
+# 	@echo "🚀 Iniciando túnel com ngrok..."
+# 	@ngrok http 5000 > /dev/null &
+# 	@sleep 3
+# 	@echo "🌐 URL pública gerada:"
+# 	@curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
 
 definitive-serve-ngrok:  ## Inicia túnel ngrok (modo gratuito, link aleatório)
 	@echo "🛑 Encerrando ngrok anterior, se existir..."
