@@ -19,17 +19,9 @@ h1, p {
   flex-direction: column;
   gap: 20px;
   padding: 25px;
-  max-width: 600px; /* ou 100% */
+  max-width: 600px;
   margin: auto;
 }
-/* .grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
-  gap: 12px;
-  padding: 25px;
-  max-width: 1200px;
-  margin: auto;
-} */
 
 .card {
   position: relative;
@@ -54,12 +46,11 @@ h1, p {
 }
 
 .carousel-image {
-  width: 100%;
-  height: 100%;
-  /* object-fit: cover; */
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   display: block;
-  margin: auto;/* centraliza*/
+  margin: auto;
 }
 
 .carousel-image.hidden {
@@ -70,7 +61,7 @@ h1, p {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 100px; /* aumenta a área clicável horizontal */
+  width: 100px;
   background-color: rgba(0,0,0,0.3);
   border: none;
   color: white;
@@ -94,27 +85,6 @@ h1, p {
 .carousel-btn:hover {
   background-color: rgba(0,0,0,0.5);
 }
-
-/* .carousel-btn {
-  position: absolute;
-  top: 40%;
-  background-color: rgba(0,0,0,0.5);
-  border: none;
-  color: white;
-  font-size: 1.5em;
-  padding: 0 10px;
-  cursor: pointer;
-  z-index: 1;
-  border-radius: 4px;
-} */
-/* 
-.carousel-btn.left {
-  left: 5px;
-}
-
-.carousel-btn.right {
-  right: 5px;
-} */
 
 .overlay {
   position: relative;
@@ -163,9 +133,45 @@ h1, p {
   background: #e84350;
 }
 
-/* .site-label {
+.site-label {
   margin-top: 4px;
   font-size: 12px;
   color: #bbb;
   text-align: center;
+}
+/* .spacer {
+  height: 50px; 
 } */
+ 
+/* RESPONSIVO: mobile */
+@media (max-width: 600px) {
+  .grid {
+    padding: 15px;
+    max-width: 95%;
+  }
+
+  .card {
+    height: auto;
+  }
+
+  .carousel {
+    height: auto;
+  }
+
+  .carousel-btn {
+    width: 60px;
+    font-size: 1.5em;
+  }
+
+  .overlay .title,
+  .overlay .price,
+  .overlay .old-price,
+  .overlay .discount {
+    font-size: 14px;
+  }
+
+  .button {
+    font-size: 16px;
+    padding: 12px;
+  }
+}
