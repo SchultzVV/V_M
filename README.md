@@ -38,6 +38,22 @@ curl -X POST http://localhost:5000/query -H 'Content-Type: application/json' -d 
 make test-unit
 ```
 
+## Product staging pipeline
+
+```mermaid
+%% see docs/pipeline.mmd for an editable version
+flowchart LR
+    A[generate_staging_json.py] --> B[Staging JSON]
+    B --> C[stage_products.py]
+    C --> D[Upload images to MinIO]
+    D --> E[POST /add_product]
+    E --> F[add_product route]
+    F --> G[save_product()]
+    G --> H[(PostgreSQL)]
+    H --> I[/api/products]
+    I --> J[Frontend]
+```
+
 ### Escalabilidade futura
 
 - Substituir `requests` por **gRPC** para comunicação entre serviços.
