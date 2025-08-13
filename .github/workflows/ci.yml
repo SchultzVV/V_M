@@ -39,8 +39,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Push to GHCR
-        run: make push-ghcr-site
+      - name: Start site with ngrok
+        run: make serve-ngrok
 
   deploy-render:
     needs: push-image
