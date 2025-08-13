@@ -53,6 +53,9 @@ jobs:
         tar -xvzf ngrok-v3-stable-linux-amd64.tgz
         sudo mv ngrok /usr/local/bin
 
+    - name: Configure ngrok authtoken
+      run: ngrok config add-authtoken ${{ secrets.NGROK_TKN }}
+
     - name: Start site with ngrok
       run: make serve-ngrok
 
