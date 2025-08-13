@@ -29,20 +29,50 @@ h1, p {
   border-radius: 16px;
   background: #111;
   transition: transform 0.3s;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 400px;
+}
+
+/* .card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #111;
+  transition: transform 0.3s;
   height: 500px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-}
+} */
 
 .card:hover {
   transform: scale(1.02);
 }
 
-.carousel {
+/* .carousel {
   height: 70%;
   position: relative;
   width: 100%;
+} */
+
+/* .carousel-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  margin: auto;
+} */
+.carousel {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  width: 100%;
+  padding: 10px 0;
+  box-sizing: border-box;
 }
 
 .carousel-image {
@@ -52,6 +82,7 @@ h1, p {
   display: block;
   margin: auto;
 }
+
 
 .carousel-image.hidden {
   display: none;

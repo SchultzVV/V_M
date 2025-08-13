@@ -199,6 +199,7 @@ prune:clean-images
 clean-images:
 	@if [ -n "$$(docker images -q)" ]; then \
 		echo "🔴 Removendo todas as imagens Docker..."; \
+		docker stop $$(docker ps -q); \
 		docker rmi -f $$(docker images -q); \
 	else \
 		echo "✅ Nenhuma imagem para remover."; \
