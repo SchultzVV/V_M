@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: vm-site
+    plan: free
+    env: docker
+    dockerfilePath: ./services/site/Dockerfile   # path to the Dockerfile in repo
+    startCommand: "python main.py"
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: MINIO_ENDPOINT        # supply actual value in Render dashboard
+      - key: MINIO_ACCESS_KEY
+      - key: MINIO_SECRET_KEY
+      - key: POSTGRES_URI

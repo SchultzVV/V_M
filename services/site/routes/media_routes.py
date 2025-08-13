@@ -1,6 +1,6 @@
 # routes/media_routes.py
 
-from flask import Blueprint, Response, abort
+from flask import Blueprint, Response, abort, jsonify
 from minio import Minio
 from minio.error import S3Error
 import os
@@ -34,6 +34,10 @@ def serve_image_proxy(bucket, filename):
     except S3Error as e:
         print(f"Erro ao buscar no MinIO: {e}")
         return abort(404)
+
+@media_bp.route("/media/ping")
+def ngrok_ping():
+    return jsonify({"status": "ok"})
 
 # # from flask import Blueprint, Response, jsonify
 # # from minio.error import S3Error

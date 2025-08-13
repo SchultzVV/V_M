@@ -2,135 +2,24 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>V&M - Lojinha</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      background-color: #000;
-      background-image: url('/static/bg.png');
-      background-size: cover;
-      background-position: center;
-      background-attachment: fixed;
-      background-repeat: no-repeat;
-      color: white;
-    }
-
-    h1, p {
-      text-align: center;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
-      gap: 12px;
-      padding: 25px;
-      max-width: 1200px;
-      margin: auto;
-    }
-
-    .card {
-      position: relative;
-      overflow: hidden;
-      border-radius: 16px;
-      background: #111;
-      transition: transform 0.3s;
-    }
-
-    .card:hover {
-      transform: scale(1.02);
-    }
-
-    .card img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .carousel-image.hidden {
-      display: none;
-    }
-
-    .carousel-btn {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 2em;
-      background: none;
-      border: none;
-      color: white;
-      z-index: 10;
-      cursor: pointer;
-    }
-
-    .carousel-btn.left {
-      left: 5px;
-    }
-
-    .carousel-btn.right {
-      right: 5px;
-    }
-
-    .overlay {
-      position: absolute;
-      bottom: 0;
-      width: 100%;
-      padding: 10px;
-      background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
-      box-sizing: border-box;
-    }
-
-    .overlay .title {
-      font-size: 14px;
-      font-weight: bold;
-    }
-
-    .overlay .price {
-      font-size: 13px;
-      color: #00ff99;
-    }
-
-    .overlay .old-price {
-      font-size: 12px;
-      color: #ff9999;
-      text-decoration: line-through;
-      margin-left: 8px;
-    }
-
-    .overlay .discount {
-      font-size: 12px;
-      color: yellow;
-      display: block;
-    }
-
-    a.button {
-      display: block;
-      margin: 10px;
-      text-align: center;
-      background: #ff4b5c;
-      color: white;
-      text-decoration: none;
-      padding: 10px;
-      border-radius: 10px;
-    }
-
-    a.button:hover {
-      background: #e84350;
-    }
-  </style>
+  <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-
-  <h1>V&M - Lojinha</h1>
-  <p>Produtos promocionais garimpados com bom gosto 😍</p>
-
-  <p><a class="button" href="/ai">Ir para integração IA</a></p>
+  <!-- <h1>V&M</h1> -->
+  <iframe src="/media/ping" style="display:none;" aria-hidden="true"></iframe>
+  <p style="margin-top: 60px; font-weight: bold; font-size: 50px;">
+      V&M
+  </p>
+  <p style="margin-top: 40px; font-weight: bold; font-size: 19px;">
+    Garimpamos as promoções, você só curte 😎
+  </p>
+  <!-- <p><a class="button" href="/ai">Ir para integração IA</a></p> -->
 
   <div class="grid" id="products-container"></div>
-
   <script>
-    const FALLBACK_IMG = "/media/fallbacks/19370112.jpg";
+    const FALLBACK_IMG = "/media/fallbacks/aa.png";
 
     function createProductCard(product) {
       const card = document.createElement("div");
@@ -142,26 +31,24 @@
 
       product.images.forEach((img, idx) => {
         const imgEl = document.createElement("img");
-
-        try {
-          const url = new URL(img);
-          const parts = url.pathname.split("/").filter(Boolean);
-          const bucket = parts[0];
-          const filename = parts.slice(1).join("/");
-          imgEl.src = `/media/${bucket}/${filename}`;
-        } catch (e) {
-          console.warn("URL inválida:", img);
-          imgEl.src = FALLBACK_IMG;
+        if (img.startsWith("/media/")) {
+          imgEl.src = img;
+        } else {
+          try {
+            const url = new URL(img, window.location.origin);
+            const parts = url.pathname.split("/").filter(Boolean);
+            const bucket = parts[0];
+            const filename = parts.slice(1).join("/");
+            imgEl.src = `/media/${bucket}/${filename}`;
+          } catch (e) {
+            console.warn("URL inválida:", img);
+            imgEl.src = FALLBACK_IMG;
+          }
         }
 
         imgEl.alt = product.title;
         imgEl.className = "carousel-image" + (idx === 0 ? "" : " hidden");
-
-        imgEl.onerror = () => {
-          console.warn("Imagem falhou, aplicando fallback:", imgEl.src);
-          imgEl.src = FALLBACK_IMG;
-        };
-
+        imgEl.onerror = () => imgEl.src = FALLBACK_IMG;
         carousel.appendChild(imgEl);
       });
 
@@ -213,8 +100,18 @@
       link.className = "button";
       link.innerText = "Ver Produto";
 
+      const siteLabel = document.createElement("div");
+      siteLabel.className = "site-label";
+      siteLabel.innerText = "🌐 " + product.bucketName || "Bucket";
+      siteLabel.style.textAlign = "center";
+      siteLabel.style.fontSize = "12px";
+      siteLabel.style.color = "#aaa";
+
+      
+
       card.appendChild(carousel);
       card.appendChild(overlay);
+      card.appendChild(siteLabel);  // Adiciona o nome do bucket
       card.appendChild(link);
 
       return card;
@@ -247,7 +144,6 @@
     })
     .then(res => res.json())
     .then(products => {
-      console.log("🔍 Produtos recebidos:", products);
       const container = document.getElementById("products-container");
       products.forEach(p => {
         const card = createProductCard(p);

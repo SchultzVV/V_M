@@ -52,13 +52,24 @@ def upload_images(bucket_name, local_paths):
     except S3Error as e:
         print(f"[ERRO] Bucket: {e}")
         return []
+    # passando o path de todas as imagens... nah
+    # for path in local_paths:
+    #     if not os.path.isfile(path):
+    #         print(f"⚠️  Imagem não encontrada: {path}")
+    #         continue
 
-    for path in local_paths:
+    #     filename = os.path.basename(path)
+    #     object_name = f"{timestamp}_{filename}"
+    if not os.path.isdir(local_paths):
+        print(f"❌ Pasta não encontrada: {local_paths}")
+        return urls
+    for filename in os.listdir(local_paths):
+        path = os.path.join(local_paths, filename)
         if not os.path.isfile(path):
-            print(f"⚠️  Imagem não encontrada: {path}")
-            continue
+           continue  # ignora subpastas, etc.
+        if not filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".gif")):
+           continue  # ignora arquivos que não são imagem
 
-        filename = os.path.basename(path)
         object_name = f"{timestamp}_{filename}"
 
         try:

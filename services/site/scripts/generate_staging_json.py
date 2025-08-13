@@ -12,14 +12,14 @@ def prompt_user():
     price = format_price(input("Preço atual (ex: 19.90): "))
     old_price = format_price(input("Preço antigo (ex: 49.90): "))
     link = input("Link de afiliado: ").strip()
-
-    images = []
-    print("Caminhos das imagens (ENTER vazio para encerrar):")
-    while True:
-        path = input("Imagem: ").strip()
-        if not path:
-            break
-        images.append(path)
+    images = input("Caminho da pasta de imagens: ").strip()
+    # images = []
+    # print("Caminhos das imagens (ENTER vazio para encerrar):")
+    # while True:
+        # path = input("Imagem: ").strip()
+        # if not path:
+            # break
+        # images.appesnd(path)
 
     return plataforma, title, price, old_price, images, link
 

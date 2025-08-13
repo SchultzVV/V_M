@@ -28,6 +28,7 @@ class Product(db.Model):
             images = []
 
         safe_images = []
+        bucket_name = None
         for img_url in images:
             try:
                 parsed = urlparse(img_url)
@@ -38,6 +39,8 @@ class Product(db.Model):
                 bucket, filename = parts
                 proxy_url = f"/media/{bucket}/{filename}?token={token}"
                 safe_images.append(proxy_url)
+                if not bucket_name:
+                    bucket_name = bucket  # pega o primeiro bucket válido
             except Exception as e:
                 print(f"[to_dict] erro ao processar imagem: {e}")
                 continue
@@ -48,5 +51,6 @@ class Product(db.Model):
             "price": self.price,
             "oldPrice": self.old_price,
             "link": self.link,
-            "images": safe_images
+            "images": safe_images,
+            "bucketName": bucket_name or "desconhecido"
         }

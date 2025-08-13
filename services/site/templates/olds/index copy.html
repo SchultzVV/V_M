@@ -1,46 +1,251 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <title>V&M - Lojinha</title>
-    <style>
-        body {
-            margin: 0;
-            font-family: 'Segoe UI', sans-serif;
-            background-image: url('/static/bg.png');
-            background-size: cover;
-            background-position: center;
-            color: white;
-            text-align: center;
-        }
-        .container {
-            padding: 80px 20px;
-            background-color: rgba(0, 0, 0, 0.5);
-            margin: 100px auto;
-            max-width: 600px;
-            border-radius: 20px;
-        }
-        button {
-            background-color: #ff4b5c;
-            border: none;
-            padding: 15px 30px;
-            font-size: 1.2em;
-            color: white;
-            border-radius: 12px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #e84350;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <title>V&M - Lojinha</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #000;
+      background-image: url('/static/bg.png');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      background-repeat: no-repeat;
+      color: white;
+    }
+
+    h1, p {
+      text-align: center;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(520px, 1fr));
+      gap: 12px;
+      padding: 25px;
+      max-width: 1200px;
+      margin: auto;
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 16px;
+      background: #111;
+      transition: transform 0.3s;
+    }
+
+    .card:hover {
+      transform: scale(1.02);
+    }
+
+    .card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .carousel-image.hidden {
+      display: none;
+    }
+
+    .carousel-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 2em;
+      background: none;
+      border: none;
+      color: white;
+      z-index: 10;
+      cursor: pointer;
+    }
+
+    .carousel-btn.left {
+      left: 5px;
+    }
+
+    .carousel-btn.right {
+      right: 5px;
+    }
+
+    .overlay {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+      box-sizing: border-box;
+    }
+
+    .overlay .title {
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .overlay .price {
+      font-size: 13px;
+      color: #00ff99;
+    }
+
+    .overlay .old-price {
+      font-size: 12px;
+      color: #ff9999;
+      text-decoration: line-through;
+      margin-left: 8px;
+    }
+
+    .overlay .discount {
+      font-size: 12px;
+      color: yellow;
+      display: block;
+    }
+
+    a.button {
+      display: block;
+      margin: 10px;
+      text-align: center;
+      background: #ff4b5c;
+      color: white;
+      text-decoration: none;
+      padding: 10px;
+      border-radius: 10px;
+    }
+
+    a.button:hover {
+      background: #e84350;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Bem-vindo à V&M</h1>
-        <p>Descubra produtos incríveis escolhidos com muito bom gosto!</p>
-        <a href="https://br.shp.ee/a6hM34H" target="_blank">
-            <button>Comprar agora na Shopee</button>
-        </a>
-    </div>
+
+  <h1>V&M - Lojinha</h1>
+  <p>Produtos promocionais garimpados com bom gosto 😍</p>
+
+  <p><a class="button" href="/ai">Ir para integração IA</a></p>
+
+  <div class="grid" id="products-container"></div>
+
+  <script>
+    function createProductCard(product) {
+      const card = document.createElement("div");
+      card.className = "card";
+
+      const carousel = document.createElement("div");
+      carousel.className = "carousel";
+      carousel.dataset.index = 0;
+
+      const fallbackImg = "http://127.0.0.1:9000/fallbacks/19370112.jpg";
+
+      product.images.forEach((img, idx) => {
+        const imgEl = document.createElement("img");
+        imgEl.src = img;
+        imgEl.alt = product.title;
+        imgEl.className = "carousel-image" + (idx === 0 ? "" : " hidden");
+
+        // Fallback se imagem não carregar
+        imgEl.onerror = () => {
+          console.warn(`🔁 Fallback ativado para imagem: ${img}`);
+          imgEl.src = fallbackImg;
+        };
+
+        carousel.appendChild(imgEl);
+      });
+
+      if (product.images.length > 1) {
+        const btnPrev = document.createElement("button");
+        btnPrev.innerHTML = "‹";
+        btnPrev.className = "carousel-btn left";
+        btnPrev.onclick = () => prevImage(btnPrev);
+
+        const btnNext = document.createElement("button");
+        btnNext.innerHTML = "›";
+        btnNext.className = "carousel-btn right";
+        btnNext.onclick = () => nextImage(btnNext);
+
+        carousel.appendChild(btnPrev);
+        carousel.appendChild(btnNext);
+      }
+
+      const overlay = document.createElement("div");
+      overlay.className = "overlay";
+
+      const title = document.createElement("div");
+      title.className = "title";
+      title.innerText = product.title;
+
+      const price = document.createElement("span");
+      price.className = "price";
+      price.innerText = product.price;
+
+      const oldPrice = document.createElement("span");
+      oldPrice.className = "old-price";
+      oldPrice.innerText = product.oldPrice || "";
+
+      const discount = document.createElement("span");
+      discount.className = "discount";
+      if (product.oldPrice && parseFloat(product.oldPrice.replace("R$", "").replace(",", ".")) > parseFloat(product.price.replace("R$", "").replace(",", "."))) {
+        const discountVal = Math.round((1 - parseFloat(product.price.replace("R$", "").replace(",", ".")) / parseFloat(product.oldPrice.replace("R$", "").replace(",", "."))) * 100);
+        discount.innerText = discountVal + "% de desconto!";
+      }
+
+      overlay.appendChild(title);
+      overlay.appendChild(price);
+      overlay.appendChild(oldPrice);
+      if (discount.innerText) overlay.appendChild(discount);
+
+      const link = document.createElement("a");
+      link.href = product.link;
+      link.target = "_blank";
+      link.className = "button";
+      link.innerText = "Comprar";
+
+      card.appendChild(carousel);
+      card.appendChild(overlay);
+      card.appendChild(link);
+
+      return card;
+    }
+
+    function nextImage(btn) {
+      const carousel = btn.closest(".carousel");
+      const images = carousel.querySelectorAll(".carousel-image");
+      let index = parseInt(carousel.dataset.index);
+      images[index].classList.add("hidden");
+      index = (index + 1) % images.length;
+      images[index].classList.remove("hidden");
+      carousel.dataset.index = index;
+    }
+
+    function prevImage(btn) {
+      const carousel = btn.closest(".carousel");
+      const images = carousel.querySelectorAll(".carousel-image");
+      let index = parseInt(carousel.dataset.index);
+      images[index].classList.add("hidden");
+      index = (index - 1 + images.length) % images.length;
+      images[index].classList.remove("hidden");
+      carousel.dataset.index = index;
+    }
+
+    fetch("/api/products", {
+      headers: {
+        "ngrok-skip-browser-warning": "true"
+      }
+    })
+    .then(res => res.json())
+    .then(products => {
+      const container = document.getElementById("products-container");
+      products.forEach(p => {
+        const card = createProductCard(p);
+        container.appendChild(card);
+      });
+    })
+    .catch(err => {
+      console.error("Erro ao carregar produtos:", err);
+    });
+  </script>
 </body>
 </html>

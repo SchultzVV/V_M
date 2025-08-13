@@ -1,67 +1,208 @@
 body {
-  font-family: 'Segoe UI', sans-serif;
-  background: #fdf6f0;
-  color: #333;
   margin: 0;
-  padding: 0;
-  display: flex;
-  height: 100vh;
-  justify-content: center;
-  align-items: center;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #000;
+  background-image: url('/static/bg.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  color: white;
 }
 
-.container {
+h1, p {
   text-align: center;
-  padding: 2rem;
-  border-radius: 12px;
-  background-color: #fff;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 25px;
+  max-width: 600px;
+  margin: auto;
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #111;
+  transition: transform 0.3s;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 400px;
+}
+
+/* .card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #111;
+  transition: transform 0.3s;
+  height: 500px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+} */
+
+.card:hover {
+  transform: scale(1.02);
+}
+
+/* .carousel {
+  height: 70%;
+  position: relative;
+  width: 100%;
+} */
+
+/* .carousel-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  margin: auto;
+} */
+.carousel {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  width: 100%;
+  padding: 10px 0;
+  box-sizing: border-box;
+}
+
+.carousel-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  margin: auto;
+}
+
+
+.carousel-image.hidden {
+  display: none;
+}
+
+.carousel-btn {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100px;
+  background-color: rgba(0,0,0,0.3);
+  border: none;
+  color: white;
+  font-size: 2em;
+  cursor: pointer;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.carousel-btn.left {
+  left: 0;
+}
+
+.carousel-btn.right {
+  right: 0;
+}
+
+.carousel-btn:hover {
+  background-color: rgba(0,0,0,0.5);
+}
+
+.overlay {
+  position: relative;
+  padding: 10px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+  box-sizing: border-box;
+}
+
+.overlay .title {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.overlay .price {
+  font-size: 18px;
+  font-weight: bold;
+  color: #00ff62ef;
+}
+
+.overlay .old-price {
+  font-size: 12px;
+  color: #ff9999;
+  text-decoration: line-through;
+  margin-left: 8px;
+}
+
+.overlay .discount {
+  font-size: 12px;
+  color: yellow;
+  display: block;
 }
 
 .button {
-  display: inline-block;
-  margin-top: 1rem;
-  padding: 0.75rem 1.5rem;
-  background-color: #e91e63;
+  margin: 10px auto 15px auto;
+  max-width: 90%;
+  display: block;
+  text-align: center;
+  background: #ff4b5c;
   color: white;
-  border-radius: 8px;
   text-decoration: none;
-  font-weight: bold;
-  transition: background 0.3s ease;
+  padding: 10px;
+  border-radius: 10px;
 }
 
 .button:hover {
-  background-color: #c2185b;
+  background: #e84350;
 }
 
-.carousel {
-    position: relative;
-    width: 200px;
-    margin: auto;
+.site-label {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #bbb;
+  text-align: center;
 }
-.carousel-image {
-    width: 200px;
-    border-radius: 12px;
-    display: block;
-}
-.hidden {
-    display: none;
-}
-.carousel-btn {
-    position: absolute;
-    top: 40%;
-    background-color: rgba(0,0,0,0.5);
-    border: none;
-    color: white;
+/* .spacer {
+  height: 50px; 
+} */
+ 
+/* RESPONSIVO: mobile */
+@media (max-width: 600px) {
+  .grid {
+    padding: 15px;
+    max-width: 95%;
+  }
+
+  .card {
+    height: auto;
+  }
+
+  .carousel {
+    height: auto;
+  }
+
+  .carousel-btn {
+    width: 60px;
     font-size: 1.5em;
-    padding: 0 10px;
-    cursor: pointer;
-    z-index: 1;
-    border-radius: 4px;
-}
-.carousel-btn.left {
-    left: 5px;
-}
-.carousel-btn.right {
-    right: 5px;
+  }
+
+  .overlay .title,
+  .overlay .price,
+  .overlay .old-price,
+  .overlay .discount {
+    font-size: 14px;
+  }
+
+  .button {
+    font-size: 16px;
+    padding: 12px;
+  }
 }

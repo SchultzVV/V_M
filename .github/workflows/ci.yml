@@ -41,3 +41,13 @@ jobs:
 
       - name: Push to GHCR
         run: make push-ghcr-site
+
+  deploy-render:
+    needs: push-image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render Deploy
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          curl -X POST "$DEPLOY_HOOK"
