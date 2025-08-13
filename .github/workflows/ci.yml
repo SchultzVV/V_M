@@ -37,10 +37,15 @@ jobs:
       TAG: latest
 
     steps:
-      - uses: actions/checkout@v3
+    - uses: actions/checkout@v3
 
-      - name: Start site with ngrok
-        run: make serve-ngrok
+    - name: Install docker-compose
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y docker-compose
+
+    - name: Start site with ngrok
+      run: make serve-ngrok
 
   deploy-render:
     needs: push-image
