@@ -59,6 +59,7 @@ serve-ngrok:  ## Inicia túnel ngrok para acessar localmente via web
 	@echo "🔧 Subindo containers Docker..."
 	@$(COMPOSE) up -d
 	@echo "🚀 Iniciando túnel com ngrok (sem tela de aviso)..."
+# 	@ngrok http --request-header-add="ngrok-skip-browser-warning:true" --subdomain="$(NGROK_SUBDOMAIN)" 5000 > /dev/null &
 	@ngrok http --request-header-add="ngrok-skip-browser-warning:true" 5000 > /dev/null &
 	@sleep 60
 	@echo "🌐 URL pública gerada:"
