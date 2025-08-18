@@ -125,6 +125,7 @@ for filename in os.listdir(STAGING_DIR):
 
         platform = data["platform"]
         local_imgs = data.get("images_local", [])
+        tag = data.get("tag", "geral")  # Pega a tag do JSON ou usa "geral" como padrão
 
         urls = upload_images(platform, local_imgs)
 
@@ -134,11 +135,21 @@ for filename in os.listdir(STAGING_DIR):
 
         data["images"] = urls
         data.pop("images_local", None)
+        
+        # Prepara o payload com a tag
+        payload = {
+            "title": data["title"],
+            "price": data["price"], 
+            "oldPrice": data["oldPrice"],
+            "images": data["images"],
+            "link": data["link"],
+            "tag": tag
+        }
 
-        resp = requests.post(API_ENDPOINT, json=data)
+        resp = requests.post(API_ENDPOINT, json=payload)
 
         if resp.status_code == 201:
-            print(f"[✔] Produto salvo: {filename}")
+            print(f"[✔] Produto salvo: {filename} (Tag: {tag})")
             newly_processed.append(filename)
         else:
             print(f"[ERRO] {filename}: {resp.status_code} - {resp.text}")

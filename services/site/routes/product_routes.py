@@ -7,57 +7,31 @@ import requests
 from flask import Blueprint, request, jsonify, render_template, Response
 from werkzeug.utils import secure_filename
 from models.product import Product
-from services.product_service import save_product, get_all_products
+from services.product_service import save_product, get_all_products, get_products_by_tag
 
 product_bp = Blueprint("product_bp", __name__)
 
 
 @product_bp.route("/")
-def home():
-    name_filter = request.args.get("q", "").lower()
-    min_price = request.args.get("min_price")
-    max_price = request.args.get("max_price")
+def index():
+    # Exibe todos os produtos na página principal
+    products = get_all_products()
+    return render_template("index.html")
 
-    all_products = get_all_products()
-    filtered = []
+@product_bp.route("/secao1")
+def secao1():
+    # Casa & Decoração
+    return render_template("secao1.html")
 
-    for p in all_products:
-        if name_filter and name_filter not in p.title.lower():
-            continue
+@product_bp.route("/secao2")
+def secao2():
+    # Moda & Estilo
+    return render_template("secao2.html")
 
-        try:
-            price_val = float(p.price.replace("R$", "").replace(",", ".").strip())
-            old_val = float(p.old_price.replace("R$", "").replace(",", ".").strip()) if p.old_price else None
-        except:
-            continue
-
-        if min_price:
-            try:
-                if price_val < float(min_price):
-                    continue
-            except:
-                pass
-
-        if max_price:
-            try:
-                if price_val > float(max_price):
-                    continue
-            except:
-                pass
-
-        if old_val and old_val > price_val:
-            p.discount = round((1 - price_val / old_val) * 100)
-        else:
-            p.discount = None
-
-        try:
-            p.image_list = json.loads(p.image) if p.image.startswith("[") else [p.image]
-        except:
-            p.image_list = [p.image]
-
-        filtered.append(p)
-
-    return render_template("index.html", products=filtered)
+@product_bp.route("/secao3")
+def secao3():
+    # Eletrônicos
+    return render_template("secao3.html")
 
 
 @product_bp.route("/add_product", methods=["POST"])
@@ -74,6 +48,13 @@ def add_product():
             return jsonify({"error": f"Caminho de imagem inválido: {img_path}"}), 400
         image_paths.append(img_path)
 
+    # Usa a tag do JSON se disponível, senão faz auto-categorização
+    if "tag" in data and data["tag"]:
+        tags = ["geral", data["tag"]]  # Sempre inclui "geral" + a tag específica
+    else:
+        # Auto-categorização baseada no título do produto (fallback)
+        tags = auto_categorize_product(data["title"])
+
     try:
         product = save_product(
             id=data.get("id"),
@@ -81,19 +62,55 @@ def add_product():
             price=data["price"],
             old_price=data["oldPrice"],
             image=json.dumps(image_paths),
-            link=data["link"]
+            link=data["link"],
+            tags=json.dumps(tags)
         )
-        # return jsonify({"message": "Produto salvo com sucesso!", "product": product.to_dict()}), 201
         return jsonify({"message": "Produto salvo com sucesso!", "product": product}), 201
 
     except Exception as e:
         return jsonify({"error": f"Erro ao salvar produto: {str(e)}"}), 500
 
+def auto_categorize_product(title):
+    """Auto-categoriza produtos baseado no título"""
+    title_lower = title.lower()
+    tags = ["geral"]  # Todo produto tem a tag geral
+    
+    # Casa & Decoração
+    casa_keywords = ['casa', 'cozinha', 'quarto', 'sala', 'decoração', 'móvel', 'organizador', 
+                     'pote', 'utensílio', 'panela', 'frigideira', 'aspirador', 'robô', 'limpeza',
+                     'hermético', 'mantimentos', 'dispensa', 'armário', 'plástico']
+    
+    # Moda & Estilo  
+    moda_keywords = ['vestido', 'blusa', 'calça', 'sapato', 'tênis', 'bolsa', 'acessório', 
+                     'roupa', 'moda', 'multiformas', 'madrinhas', 'casamento', 'festas']
+    
+    # Eletrônicos
+    eletronicos_keywords = ['celular', 'smartphone', 'tablet', 'notebook', 'fone', 'carregador', 
+                           'cabo', 'eletrônico', 'tv', 'monitor', 'mouse', 'teclado', 'camera', 
+                           'smartwatch', 'airfryer', 'fritadeira', 'philips']
+    
+    if any(keyword in title_lower for keyword in casa_keywords):
+        tags.append("CD")
+        
+    if any(keyword in title_lower for keyword in moda_keywords):
+        tags.append("ME")
+        
+    if any(keyword in title_lower for keyword in eletronicos_keywords):
+        tags.append("E")
+    
+    return tags
+
 
 @product_bp.route("/api/products")
 def api_products():
     try:
-        products = get_all_products()
+        tag = request.args.get('tag', 'all')
+        
+        if tag == 'all':
+            products = get_all_products()
+        else:
+            products = get_products_by_tag(tag)
+            
         return jsonify([p.to_dict() for p in products])
     except Exception as e:
         return jsonify({"error": f"Erro ao obter produtos: {str(e)}"}), 500

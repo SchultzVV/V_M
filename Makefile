@@ -61,7 +61,7 @@ serve-ngrok:  ## Inicia túnel ngrok para acessar localmente via web
 	@echo "🚀 Iniciando túnel com ngrok (sem tela de aviso)..."
 # 	@ngrok http --request-header-add="ngrok-skip-browser-warning:true" --subdomain="$(NGROK_SUBDOMAIN)" 5000 > /dev/null &
 	@ngrok http --request-header-add="ngrok-skip-browser-warning:true" 5000 > /dev/null &
-	@sleep 60
+	@sleep 6
 	@echo "🌐 URL pública gerada:"
 	@curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
 
@@ -185,6 +185,13 @@ stage: ## Executa o stage_products.py dentro do site-dev
 
 prepare-products: ## Executa generate_staging_json.py dentro do site-dev
 	$(MAKE) run-py script=scripts/generate_staging_json.py
+
+migrate-tags: ## Executa a migração para adicionar coluna tags
+	@if ! docker ps | grep -q site-dev; then \
+		echo "🛠️  Container site-dev não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@docker exec -it site-dev python3 scripts/migrate_add_tags.py
 
 
 help: ## Mostra esta ajuda

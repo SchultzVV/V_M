@@ -11,7 +11,15 @@ def get_all_products():
     finally:
         db.close()
 
-def save_product(title, price, old_price, image, link, id=None):
+def get_products_by_tag(tag):
+    """Busca produtos que contenham a tag especificada"""
+    db = SessionLocal()
+    try:
+        return db.query(Product).filter(Product.tags.contains(f'"{tag}"')).all()
+    finally:
+        db.close()
+
+def save_product(title, price, old_price, image, link, id=None, tags=None):
     db = SessionLocal()
     try:
         product = Product(
@@ -20,7 +28,8 @@ def save_product(title, price, old_price, image, link, id=None):
             price=price,
             old_price=old_price,
             image=image,
-            link=link
+            link=link,
+            tags=tags or '["geral"]'  # Default para "geral" se não especificado
         )
         db.add(product)
         db.flush()
@@ -32,7 +41,8 @@ def save_product(title, price, old_price, image, link, id=None):
             "price": product.price,
             "old_price": product.old_price,
             "image": product.image,
-            "link": product.link
+            "link": product.link,
+            "tags": product.tags
         }
 
     except Exception as e:

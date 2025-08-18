@@ -15,6 +15,7 @@ class Product(db.Model):
     old_price = db.Column(db.String(50))
     image = db.Column(db.Text, nullable=False)  # JSON string com lista de imagens
     link = db.Column(db.Text, nullable=False)
+    tags = db.Column(db.Text, default='["geral"]')  # JSON string com as tags
 
     def to_dict(self):
         token = os.getenv("MEDIA_TOKEN", "secreto123")
@@ -52,5 +53,6 @@ class Product(db.Model):
             "oldPrice": self.old_price,
             "link": self.link,
             "images": safe_images,
-            "bucketName": bucket_name or "desconhecido"
+            "bucketName": bucket_name or "desconhecido",
+            "tags": json.loads(self.tags) if hasattr(self, 'tags') and self.tags else ["geral"]
         }

@@ -12,3 +12,4 @@ class Product(Base):
     old_price = Column(String)
     image = Column(Text)
     link = Column(Text)
+    tags = Column(Text)  # JSON string com as tags: ["geral", "CD", "ME", "E"]
