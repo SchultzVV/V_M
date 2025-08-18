@@ -9,6 +9,35 @@
     body {
       background-image: url('/static/background_CD.png');
     }
+    
+    .sort-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+    
+    .sort-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 25px;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    
+    .sort-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+    
+    .sort-btn.active {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
   </style>
 </head>
 <body>
@@ -22,6 +51,14 @@
   <p style="margin-top: 20px; font-weight: bold; font-size: 19px;">
     Transforme sua casa com ofertas incríveis 🏠✨
   </p>
+  
+  <!-- Botões de ordenação -->
+  <div class="sort-buttons" style="text-align: center; margin: 20px 0;">
+    <button class="sort-btn" onclick="sortProducts('price-asc')">💰 Mais Baratos!</button>
+    <button class="sort-btn" onclick="sortProducts('price-desc')">💸 Mais Caros!</button>
+    <button class="sort-btn" onclick="sortProducts('discount')">🔥 Maior Desconto!</button>
+  </div>
+  
   <div class="grid" id="products-container"></div>
   <script>
     const FALLBACK_IMG = "/media/fallbacks/aa.png";
@@ -140,6 +177,52 @@
       carousel.dataset.index = index;
     }
 
+    let allProducts = []; // Variável global para armazenar todos os produtos
+
+    function getNumericPrice(priceStr) {
+      return parseFloat(priceStr.replace("R$", "").replace(",", ".").trim());
+    }
+
+    function getDiscountPercentage(product) {
+      if (!product.oldPrice || product.oldPrice === product.price) return 0;
+      const oldPrice = getNumericPrice(product.oldPrice);
+      const currentPrice = getNumericPrice(product.price);
+      if (oldPrice > currentPrice) {
+        return Math.round((1 - currentPrice / oldPrice) * 100);
+      }
+      return 0;
+    }
+
+    function sortProducts(type) {
+      // Remove active class de todos os botões
+      document.querySelectorAll('.sort-btn').forEach(btn => btn.classList.remove('active'));
+      
+      // Adiciona active class ao botão clicado
+      event.target.classList.add('active');
+
+      let sortedProducts = [...allProducts];
+      
+      switch(type) {
+        case 'price-asc':
+          sortedProducts.sort((a, b) => getNumericPrice(a.price) - getNumericPrice(b.price));
+          break;
+        case 'price-desc':
+          sortedProducts.sort((a, b) => getNumericPrice(b.price) - getNumericPrice(a.price));
+          break;
+        case 'discount':
+          sortedProducts.sort((a, b) => getDiscountPercentage(b) - getDiscountPercentage(a));
+          break;
+      }
+      
+      // Limpa o container e adiciona produtos ordenados
+      const container = document.getElementById("products-container");
+      container.innerHTML = '';
+      sortedProducts.forEach(product => {
+        const card = createProductCard(product);
+        container.appendChild(card);
+      });
+    }
+
     // Carregar produtos da seção 1 (Casa & Decoração)
     fetch('/api/products?tag=CD', {
       headers: {
@@ -148,6 +231,7 @@
     })
       .then(res => res.json())
       .then(products => {
+        allProducts = products; // Armazena os produtos globalmente
         const container = document.getElementById('products-container');
         products.forEach(product => {
           const card = createProductCard(product);
