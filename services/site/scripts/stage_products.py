@@ -52,25 +52,27 @@ def upload_images(bucket_name, local_paths):
     except S3Error as e:
         print(f"[ERRO] Bucket: {e}")
         return []
-    # passando o path de todas as imagens... nah
-    # for path in local_paths:
-    #     if not os.path.isfile(path):
-    #         print(f"⚠️  Imagem não encontrada: {path}")
-    #         continue
 
-    #     filename = os.path.basename(path)
-    #     object_name = f"{timestamp}_{filename}"
     if not os.path.isdir(local_paths):
         print(f"❌ Pasta não encontrada: {local_paths}")
         return urls
-    for filename in os.listdir(local_paths):
+    
+    # Extrair o nome da pasta do produto (ex: "racao" de "uploads/racao")
+    product_folder_name = os.path.basename(local_paths.rstrip('/'))
+    print(f"📁 Criando pasta do produto: {product_folder_name}")
+    
+    # Listar arquivos em ordem alfabética
+    filenames = sorted(os.listdir(local_paths))
+    
+    for filename in filenames:
         path = os.path.join(local_paths, filename)
         if not os.path.isfile(path):
            continue  # ignora subpastas, etc.
         if not filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp", ".gif")):
            continue  # ignora arquivos que não são imagem
 
-        object_name = f"{timestamp}_{filename}"
+        # Criar estrutura: bucket/produto/timestamp_filename
+        object_name = f"{product_folder_name}/{timestamp}_{filename}"
 
         try:
             minio_client.fput_object(bucket_name, object_name, path)
@@ -113,10 +115,10 @@ else:
 
 newly_processed = []
 
-for filename in os.listdir(STAGING_DIR):
-    if not filename.endswith(".json") or filename == ".processed" or filename in processed_files:
-        continue
+# Processar arquivos JSON em ordem alfabética
+json_files = sorted([f for f in os.listdir(STAGING_DIR) if f.endswith(".json") and f != ".processed" and f not in processed_files])
 
+for filename in json_files:
     path = os.path.join(STAGING_DIR, filename)
 
     try:

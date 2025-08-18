@@ -33,6 +33,11 @@ def secao3():
     # Eletrônicos
     return render_template("secao3.html")
 
+@product_bp.route("/secao4")
+def secao4():
+    # PetShop
+    return render_template("secao4.html")
+
 
 @product_bp.route("/add_product", methods=["POST"])
 def add_product():

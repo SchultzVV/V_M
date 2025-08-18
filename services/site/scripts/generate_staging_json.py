@@ -19,15 +19,17 @@ def prompt_user():
     print("1. CD - Casa & Decoração")
     print("2. ME - Moda & Estilo") 
     print("3. E - Eletrônicos")
-    print("4. Geral (padrão)")
+    print("4. PET - PetShop")
+    print("5. Geral (padrão)")
     
-    tag_choice = input("Digite o número da categoria (1-4) [4]: ").strip()
+    tag_choice = input("Digite o número da categoria (1-5) [5]: ").strip()
     
     tag_map = {
         "1": "CD",
         "2": "ME", 
         "3": "E",
-        "4": "geral"
+        "4": "PET",
+        "5": "geral"
     }
     
     tag = tag_map.get(tag_choice, "geral")

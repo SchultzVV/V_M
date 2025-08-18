@@ -30,15 +30,29 @@ class Product(db.Model):
 
         safe_images = []
         bucket_name = None
-        for img_url in images:
+        
+        # Ordenar imagens alfabeticamente pelo nome do arquivo
+        sorted_images = sorted(images, key=lambda url: urlparse(url).path.split("/")[-1].lower())
+        
+        for img_url in sorted_images:
             try:
                 parsed = urlparse(img_url)
-                parts = parsed.path.strip("/").split("/", 1)
-                if len(parts) != 2:
+                path_parts = parsed.path.strip("/").split("/")
+                
+                # Suporta tanto estrutura antiga (bucket/arquivo) quanto nova (bucket/pasta/arquivo)
+                if len(path_parts) == 2:
+                    # Estrutura antiga: bucket/arquivo
+                    bucket, filename = path_parts
+                    proxy_url = f"/media/{bucket}/{filename}?token={token}"
+                elif len(path_parts) >= 3:
+                    # Estrutura nova: bucket/pasta/arquivo ou bucket/pasta/subpasta/arquivo
+                    bucket = path_parts[0]
+                    remaining_path = "/".join(path_parts[1:])
+                    proxy_url = f"/media/{bucket}/{remaining_path}?token={token}"
+                else:
                     print(f"[to_dict] URL inválida: {img_url}")
                     continue
-                bucket, filename = parts
-                proxy_url = f"/media/{bucket}/{filename}?token={token}"
+                    
                 safe_images.append(proxy_url)
                 if not bucket_name:
                     bucket_name = bucket  # pega o primeiro bucket válido
