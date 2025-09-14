@@ -5,12 +5,37 @@
     <title>Demo IA</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
-        #messages { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: auto; }
+        #messages { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: auto; margin-bottom: 10px; }
         #messages div { margin-bottom: 5px; }
+        .status-indicator { 
+            display: inline-block; 
+            padding: 5px 10px; 
+            margin: 5px; 
+            border-radius: 3px; 
+            font-size: 12px; 
+            font-weight: bold;
+        }
+        .status-online { background-color: #d4edda; color: #155724; }
+        .status-offline { background-color: #f8d7da; color: #721c24; }
+        .status-degraded { background-color: #fff3cd; color: #856404; }
+        .error-message { color: #721c24; background-color: #f8d7da; padding: 8px; border-radius: 3px; margin: 5px 0; }
+        .suggestion { color: #004085; background-color: #cce7f0; padding: 8px; border-radius: 3px; margin: 5px 0; }
+        #service-status { margin-bottom: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
     </style>
 </head>
 <body>
 <h1>Integração com IA</h1>
+
+<div id="service-status">
+    <h3>Status dos Serviços</h3>
+    <div id="status-indicators">
+        <span class="status-indicator status-offline" id="ingestion-status">Serviço de Ingestão: Verificando...</span>
+        <span class="status-indicator status-offline" id="retrieval-status">Serviço de Consulta: Verificando...</span>
+        <span class="status-indicator status-offline" id="overall-status">Status Geral: Verificando...</span>
+    </div>
+    <button id="refresh-status">Atualizar Status</button>
+</div>
+
 <form id="ingest-form">
     <input type="text" id="url-input" placeholder="Cole a URL" size="50" required>
     <button type="submit">Ingerir URL</button>
@@ -22,27 +47,112 @@
     <input type="text" id="question-input" placeholder="Digite sua pergunta" size="50">
     <button id="send-btn">Enviar</button>
 </div>
+
 <script>
 const statusEl = document.getElementById('ingest-status');
+
+// Função para atualizar o status dos serviços
+async function updateServiceStatus() {
+    try {
+        const res = await fetch('/ai/status');
+        const data = await res.json();
+        
+        // Atualizar indicadores de status
+        updateStatusIndicator('ingestion-status', 'Serviço de Ingestão', data.ingestion_service);
+        updateStatusIndicator('retrieval-status', 'Serviço de Consulta', data.retrieval_service);
+        updateStatusIndicator('overall-status', 'Status Geral', data.overall_status);
+        
+    } catch (error) {
+        console.error('Erro ao verificar status dos serviços:', error);
+    }
+}
+
+function updateStatusIndicator(elementId, serviceName, status) {
+    const element = document.getElementById(elementId);
+    element.textContent = `${serviceName}: ${status}`;
+    
+    // Remover classes anteriores
+    element.classList.remove('status-online', 'status-offline', 'status-degraded');
+    
+    // Adicionar classe apropriada
+    if (status === 'online' || status === 'operational') {
+        element.classList.add('status-online');
+    } else if (status === 'degraded') {
+        element.classList.add('status-degraded');
+    } else {
+        element.classList.add('status-offline');
+    }
+}
+
+// Atualizar status na carga da página
+updateServiceStatus();
+
+// Event listener para o botão de refresh
+document.getElementById('refresh-status').onclick = updateServiceStatus;
 
 document.getElementById('ingest-form').onsubmit = async (e) => {
     e.preventDefault();
     const url = document.getElementById('url-input').value;
-    const res = await fetch('/ingest-url', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url})});
-    const data = await res.json();
-    statusEl.textContent = data.message || data.error || 'OK';
+    statusEl.innerHTML = 'Processando...';
+    
+    try {
+        const res = await fetch('/ingest-url', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url})});
+        const data = await res.json();
+        
+        if (res.status === 503) {
+            statusEl.innerHTML = `<div class="error-message">${data.error}</div>` + 
+                               (data.suggestion ? `<div class="suggestion">${data.suggestion}</div>` : '');
+        } else if (data.error) {
+            statusEl.innerHTML = `<div class="error-message">${data.error}</div>`;
+        } else {
+            statusEl.textContent = data.message || 'URL processada com sucesso!';
+        }
+    } catch (error) {
+        statusEl.innerHTML = `<div class="error-message">Erro de conexão: ${error.message}</div>`;
+    }
 };
 
 document.getElementById('send-btn').onclick = async () => {
     const input = document.getElementById('question-input');
     const question = input.value.trim();
     if(!question) return;
+    
     addMessage('Você: ' + question);
     input.value = '';
-    const res = await fetch('/query', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({question})});
-    const data = await res.json();
-    addMessage('Bot: ' + (data.answer || JSON.stringify(data)));
+    addMessage('Bot: Processando...');
+    
+    try {
+        const res = await fetch('/query', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({question})});
+        const data = await res.json();
+        
+        // Remove a mensagem "Processando..."
+        const messages = document.getElementById('messages');
+        messages.removeChild(messages.lastChild);
+        
+        if (res.status === 503) {
+            addMessage(`Bot: ❌ ${data.error}`);
+            if (data.suggestion) {
+                addMessage(`💡 Sugestão: ${data.suggestion}`);
+            }
+        } else if (data.error) {
+            addMessage(`Bot: ❌ ${data.error}`);
+        } else {
+            addMessage('Bot: ' + (data.answer || JSON.stringify(data)));
+        }
+    } catch (error) {
+        // Remove a mensagem "Processando..."
+        const messages = document.getElementById('messages');
+        messages.removeChild(messages.lastChild);
+        addMessage(`Bot: ❌ Erro de conexão: ${error.message}`);
+    }
 };
+
+// Permitir envio com Enter
+document.getElementById('question-input').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        document.getElementById('send-btn').click();
+    }
+});
 
 function addMessage(text){
     const div = document.createElement('div');
