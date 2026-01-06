@@ -21,11 +21,14 @@ RUN pip install --no-cache-dir playwright==1.54.0 \
 # 📁 Define o diretório da aplicação
 WORKDIR /app
 
-# 🗂️ Copia apenas os arquivos do site
-COPY services/site/ .
+# 🗂️ Primeiro copia requirements para cache de layer
+COPY services/site/requirements-prd.txt .
 
 # 📦 Instala dependências da aplicação (produção)
 RUN pip install --no-cache-dir -r requirements-prd.txt
+
+# 🗂️ Agora copia todo o código do site
+COPY services/site/ .
 
 # 🔌 Porta exposta pela aplicação Flask
 EXPOSE 5000
