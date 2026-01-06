@@ -3,7 +3,7 @@ services:
     name: vm-site
     plan: free
     env: docker
-    dockerfilePath: ./services/site/Dockerfile
+    dockerfilePath: ./Dockerfile.render
     envVars:
       - key: FLASK_ENV
         value: production
