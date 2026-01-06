@@ -7,12 +7,20 @@ def format_price(raw):
     return f"R$ {raw.strip()}"
 
 def prompt_user():
-    plataforma = input("Plataforma (ex: shopee, amazon): ").strip().lower()
+    plataforma = input("Plataforma (ex: shopee, amazon, mercadolivre): ").strip().lower()
+    
+    # External ID para rastreamento via webhook
+    external_id = input("ID do produto no marketplace (ex: MLB123456789) [opcional]: ").strip()
+    
     title = input("Título do produto: ").strip()
     price = format_price(input("Preço atual (ex: 19.90): "))
     old_price = format_price(input("Preço antigo (ex: 49.90): "))
     link = input("Link de afiliado: ").strip()
     images = input("Caminho da pasta de imagens: ").strip()
+    
+    # Disponibilidade
+    disponivel_input = input("Produto disponível? (s/n) [s]: ").strip().lower()
+    disponivel = disponivel_input != 'n'
     
     # Solicitar a tag/categoria do produto
     print("\n🏷️  Escolha a categoria do produto:")
@@ -35,9 +43,9 @@ def prompt_user():
     tag = tag_map.get(tag_choice, "geral")
     print(f"✅ Categoria selecionada: {tag}")
     
-    return plataforma, title, price, old_price, images, link, tag
+    return plataforma, external_id, title, price, old_price, images, link, tag, disponivel
 
-def generate_staging_json(plataforma, title, price, old_price, local_paths, link, tag):
+def generate_staging_json(plataforma, external_id, title, price, old_price, local_paths, link, tag, disponivel):
     os.makedirs("staging", exist_ok=True)
     slug = slugify(title)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -45,13 +53,17 @@ def generate_staging_json(plataforma, title, price, old_price, local_paths, link
 
     data = {
         "platform": plataforma,
+        "external_id": external_id if external_id else None,
         "title": title,
         "price": price,
         "oldPrice": old_price,
         "images_local": local_paths,
         "images": [],  # será preenchido posteriormente no stage
         "link": link,
-        "tag": tag  # Nova tag selecionada pelo usuário
+        "tag": tag,
+        "disponivel": disponivel,
+        "criado_em": timestamp,
+        "via_webhook": False
     }
 
     with open(filename, "w", encoding="utf-8") as f:
@@ -59,7 +71,11 @@ def generate_staging_json(plataforma, title, price, old_price, local_paths, link
 
     print(f"\n✅ Staging salvo em: {filename}")
     print(f"🏷️  Tag: {tag}")
+    print(f"📦 Plataforma: {plataforma}")
+    if external_id:
+        print(f"🔗 External ID: {external_id}")
+    print(f"✅ Disponível: {'Sim' if disponivel else 'Não'}")
 
 if __name__ == "__main__":
-    plataforma, title, price, old_price, images, link, tag = prompt_user()
-    generate_staging_json(plataforma, title, price, old_price, images, link, tag)
+    plataforma, external_id, title, price, old_price, images, link, tag, disponivel = prompt_user()
+    generate_staging_json(plataforma, external_id, title, price, old_price, images, link, tag, disponivel)

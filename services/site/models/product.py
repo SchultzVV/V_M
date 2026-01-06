@@ -3,6 +3,7 @@ import json
 from flask_sqlalchemy import SQLAlchemy
 from urllib.parse import urlparse
 import os
+from datetime import datetime
 
 db = SQLAlchemy()
 
@@ -10,12 +11,30 @@ class Product(db.Model):
     __tablename__ = "products"
 
     id = db.Column(db.String(50), primary_key=True, default=lambda: str(uuid.uuid4()))
+    platform = db.Column(db.String(50), nullable=True)  # mercadolivre, shopee, amazon
+    external_id = db.Column(db.String(255), nullable=True)  # ID do produto no marketplace
     title = db.Column(db.String(255), nullable=False)
     price = db.Column(db.String(50), nullable=False)
     old_price = db.Column(db.String(50))
     image = db.Column(db.Text, nullable=False)  # JSON string com lista de imagens
     link = db.Column(db.Text, nullable=False)
     tags = db.Column(db.Text, default='["geral"]')  # JSON string com as tags
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Campos adicionais para compatibilidade com webhook
+    nome = db.Column(db.String(255), nullable=True)  # Alias para title
+    preco = db.Column(db.String(50), nullable=True)  # Alias para price
+    preco_original = db.Column(db.String(50), nullable=True)  # Alias para old_price
+    desconto = db.Column(db.Float, default=0)
+    descricao = db.Column(db.Text, nullable=True)
+    imagens = db.Column(db.Text, nullable=True)  # Alias para image
+    disponivel = db.Column(db.Boolean, default=True)  # Disponibilidade do produto
+    
+    # Índice único para evitar duplicatas
+    __table_args__ = (
+        db.UniqueConstraint('platform', 'external_id', name='unique_platform_external_id'),
+    )
 
     def to_dict(self):
         token = os.getenv("MEDIA_TOKEN", "secreto123")

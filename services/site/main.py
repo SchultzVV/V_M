@@ -26,6 +26,9 @@ from models import Base
 from routes.media_routes import media_bp
 from routes.ai_routes import ai_bp
 from routes.index import index_bp
+from routes.webhook_routes import webhook_bp
+from routes.auth_routes import auth_bp
+from routes.sync_routes import sync_bp
 
 app = Flask(__name__)
 
@@ -44,10 +47,23 @@ Base.metadata.create_all(bind=engine)
 app.register_blueprint(product_bp)
 app.register_blueprint(media_bp)
 app.register_blueprint(ai_bp)
+app.register_blueprint(webhook_bp)
+app.register_blueprint(auth_bp)
+app.register_blueprint(sync_bp)
 
 with app.app_context():
     db.create_all()  # ✅ Cria a tabela 'products' se não existir
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0")
+    # Verifica se os certificados SSL existem para rodar com HTTPS
+    import os.path
+    cert_path = "/app/cert.pem"
+    key_path = "/app/key.pem"
+    
+    if os.path.exists(cert_path) and os.path.exists(key_path):
+        print("🔒 Rodando com HTTPS (SSL certificado encontrado)")
+        app.run(debug=True, host="0.0.0.0", ssl_context=(cert_path, key_path))
+    else:
+        print("⚠️  Rodando com HTTP (sem certificado SSL)")
+        app.run(debug=True, host="0.0.0.0")

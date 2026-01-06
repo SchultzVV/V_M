@@ -58,12 +58,44 @@ serve-ngrok:  ## Inicia túnel ngrok para acessar localmente via web
 	@pkill ngrok || true
 	@echo "🔧 Subindo containers Docker..."
 	@$(COMPOSE) up -d
-	@echo "🚀 Iniciando túnel com ngrok (sem tela de aviso)..."
-# 	@ngrok http --request-header-add="ngrok-skip-browser-warning:true" --subdomain="$(NGROK_SUBDOMAIN)" 5000 > /dev/null &
+	@echo "🚀 Iniciando túnel com ngrok (URL aleatória - plano free)..."
 	@ngrok http --request-header-add="ngrok-skip-browser-warning:true" 5000 > /dev/null &
 	@sleep 6
 	@echo "🌐 URL pública gerada:"
 	@curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+	@echo ""
+	@echo "⚠️  IMPORTANTE: Copie a URL acima e adicione no painel do Mercado Livre:"
+	@echo "   https://developers.mercadolivre.com.br/devcenter"
+	@echo "   Redirect URI: <URL_ACIMA>/auth/mercadolivre/callback"
+
+serve-render:  ## Deploy no Render.com (produção gratuita)
+	@echo "📦 Verificando configuração do Git..."
+	@if [ -z "$$(git config user.email)" ]; then \
+		echo "⚠️  Configurando Git..."; \
+		git config user.email "$(GITHUB_USERNAME)@users.noreply.github.com"; \
+		git config user.name "$(GITHUB_USERNAME)"; \
+	fi
+	@echo "📝 Commitando alterações locais..."
+	@git add -A
+	@git diff-index --quiet HEAD || git commit -m "Deploy to Render - $$(date '+%Y-%m-%d %H:%M:%S')" || true
+	@echo "🚀 Enviando para o GitHub (branch main)..."
+	@git push origin $$(git branch --show-current):main || git push origin main
+	@echo ""
+	@echo "✅ Código enviado para GitHub!"
+	@echo ""
+	@echo "📋 PRÓXIMOS PASSOS:"
+	@echo "1. Acesse: https://dashboard.render.com/"
+	@echo "2. Clique em 'New +' → 'Web Service'"
+	@echo "3. Conecte seu repositório: schultzvv/V_M"
+	@echo "4. Render vai detectar o .render.yaml automaticamente"
+	@echo "5. Configure as variáveis de ambiente necessárias"
+	@echo "6. Clique em 'Create Web Service'"
+	@echo ""
+	@echo "⏳ Deploy leva ~5-10 minutos. Sua URL será:"
+	@echo "   https://vm-site.onrender.com"
+	@echo ""
+	@echo "🔗 Use essa URL no Mercado Livre:"
+	@echo "   Redirect URI: https://vm-site.onrender.com/auth/mercadolivre/callback"
 
 
 # serve-ngrok:  ## Inicia túnel ngrok para acessar localmente via web
@@ -192,6 +224,13 @@ migrate-tags: ## Executa a migração para adicionar coluna tags
 		$(COMPOSE) up -d --build site; \
 	fi
 	@docker exec -it site-dev python3 scripts/migrate_add_tags.py
+
+migrate-webhook: ## Executa a migração para adicionar campos de webhook
+	@if ! docker ps | grep -q site-dev; then \
+		echo "🛠️  Container site-dev não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@docker exec -it site-dev python3 scripts/migrate_add_webhook_fields.py
 
 
 help: ## Mostra esta ajuda

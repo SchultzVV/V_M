@@ -3,12 +3,38 @@ services:
     name: vm-site
     plan: free
     env: docker
-    dockerfilePath: ./services/site/Dockerfile   # path to the Dockerfile in repo
-    startCommand: "python main.py"
+    dockerfilePath: ./services/site/Dockerfile
+    dockerContext: ./services/site
     envVars:
       - key: FLASK_ENV
         value: production
-      - key: MINIO_ENDPOINT        # supply actual value in Render dashboard
+      - key: PORT
+        value: 5000
+      - key: ML_APP_ID
+        sync: false
+      - key: ML_CLIENT_SECRET
+        sync: false
+      - key: ML_REDIRECT_URI
+        value: https://vm-site.onrender.com/auth/mercadolivre/callback
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vm-postgres
+          property: connectionString
+      - key: MINIO_ENDPOINT
+        sync: false
       - key: MINIO_ACCESS_KEY
+        sync: false
       - key: MINIO_SECRET_KEY
-      - key: POSTGRES_URI
+        sync: false
+      - key: MINIO_PUBLIC_ENDPOINT
+        sync: false
+
+  - type: pserv
+    name: vm-postgres
+    plan: free
+    env: docker
+    dockerfilePath: ./Dockerfile.postgres
+    disk:
+      name: postgres-data
+      mountPath: /var/lib/postgresql/data
+      sizeGB: 1
