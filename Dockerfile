@@ -41,7 +41,6 @@ COPY services/site/templates/ /app/templates/
 COPY services/site/static/ /app/static/
 COPY services/site/staging/ /app/staging/
 COPY services/site/uploads/ /app/uploads/
-COPY services/site/config/ /app/config/
 
 # 🔌 Porta exposta pela aplicação Flask
 EXPOSE 5000
