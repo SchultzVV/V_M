@@ -28,7 +28,11 @@ COPY services/site/requirements-prd.txt /app/requirements-prd.txt
 RUN pip install --no-cache-dir -r /app/requirements-prd.txt
 
 # 🗂️ Agora copia todo o código do site (apenas de services/site/)
-COPY services/site/*.py /app/
+COPY services/site/__init__.py /app/
+COPY services/site/main.py /app/
+COPY services/site/database.py /app/
+COPY services/site/models.py /app/
+COPY services/site/auth.py /app/
 COPY services/site/models/ /app/models/
 COPY services/site/routes/ /app/routes/
 COPY services/site/services/ /app/services/
