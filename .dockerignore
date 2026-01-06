@@ -1,4 +1,4 @@
-# Ignorar arquivos desnecessários no build Docker
+# Ignorar arquivos desnecessários no build Docker do Render
 __pycache__/
 *.pyc
 *.pyo
@@ -22,8 +22,6 @@ ENV/
 node_modules/
 .vscode/
 .idea/
-*.md
-!requirements*.txt
 tests/
 vector_db/
 cert.pem
@@ -33,5 +31,7 @@ docker-compose*.yaml
 Makefile
 Dockerfile
 !Dockerfile.render
-main.py
 pytest.ini
+README.md
+.render.yaml
+shared/
