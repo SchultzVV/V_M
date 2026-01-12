@@ -218,6 +218,20 @@ stage: ## Executa o stage_products.py dentro do site-dev
 prepare-products: ## Executa generate_staging_json.py dentro do site-dev
 	$(MAKE) run-py script=scripts/generate_staging_json.py
 
+prepare-auto: ## Prepara produto automaticamente do Mercado Livre (uso: make prepare-auto URL=https://...)
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make prepare-auto URL=https://mercadolivre.com/sec/ABC123"; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site-dev; then \
+		echo "🛠️  Container site-dev não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo "🤖 Preparando produto automaticamente..."
+	@docker exec -it site-dev python3 scripts/auto_prepare_ml.py "$(URL)"
+
 migrate-tags: ## Executa a migração para adicionar coluna tags
 	@if ! docker ps | grep -q site-dev; then \
 		echo "🛠️  Container site-dev não encontrado. Subindo com docker-compose..."; \
@@ -236,6 +250,39 @@ migrate-webhook: ## Executa a migração para adicionar campos de webhook
 help: ## Mostra esta ajuda
 	@echo "🛠️  Comandos disponíveis:"
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9._-]+:.*##/ {printf "👉 \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+help-products: ## Mostra ajuda para adicionar produtos
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🤖 FLUXO AUTOMÁTICO - Adicionar Produto do Mercado Livre"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "1️⃣  Preparar produto automaticamente:"
+	@echo "   make prepare-auto URL=\"https://produto.mercadolivre.com.br/MLB-...\""
+	@echo ""
+	@echo "   ✅ Faz scraping do produto"
+	@echo "   ✅ Baixa imagens automaticamente"
+	@echo "   ✅ Detecta categoria"
+	@echo "   ✅ Gera JSON de staging"
+	@echo ""
+	@echo "2️⃣  Publicar no site:"
+	@echo "   make stage"
+	@echo ""
+	@echo "   ✅ Upload de imagens para MinIO"
+	@echo "   ✅ Adiciona ao banco de dados"
+	@echo "   ✅ Produto disponível no site"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "📝 MÉTODO MANUAL (legacy):"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "   make prepare-products  # Digite dados manualmente"
+	@echo "   make stage             # Publicar"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "📚 Documentação completa: services/site/docs/AUTO_PREPARE_PRODUTOS.md"
+	@echo ""
 
 check-stage:
 	@$(MAKE) run-py script=scripts/check_stage_images.py

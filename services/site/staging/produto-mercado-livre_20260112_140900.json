@@ -1,0 +1,14 @@
+{
+  "platform": "mercadolivre",
+  "external_id": null,
+  "title": "Produto Mercado Livre",
+  "price": "R$ 514",
+  "oldPrice": "R$ 514",
+  "images_local": "uploads/fallback_img",
+  "images": [],
+  "link": "https://mercadolivre.com/sec/1V2ijXV",
+  "tag": "geral",
+  "disponivel": true,
+  "criado_em": "20260112_140900",
+  "via_webhook": false
+}

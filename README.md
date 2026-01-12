@@ -1,6 +1,39 @@
 # V&M Site
 
-Este repositório contém o site Flask e scripts auxiliares. Agora há integração com dois microserviços de IA para ingestão de URLs e perguntas via chat.
+Este repositório contém o site Flask com integração ao Mercado Livre e sistema automatizado de produtos.
+
+## 🚀 Quick Start
+
+### Subir o ambiente com ngrok
+
+```bash
+make serve-ngrok
+```
+
+Isso vai:
+- ✅ Subir todos os containers (PostgreSQL, Redis, MinIO, site)
+- ✅ Iniciar túnel ngrok
+- ✅ Gerar URL pública para webhooks do Mercado Livre
+
+### Adicionar produto automaticamente
+
+```bash
+# 1. Preparar produto do Mercado Livre (automático)
+make prepare-auto URL="https://produto.mercadolivre.com.br/MLB-..."
+
+# 2. Publicar no site
+make stage
+```
+
+**Pronto!** O produto está no seu site com imagens, preço e categoria detectados automaticamente.
+
+Para mais detalhes: `make help-products`
+
+## 📚 Documentação
+
+- [Preparação Automática de Produtos](services/site/docs/AUTO_PREPARE_PRODUTOS.md)
+- [OAuth Mercado Livre](services/site/docs/OAUTH_MERCADOLIVRE.md)
+- [Webhooks](services/site/docs/WEBHOOKS.md)
 
 ## Como subir o ambiente
 
