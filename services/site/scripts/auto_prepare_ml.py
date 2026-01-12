@@ -19,47 +19,116 @@ import re
 
 def extract_ml_product_id(url):
     """Extrai o ID do produto do Mercado Livre da URL."""
-    # Tenta pegar da URL direta: https://produto.mercadolivre.com.br/MLB-123456789-...
-    match = re.search(r'ML[A-Z]-(\d+)', url)
+    # Formato permalink: /p/MLB123456789
+    match = re.search(r'/p/(ML[A-Z]\d+)', url)
     if match:
-        return f"ML{match.group(0)[2]}-{match.group(1)}"
+        return match.group(1)
     
-    # Tenta seguir redirect de link curto
-    try:
-        response = requests.head(url, allow_redirects=True, timeout=10)
-        final_url = response.url
-        match = re.search(r'ML[A-Z]-(\d+)', final_url)
-        if match:
-            return match.group(0)
-    except:
-        pass
+    # Formato padrão: MLB-123456789 ou MLB123456789
+    match = re.search(r'(ML[A-Z])[\-]?(\d+)', url)
+    if match:
+        return f"{match.group(1)}-{match.group(2)}"
     
     return None
 
-def scrape_mercadolivre_product(url):
+def follow_affiliate_link(url):
     """
-    Faz scraping dos dados do produto no Mercado Livre.
-    Retorna dict com: title, price, old_price, images, external_id
+    Segue o link de afiliado até chegar na página final do produto.
+    Retorna a URL final do produto.
     """
-    print(f"🔍 Buscando informações do produto...")
+    print(f"🔗 Seguindo link de afiliado...")
+    print(f"   URL inicial: {url}")
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
     
     try:
-        # Seguir redirects para pegar a URL final
+        # Seguir todos os redirects
         response = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
-        response.raise_for_status()
+        final_url = response.url
         
-        # Extrair ID do produto
-        external_id = extract_ml_product_id(response.url)
+        print(f"   URL final: {final_url}")
+        
+        # Verificar se é uma página de perfil (não produto direto)
+        if '/social/' in final_url or '/perfil/' in final_url:
+            print(f"\n🔄 Detectada página de perfil. Procurando link do produto...")
+            
+            # Tentar extrair o link do produto do botão "ir para produto"
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Procurar por links que contenham /p/ (permalink de produto)
+            product_links = soup.find_all('a', href=re.compile(r'/p/MLB\d+'))
+            
+            if product_links:
+                product_url = product_links[0].get('href')
+                
+                # Se for URL relativa, completar com domínio
+                if product_url.startswith('/'):
+                    product_url = f"https://www.mercadolivre.com.br{product_url}"
+                
+                print(f"   ✅ Link do produto encontrado: {product_url}")
+                
+                # Extrair apenas a parte antes dos parâmetros
+                if '#' in product_url:
+                    product_url = product_url.split('#')[0]
+                if '?' in product_url:
+                    product_url = product_url.split('?')[0]
+                
+                return product_url
+            else:
+                print(f"\n❌ ERRO: Não foi possível encontrar o link do produto na página de perfil.")
+                print(f"   Por favor, use um link direto do produto.")
+                print(f"   Exemplo: https://produto.mercadolivre.com.br/MLB-123456789-...")
+                return None
+        
+        # Verificar se chegamos em uma página de produto
+        if 'mercadolivre.com' in final_url or 'mercadolibre.com' in final_url:
+            return final_url
+        else:
+            print(f"⚠️  URL não parece ser do Mercado Livre: {final_url}")
+            return url
+            
+    except Exception as e:
+        print(f"⚠️  Erro ao seguir redirect: {e}")
+        return url
+
+def scrape_mercadolivre_product(url):
+    """
+    Faz scraping dos dados do produto no Mercado Livre.
+    Retorna dict com: title, price, old_price, images, external_id
+    """
+    print(f"\n{'='*60}")
+    print(f"📥 COLETANDO DADOS DO PRODUTO")
+    print(f"{'='*60}\n")
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    
+    try:
+        # Primeiro, seguir o link de afiliado até a página do produto
+        product_url = follow_affiliate_link(url)
+        
+        # Se não conseguiu obter URL válida, abortar
+        if not product_url:
+            return None
+        
+        # Extrair ID do produto da URL final
+        external_id = extract_ml_product_id(product_url)
+        
+        if external_id:
+            print(f"\n🆔 ID do produto encontrado: {external_id}")
+        else:
+            print(f"\n⚠️  Não foi possível extrair o ID do produto")
         
         # Tentar usar a API do Mercado Livre se tivermos o ID
         if external_id:
             try:
+                print(f"🌐 Consultando API do Mercado Livre...")
                 api_url = f"https://api.mercadolibre.com/items/{external_id}"
                 api_response = requests.get(api_url, timeout=10)
+                
                 if api_response.status_code == 200:
                     data = api_response.json()
                     
@@ -75,9 +144,10 @@ def scrape_mercadolivre_product(url):
                         if img_url:
                             images.append(img_url)
                     
-                    print(f"✅ Dados obtidos via API do Mercado Livre")
+                    print(f"\n✅ Dados obtidos com sucesso via API!")
                     print(f"📦 Produto: {title}")
-                    print(f"💰 Preço: R$ {price}")
+                    print(f"💰 Preço: R$ {price:.2f}")
+                    print(f"🖼️  Imagens encontradas: {len(images)}")
                     print(f"🖼️  Imagens encontradas: {len(images)}")
                     
                     return {
@@ -85,30 +155,60 @@ def scrape_mercadolivre_product(url):
                         'price': f"R$ {price:.2f}",
                         'old_price': f"R$ {old_price:.2f}",
                         'images': images,
-                        'external_id': external_id
+                        'external_id': external_id,
+                        'product_url': product_url
                     }
             except Exception as e:
                 print(f"⚠️  Falha na API, tentando scraping HTML: {e}")
         
         # Fallback: scraping HTML
+        print(f"\n🔄 Tentando scraping HTML da página...")
+        response = requests.get(product_url, headers=headers, timeout=15, allow_redirects=True)
+        response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         
         # Título
         title_tag = soup.find('h1', class_='ui-pdp-title')
         title = title_tag.text.strip() if title_tag else "Produto Mercado Livre"
         
-        # Preço
-        price_tag = soup.find('span', class_='andes-money-amount__fraction')
-        price_text = price_tag.text.strip() if price_tag else "0.00"
-        price = f"R$ {price_text}"
+        # Estratégia para pegar preços corretamente
+        # 1. Procurar por todos os preços na página
+        all_prices = soup.find_all('span', class_='andes-money-amount__fraction')
         
-        # Preço antigo (se houver)
+        # 2. Procurar especificamente por preço riscado (preço antigo)
         old_price_tag = soup.find('s', class_='andes-money-amount--previous')
-        if old_price_tag:
+        
+        price = None
+        old_price = None
+        
+        if old_price_tag and len(all_prices) >= 2:
+            # Se há preço riscado, significa que há promoção
+            # O primeiro preço visível é o promocional, o riscado é o antigo
+            price_text = all_prices[0].text.strip().replace('.', '').replace(',', '.')
+            price = f"R$ {price_text}"
+            
             old_price_fraction = old_price_tag.find('span', class_='andes-money-amount__fraction')
-            old_price = f"R$ {old_price_fraction.text.strip()}" if old_price_fraction else price
-        else:
+            if old_price_fraction:
+                old_price_text = old_price_fraction.text.strip().replace('.', '').replace(',', '.')
+                old_price = f"R$ {old_price_text}"
+            else:
+                old_price = price
+                
+        elif len(all_prices) > 0:
+            # Sem promoção, ambos preços iguais
+            price_text = all_prices[0].text.strip().replace('.', '').replace(',', '.')
+            price = f"R$ {price_text}"
             old_price = price
+        else:
+            # Fallback
+            price = "R$ 0.00"
+            old_price = "R$ 0.00"
+        
+        print(f"\n💰 Preços detectados:")
+        print(f"   Preço atual (promocional): {price}")
+        print(f"   Preço original: {old_price}")
+        if price != old_price:
+            print(f"   🎉 Produto com desconto!")
         
         # Imagens
         images = []
@@ -123,7 +223,7 @@ def scrape_mercadolivre_product(url):
         # Remover duplicatas mantendo ordem
         images = list(dict.fromkeys(images))
         
-        print(f"✅ Dados obtidos via scraping HTML")
+        print(f"\n✅ Dados obtidos com sucesso via HTML!")
         print(f"📦 Produto: {title}")
         print(f"💰 Preço: {price}")
         print(f"🖼️  Imagens encontradas: {len(images)}")
@@ -133,7 +233,8 @@ def scrape_mercadolivre_product(url):
             'price': price,
             'old_price': old_price,
             'images': images,
-            'external_id': external_id
+            'external_id': external_id,
+            'product_url': product_url
         }
         
     except Exception as e:
@@ -281,15 +382,19 @@ def ask_user_category(suggested_category):
     
     return selected
 
-def generate_staging_json(product_data, images_dir, affiliate_link, tag):
+def generate_staging_json(product_data, images_dir, original_affiliate_link, tag):
     """
     Gera o JSON de staging com os dados do produto.
+    Usa o link completo do produto (não o link curto de afiliado).
     """
     os.makedirs("staging", exist_ok=True)
     
     slug = slugify(product_data['title'])
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"staging/{slug}_{timestamp}.json"
+    
+    # Usar o link completo do produto obtido durante o scraping
+    product_link = product_data.get('product_url', original_affiliate_link)
     
     data = {
         "platform": "mercadolivre",
@@ -299,7 +404,7 @@ def generate_staging_json(product_data, images_dir, affiliate_link, tag):
         "oldPrice": product_data['old_price'],
         "images_local": images_dir,
         "images": [],  # será preenchido pelo stage_products.py
-        "link": affiliate_link,
+        "link": product_link,  # Link completo do produto, não o de afiliado
         "tag": tag,
         "disponivel": True,
         "criado_em": timestamp,
