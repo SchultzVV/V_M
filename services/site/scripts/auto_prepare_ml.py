@@ -191,6 +191,7 @@ def download_images(images, product_slug):
 def detect_product_category(title):
     """
     Detecta automaticamente a categoria do produto baseado no título.
+    Retorna uma sugestão, mas não a categoria final.
     """
     title_lower = title.lower()
     
@@ -234,7 +235,53 @@ def detect_product_category(title):
     
     return 'geral'
 
-def generate_staging_json(product_data, images_dir, affiliate_link):
+def ask_user_category(suggested_category):
+    """
+    Pergunta ao usuário qual categoria usar, mostrando sugestão.
+    """
+    print("\n" + "=" * 60)
+    print("🏷️  ESCOLHA A CATEGORIA DO PRODUTO")
+    print("=" * 60)
+    print("\n📋 Categorias disponíveis:")
+    print("  1. PET - PetShop")
+    print("  2. E - Eletrônicos")
+    print("  3. CD - Casa & Decoração")
+    print("  4. ME - Moda & Estilo")
+    print("  5. geral - Categoria Geral")
+    
+    category_map = {
+        "1": "PET",
+        "2": "E",
+        "3": "CD",
+        "4": "ME",
+        "5": "geral",
+        "PET": "PET",
+        "E": "E",
+        "CD": "CD",
+        "ME": "ME",
+        "geral": "geral"
+    }
+    
+    # Encontrar número da sugestão
+    suggested_number = "5"
+    for num, cat in category_map.items():
+        if cat == suggested_category and num.isdigit():
+            suggested_number = num
+            break
+    
+    print(f"\n💡 Sugestão baseada no título: {suggested_category} (opção {suggested_number})")
+    
+    choice = input(f"\nDigite o número da categoria [pressione Enter para usar a sugestão]: ").strip()
+    
+    if not choice:
+        choice = suggested_number
+    
+    selected = category_map.get(choice, suggested_category)
+    print(f"✅ Categoria selecionada: {selected}")
+    
+    return selected
+
+def generate_staging_json(product_data, images_dir, affiliate_link, tag):
     """
     Gera o JSON de staging com os dados do produto.
     """
@@ -243,9 +290,6 @@ def generate_staging_json(product_data, images_dir, affiliate_link):
     slug = slugify(product_data['title'])
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"staging/{slug}_{timestamp}.json"
-    
-    # Detectar categoria automaticamente
-    tag = detect_product_category(product_data['title'])
     
     data = {
         "platform": "mercadolivre",
@@ -265,8 +309,11 @@ def generate_staging_json(product_data, images_dir, affiliate_link):
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     
-    print(f"\n✅ JSON de staging gerado: {filename}")
-    print(f"🏷️  Categoria detectada: {tag}")
+    print("\n" + "=" * 60)
+    print("✅ JSON DE STAGING GERADO COM SUCESSO")
+    print("=" * 60)
+    print(f"\n📄 Arquivo: {filename}")
+    print(f"🏷️  Categoria: {tag}")
     print(f"📦 Produto: {data['title']}")
     print(f"💰 Preço: {data['price']}")
     print(f"🔗 Link: {data['link']}")
@@ -302,8 +349,12 @@ def main():
         print("⚠️  Continuando sem imagens...")
         images_dir = "uploads/fallback_img"
     
-    # 3. Gerar JSON de staging
-    staging_file = generate_staging_json(product_data, images_dir, url)
+    # 3. Detectar categoria sugerida e perguntar ao usuário
+    suggested_category = detect_product_category(product_data['title'])
+    selected_category = ask_user_category(suggested_category)
+    
+    # 4. Gerar JSON de staging
+    staging_file = generate_staging_json(product_data, images_dir, url, selected_category)
     
     print("\n" + "=" * 60)
     print("✅ PREPARAÇÃO CONCLUÍDA COM SUCESSO!")

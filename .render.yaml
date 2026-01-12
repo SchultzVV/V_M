@@ -1,39 +1,39 @@
-services:
-  - type: web
-    name: vm-site
-    plan: free
-    env: docker
-    dockerfilePath: ./Dockerfile
-    envVars:
-      - key: FLASK_ENV
-        value: production
-      - key: PORT
-        value: 5000
-      - key: ML_APP_ID
-        sync: false
-      - key: ML_CLIENT_SECRET
-        sync: false
-      - key: ML_REDIRECT_URI
-        value: https://vm-site.onrender.com/auth/mercadolivre/callback
-      - key: DATABASE_URL
-        fromDatabase:
-          name: vm-postgres
-          property: connectionString
-      - key: MINIO_ENDPOINT
-        sync: false
-      - key: MINIO_ACCESS_KEY
-        sync: false
-      - key: MINIO_SECRET_KEY
-        sync: false
-      - key: MINIO_PUBLIC_ENDPOINT
-        sync: false
+# services:
+#   - type: web
+#     name: vm-site
+#     plan: free
+#     env: docker
+#     dockerfilePath: ./Dockerfile
+#     envVars:
+#       - key: FLASK_ENV
+#         value: production
+#       - key: PORT
+#         value: 5000
+#       - key: ML_APP_ID
+#         sync: false
+#       - key: ML_CLIENT_SECRET
+#         sync: false
+#       - key: ML_REDIRECT_URI
+#         value: https://vm-site.onrender.com/auth/mercadolivre/callback
+#       - key: DATABASE_URL
+#         fromDatabase:
+#           name: vm-postgres
+#           property: connectionString
+#       - key: MINIO_ENDPOINT
+#         sync: false
+#       - key: MINIO_ACCESS_KEY
+#         sync: false
+#       - key: MINIO_SECRET_KEY
+#         sync: false
+#       - key: MINIO_PUBLIC_ENDPOINT
+#         sync: false
 
-  - type: pserv
-    name: vm-postgres
-    plan: free
-    env: docker
-    dockerfilePath: ./Dockerfile.postgres
-    disk:
-      name: postgres-data
-      mountPath: /var/lib/postgresql/data
-      sizeGB: 1
+#   - type: pserv
+#     name: vm-postgres
+#     plan: free
+#     env: docker
+#     dockerfilePath: ./Dockerfile.postgres
+#     disk:
+#       name: postgres-data
+#       mountPath: /var/lib/postgresql/data
+#       sizeGB: 1

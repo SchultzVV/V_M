@@ -4,10 +4,14 @@ import requests
 from datetime import datetime
 from minio import Minio
 from minio.error import S3Error
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+# Desabilitar warnings de SSL para desenvolvimento
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 STAGING_DIR = "staging"
 PROCESSED_FILE = os.path.join(STAGING_DIR, ".processed")
-API_ENDPOINT = "http://localhost:5000/add_product"
+API_ENDPOINT = "https://localhost:5000/add_product"  # Usar HTTPS
 
 # Configuração do MinIO
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
@@ -148,7 +152,7 @@ for filename in json_files:
             "tag": tag
         }
 
-        resp = requests.post(API_ENDPOINT, json=payload)
+        resp = requests.post(API_ENDPOINT, json=payload, verify=False)  # verify=False para SSL auto-assinado
 
         if resp.status_code == 201:
             print(f"[✔] Produto salvo: {filename} (Tag: {tag})")
