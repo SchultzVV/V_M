@@ -68,6 +68,40 @@ serve-ngrok:  ## Inicia túnel ngrok para acessar localmente via web
 	@echo "   https://developers.mercadolivre.com.br/devcenter"
 	@echo "   Redirect URI: <URL_ACIMA>/auth/mercadolivre/callback"
 
+test-oauth:  ## Testa o fluxo OAuth - Abre navegador para autorizar
+	@echo "🔑 Testando OAuth do Mercado Livre..."
+	@echo ""
+	@echo "📋 Configuração atual:"
+	@grep "ML_APP_ID" .env | head -1
+	@grep "ML_REDIRECT_URI" .env
+	@echo ""
+	@echo "🌐 Método 1 - Via nosso site (redirect automático):"
+	@curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url' | xargs -I {} echo "{}/auth/mercadolivre/login"
+	@echo ""
+	@echo "🌐 Método 2 - URL Direta do Mercado Livre:"
+	@./test_oauth_direct.sh | grep "https://auth.mercadolivre" | head -1
+	@echo ""
+	@echo "💡 Recomendado: Use o Método 2 (URL direta) para evitar bloqueios"
+	@echo "✅ Após autorizar, verifique os tokens com: make check-tokens"
+
+check-tokens:  ## Verifica se os tokens OAuth foram salvos
+	@echo "🔍 Verificando tokens salvos..."
+	@echo ""
+	@docker exec site cat /app/config/ml_tokens.json 2>/dev/null | jq -r '"✅ User ID: " + (.user_id | tostring), "✅ Token expira em: " + (.expires_in | tostring) + " segundos", "✅ Access Token: " + .access_token[:30] + "...", "✅ Refresh Token: " + .refresh_token[:30] + "..."' || echo "❌ Arquivo de tokens não encontrado"
+	@echo ""
+	@echo "💡 Para testar o token, use: make test-api"
+
+test-api:  ## Testa chamada à API do Mercado Livre com token OAuth
+	@echo "🧪 Testando API do Mercado Livre..."
+	@echo ""
+	@TOKEN=$$(docker exec site cat /app/config/ml_tokens.json 2>/dev/null | jq -r '.access_token'); \
+	if [ -z "$$TOKEN" ]; then \
+		echo "❌ Token não encontrado. Execute: make test-oauth"; \
+		exit 1; \
+	fi; \
+	echo "📡 Buscando dados do usuário..."; \
+	curl -s -H "Authorization: Bearer $$TOKEN" https://api.mercadolibre.com/users/me | jq '{id, nickname, email, pontos: .points, reputacao: .seller_reputation.level_id}'
+
 serve-render:  ## Deploy no Render.com (produção gratuita)
 	@echo "📦 Verificando configuração do Git..."
 	@if [ -z "$$(git config user.email)" ]; then \

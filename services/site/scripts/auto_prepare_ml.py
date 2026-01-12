@@ -171,74 +171,131 @@ def scrape_mercadolivre_product(url):
         title_tag = soup.find('h1', class_='ui-pdp-title')
         title = title_tag.text.strip() if title_tag else "Produto Mercado Livre"
         
-        # Estratégia para pegar preços corretamente
-        # 1. Procurar por todos os preços na página
-        all_prices = soup.find_all('span', class_='andes-money-amount__fraction')
+        # ===== PREÇOS - Estratégia aprimorada =====
+        print(f"\n🔍 Analisando preços...")
         
-        # 2. Procurar especificamente por preço riscado (preço antigo)
-        old_price_tag = soup.find('s', class_='andes-money-amount--previous')
+        # Procurar container principal de preços
+        price_container = soup.find('div', class_='ui-pdp-price')
         
         price = None
         old_price = None
         
-        if old_price_tag and len(all_prices) >= 2:
-            # Se há preço riscado, significa que há promoção
-            # O primeiro preço visível é o promocional, o riscado é o antigo
-            price_text = all_prices[0].text.strip().replace('.', '').replace(',', '.')
-            price = f"R$ {price_text}"
+        if price_container:
+            # Pegar todos os elementos de preço dentro do container
+            all_prices = price_container.find_all('span', class_='andes-money-amount__fraction')
             
-            old_price_fraction = old_price_tag.find('span', class_='andes-money-amount__fraction')
-            if old_price_fraction:
-                old_price_text = old_price_fraction.text.strip().replace('.', '').replace(',', '.')
-                old_price = f"R$ {old_price_text}"
-            else:
-                old_price = price
+            # Procurar preço riscado (preço original antes do desconto)
+            old_price_element = price_container.find('s', class_='andes-money-amount--previous')
+            
+            if old_price_element and len(all_prices) >= 1:
+                # Tem desconto: primeiro preço é o promocional
+                price_text = all_prices[0].text.strip().replace('.', '').replace(',', '.')
+                price = f"R$ {price_text}"
                 
-        elif len(all_prices) > 0:
-            # Sem promoção, ambos preços iguais
-            price_text = all_prices[0].text.strip().replace('.', '').replace(',', '.')
-            price = f"R$ {price_text}"
-            old_price = price
-        else:
-            # Fallback
-            price = "R$ 0.00"
-            old_price = "R$ 0.00"
+                # Preço riscado é o original
+                old_price_fraction = old_price_element.find('span', class_='andes-money-amount__fraction')
+                if old_price_fraction:
+                    old_price_text = old_price_fraction.text.strip().replace('.', '').replace(',', '.')
+                    old_price = f"R$ {old_price_text}"
+                else:
+                    old_price = price
+            elif len(all_prices) > 0:
+                # Sem desconto
+                price_text = all_prices[0].text.strip().replace('.', '').replace(',', '.')
+                price = f"R$ {price_text}"
+                old_price = price
         
-        print(f"\n💰 Preços detectados:")
+        # Fallback: buscar em toda página se não encontrou no container
+        if not price:
+            all_prices = soup.find_all('span', class_='andes-money-amount__fraction')
+            if len(all_prices) > 0:
+                price_text = all_prices[0].text.strip().replace('.', '').replace(',', '.')
+                price = f"R$ {price_text}"
+                old_price = price
+            else:
+                price = "R$ 0.00"
+                old_price = "R$ 0.00"
+        
+        print(f"💰 Preços detectados:")
         print(f"   Preço atual (promocional): {price}")
         print(f"   Preço original: {old_price}")
         if price != old_price:
             print(f"   🎉 Produto com desconto!")
         
-        # Imagens
+        # ===== IMAGENS E VÍDEOS =====
+        print(f"\n🖼️  Coletando mídias...")
+        
         images = []
-        img_tags = soup.find_all('img', class_='ui-pdp-image')
+        videos = []
+        
+        # Estratégia 1: Pegar de todos os thumbnails e galeria
+        img_tags = soup.find_all('img')
         for img in img_tags:
-            img_url = img.get('src') or img.get('data-src')
-            if img_url and img_url.startswith('http'):
-                # Pegar versão em alta resolução
-                img_url = img_url.replace('-I.jpg', '-O.jpg')
-                images.append(img_url)
+            img_url = img.get('src') or img.get('data-src') or img.get('data-zoom')
+            if img_url and 'http' in img_url and 'mlstatic.com' in img_url:
+                # Filtrar apenas imagens de produto (não logos, ícones, etc)
+                if any(x in img_url for x in ['/D_', '/I/', '/O/', '/W/', '/F/']):
+                    # Forçar alta resolução
+                    img_url = img_url.split('?')[0]  # Remover query params
+                    img_url = re.sub(r'-[IOWF]\.', '-O.', img_url)  # Trocar para -O (original)
+                    images.append(img_url)
+        
+        # Estratégia 2: Extrair de scripts JSON-LD (dados estruturados)
+        scripts = soup.find_all('script', type='application/ld+json')
+        for script in scripts:
+            try:
+                data = json.loads(script.string)
+                if isinstance(data, dict) and 'image' in data:
+                    img_data = data['image']
+                    if isinstance(img_data, list):
+                        images.extend(img_data)
+                    elif isinstance(img_data, str):
+                        images.append(img_data)
+            except:
+                pass
+        
+        # Estratégia 3: Vídeos
+        video_tags = soup.find_all('video')
+        for video in video_tags:
+            video_url = video.get('src')
+            if video_url:
+                videos.append(video_url)
+        
+        # Vídeos em source tags
+        source_tags = soup.find_all('source')
+        for source in source_tags:
+            video_url = source.get('src')
+            if video_url and ('video' in video_url or '.mp4' in video_url):
+                videos.append(video_url)
         
         # Remover duplicatas mantendo ordem
         images = list(dict.fromkeys(images))
+        videos = list(dict.fromkeys(videos))
+        
+        # Adicionar vídeos à lista de imagens (para download)
+        all_media = images + videos
+        
+        print(f"   📸 Imagens: {len(images)}")
+        print(f"   🎥 Vídeos: {len(videos)}")
+        print(f"   📦 Total de mídias: {len(all_media)}")
         
         print(f"\n✅ Dados obtidos com sucesso via HTML!")
         print(f"📦 Produto: {title}")
         print(f"💰 Preço: {price}")
-        print(f"🖼️  Imagens encontradas: {len(images)}")
         
         return {
             'title': title,
             'price': price,
             'old_price': old_price,
-            'images': images,
+            'images': all_media,  # Incluir imagens e vídeos
             'external_id': external_id,
             'product_url': product_url
         }
         
     except Exception as e:
         print(f"❌ Erro ao fazer scraping: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def download_images(images, product_slug):

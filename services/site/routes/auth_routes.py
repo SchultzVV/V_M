@@ -2,6 +2,8 @@
 Rotas de autenticação OAuth para Mercado Livre
 """
 
+import os
+import sys
 from flask import Blueprint, request, redirect, jsonify, render_template_string
 from services.ml_auth import ml_auth
 
@@ -12,75 +14,12 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 def mercadolivre_login():
     """
     Inicia o fluxo de autenticação OAuth do Mercado Livre
-    Redireciona o usuário para a página de autorização
+    Redireciona DIRETAMENTE para a página de autorização (sem página intermediária)
     """
     auth_url = ml_auth.get_authorization_url()
     
-    # Template simples para mostrar o link
-    template = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Login - Mercado Livre</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-                margin: 0;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            }
-            .container {
-                background: white;
-                padding: 40px;
-                border-radius: 10px;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-                text-align: center;
-                max-width: 500px;
-            }
-            h1 {
-                color: #333;
-                margin-bottom: 20px;
-            }
-            .btn {
-                display: inline-block;
-                padding: 15px 30px;
-                background: #FFE600;
-                color: #333;
-                text-decoration: none;
-                border-radius: 5px;
-                font-weight: bold;
-                transition: transform 0.2s;
-            }
-            .btn:hover {
-                transform: scale(1.05);
-            }
-            .info {
-                margin-top: 20px;
-                color: #666;
-                font-size: 14px;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🔐 Autenticação Mercado Livre</h1>
-            <p>Clique no botão abaixo para autorizar nossa aplicação a acessar sua conta do Mercado Livre.</p>
-            <br>
-            <a href="{{ auth_url }}" class="btn">🛍️ Autorizar no Mercado Livre</a>
-            <div class="info">
-                <p><strong>Permissões solicitadas:</strong></p>
-                <p>✅ Leitura de produtos<br>
-                   ✅ Receber notificações de atualizações</p>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-    
-    return render_template_string(template, auth_url=auth_url)
+    # Redirecionar diretamente para evitar problemas com CloudFront/bloqueios
+    return redirect(auth_url)
 
 
 @auth_bp.route("/mercadolivre/callback")
@@ -106,8 +45,14 @@ def mercadolivre_callback():
         }), 400
     
     try:
+        print(f"🔍 Callback recebido - código: {code[:30]}...", flush=True)
+        sys.stdout.flush()
+        
         # Troca o código por tokens
         tokens = ml_auth.exchange_code_for_token(code)
+        
+        print(f"✅ Tokens recebidos com sucesso!", flush=True)
+        sys.stdout.flush()
         
         # Template de sucesso
         template = """
@@ -199,9 +144,17 @@ def mercadolivre_callback():
         )
         
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"❌ ERRO no callback:", flush=True)
+        print(error_trace, flush=True)
+        sys.stdout.flush()
+        
         return jsonify({
             "status": "error",
-            "message": f"Erro ao processar callback: {str(e)}"
+            "message": f"Erro ao processar callback: {str(e)}",
+            "type": type(e).__name__,
+            "trace": error_trace if os.getenv("DEBUG") == "True" else None
         }), 500
 
 
