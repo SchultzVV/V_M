@@ -84,6 +84,76 @@ test-oauth:  ## Testa o fluxo OAuth - Abre navegador para autorizar
 	@echo "💡 Recomendado: Use o Método 2 (URL direta) para evitar bloqueios"
 	@echo "✅ Após autorizar, verifique os tokens com: make check-tokens"
 
+oauth-url:  ## Gera URL de autenticação OAuth com ngrok atual
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔑 URL DE AUTENTICAÇÃO OAUTH - MERCADO LIVRE"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@NGROK_URL=$$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | jq -r '.tunnels[0].public_url' 2>/dev/null); \
+	if [ -z "$$NGROK_URL" ] || [ "$$NGROK_URL" = "null" ]; then \
+		echo "❌ Ngrok não está rodando!"; \
+		echo ""; \
+		echo "Execute primeiro: make serve-ngrok"; \
+		exit 1; \
+	fi; \
+	APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2); \
+	AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NGROK_URL/auth/mercadolivre/callback"; \
+	echo "🌐 URL do ngrok atual:"; \
+	echo "   $$NGROK_URL"; \
+	echo ""; \
+	echo "🔗 Cole esta URL no navegador para autorizar:"; \
+	echo ""; \
+	echo "$$AUTH_URL"; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "⚠️  IMPORTANTE: Cadastre no painel do Mercado Livre:"
+	@echo "   https://developers.mercadolivre.com.br/devcenter"
+	@echo ""
+	@NGROK_URL=$$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | jq -r '.tunnels[0].public_url' 2>/dev/null); \
+	echo "   Redirect URI: $$NGROK_URL/auth/mercadolivre/callback"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+
+update-ngrok-url:  ## Atualiza .env e reinicia containers com nova URL do ngrok
+	@echo ""
+	@echo "🔄 Atualizando configuração do ngrok..."
+	@echo ""
+	@NGROK_URL=$$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | jq -r '.tunnels[0].public_url' 2>/dev/null); \
+	if [ -z "$$NGROK_URL" ] || [ "$$NGROK_URL" = "null" ]; then \
+		echo "❌ Ngrok não está rodando!"; \
+		echo "Execute primeiro: make serve-ngrok"; \
+		exit 1; \
+	fi; \
+	OLD_URL=$$(grep "^ML_REDIRECT_URI=" .env | cut -d'=' -f2); \
+	NEW_URL="$$NGROK_URL/auth/mercadolivre/callback"; \
+	echo "🔗 URL antiga: $$OLD_URL"; \
+	echo "🔗 URL nova:   $$NEW_URL"; \
+	echo ""; \
+	if [ "$$OLD_URL" = "$$NEW_URL" ]; then \
+		echo "✅ URL já está atualizada!"; \
+		exit 0; \
+	fi; \
+	echo "📝 Atualizando .env..."; \
+	sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=$$NEW_URL|" .env; \
+	echo "✅ .env atualizado"; \
+	echo ""; \
+	echo "🔄 Reiniciando containers para carregar nova URL..."; \
+	docker-compose down > /dev/null 2>&1; \
+	docker-compose up -d > /dev/null 2>&1; \
+	sleep 3; \
+	echo "✅ Containers reiniciados"; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "⚠️  PRÓXIMOS PASSOS:"; \
+	echo ""; \
+	echo "1. Cadastre no painel ML: https://developers.mercadolivre.com.br/devcenter"; \
+	echo "   Redirect URI: $$NEW_URL"; \
+	echo ""; \
+	echo "2. Autorize novamente: make oauth-url"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+
 check-tokens:  ## Verifica se os tokens OAuth foram salvos
 	@echo "🔍 Verificando tokens salvos..."
 	@echo ""
@@ -235,55 +305,99 @@ mc-alias:  ## Cria alias do cliente MinIO (MC)
 	alias set localminio http://minio:9000 minio minio123
 
 
-run-py: ## Roda um script Python dentro do container site-dev
-	@if ! docker ps | grep -q site-dev; then \
-		echo "🛠️  Container site-dev não encontrado. Subindo com docker-compose..."; \
+run-py: ## Roda um script Python dentro do container site
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
 		$(COMPOSE) up -d --build site; \
 	fi
-	@docker exec -it site-dev python3 $(script)
+	@docker exec -it site python3 $(script)
 
-stage: ## Executa o stage_products.py dentro do site-dev
-	@if ! docker ps | grep -q site-dev; then \
-		echo "🛠️  Container site-dev não encontrado. Subindo com docker-compose..."; \
+stage: ## Executa o stage_products.py dentro do site
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
 		$(COMPOSE) up -d --build site; \
 	fi
-	@docker exec -it site-dev python3 scripts/stage_products.py
+	@docker exec -it site python3 scripts/stage_products.py
 
-prepare-products: ## Executa generate_staging_json.py dentro do site-dev
+prepare-products: ## Executa generate_staging_json.py dentro do site
 	$(MAKE) run-py script=scripts/generate_staging_json.py
 
-prepare-auto: ## Prepara produto automaticamente do Mercado Livre (uso: make prepare-auto URL=https://...)
+prepare-auto: ## Prepara produto via scraping HTML (uso: make prepare-auto URL=https://...)
 	@if [ -z "$(URL)" ]; then \
 		echo "❌ Erro: URL não fornecida"; \
 		echo ""; \
 		echo "Uso: make prepare-auto URL=https://mercadolivre.com/sec/ABC123"; \
 		exit 1; \
 	fi
-	@if ! docker ps | grep -q site-dev; then \
-		echo "🛠️  Container site-dev não encontrado. Subindo com docker-compose..."; \
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
 		$(COMPOSE) up -d --build site; \
 	fi
-	@echo "🤖 Preparando produto automaticamente..."
-	@docker exec -it site-dev python3 scripts/auto_prepare_ml.py "$(URL)"
+	@echo "🤖 Preparando produto via scraping..."
+	@docker exec -it site python3 scripts/auto_prepare_ml.py "$(URL)"
+
+api-prepare-product: ## Prepara produto via API oficial (uso: make api-prepare-product URL=https://...)
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make api-prepare-product URL=https://mercadolivre.com/sec/ABC123"; \
+		echo "     make api-prepare-product URL=https://produto.mercadolivre.com.br/MLB-..."; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo "🚀 Preparando produto via API oficial..."
+	@docker exec -it site python3 scripts/api_prepare_ml.py "$(URL)"
 
 migrate-tags: ## Executa a migração para adicionar coluna tags
-	@if ! docker ps | grep -q site-dev; then \
-		echo "🛠️  Container site-dev não encontrado. Subindo com docker-compose..."; \
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
 		$(COMPOSE) up -d --build site; \
 	fi
-	@docker exec -it site-dev python3 scripts/migrate_add_tags.py
+	@docker exec -it site python3 scripts/migrate_add_tags.py
 
 migrate-webhook: ## Executa a migração para adicionar campos de webhook
-	@if ! docker ps | grep -q site-dev; then \
-		echo "🛠️  Container site-dev não encontrado. Subindo com docker-compose..."; \
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
 		$(COMPOSE) up -d --build site; \
 	fi
-	@docker exec -it site-dev python3 scripts/migrate_add_webhook_fields.py
+	@docker exec -it site python3 scripts/migrate_add_webhook_fields.py
 
 
 help: ## Mostra esta ajuda
-	@echo "🛠️  Comandos disponíveis:"
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9._-]+:.*##/ {printf "👉 \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🛠️  COMANDOS DISPONÍVEIS"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "📦 DESENVOLVIMENTO:"
+	@awk 'BEGIN {FS = ":.*?## "} /^(up|down|restart-site|redo-site|logs-site):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "🌐 NGROK & DEPLOY:"
+	@awk 'BEGIN {FS = ":.*?## "} /^(serve-ngrok|serve-render):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "🔑 OAUTH MERCADO LIVRE:"
+	@awk 'BEGIN {FS = ":.*?## "} /^(oauth-url|update-ngrok-url|test-oauth|check-tokens|test-api):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "🤖 PRODUTOS (Mercado Livre):"
+	@awk 'BEGIN {FS = ":.*?## "} /^(prepare-auto|api-prepare-product|stage|prepare-products):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "🗄️  BANCO DE DADOS:"
+	@awk 'BEGIN {FS = ":.*?## "} /^(migrate-tags|migrate-webhook):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "🚀 PRODUÇÃO:"
+	@awk 'BEGIN {FS = ":.*?## "} /^(prd-up|prd-down|prd-up-ghcr):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "🧹 LIMPEZA:"
+	@awk 'BEGIN {FS = ":.*?## "} /^(prune|clean-images):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "💡 AJUDA DETALHADA:"
+	@echo "   make help-products  - Guia completo de produtos"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
 
 help-products: ## Mostra ajuda para adicionar produtos
 	@echo ""
@@ -291,15 +405,23 @@ help-products: ## Mostra ajuda para adicionar produtos
 	@echo "🤖 FLUXO AUTOMÁTICO - Adicionar Produto do Mercado Livre"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
-	@echo "1️⃣  Preparar produto automaticamente:"
+	@echo "🚀 MÉTODO RECOMENDADO - API Oficial (OAuth necessário):"
+	@echo "   make api-prepare-product URL=\"https://mercadolivre.com/sec/ABC123\""
+	@echo ""
+	@echo "   ✅ Dados 100% precisos da API oficial"
+	@echo "   ✅ Imagens em alta qualidade"
+	@echo "   ✅ Preços e descontos reais"
+	@echo "   ✅ Vídeos do produto (se houver)"
+	@echo "   ✅ Resolve links de afiliado automaticamente"
+	@echo ""
+	@echo "🔄 MÉTODO ALTERNATIVO - Scraping HTML (sem OAuth):"
 	@echo "   make prepare-auto URL=\"https://produto.mercadolivre.com.br/MLB-...\""
 	@echo ""
-	@echo "   ✅ Faz scraping do produto"
-	@echo "   ✅ Baixa imagens automaticamente"
-	@echo "   ✅ Detecta categoria"
-	@echo "   ✅ Gera JSON de staging"
+	@echo "   ✅ Funciona sem autenticação"
+	@echo "   ⚠️  Imagens podem vir incorretas"
+	@echo "   ⚠️  Preços podem estar desatualizados"
 	@echo ""
-	@echo "2️⃣  Publicar no site:"
+	@echo "📤 PUBLICAR NO SITE:"
 	@echo "   make stage"
 	@echo ""
 	@echo "   ✅ Upload de imagens para MinIO"
@@ -318,13 +440,13 @@ help-products: ## Mostra ajuda para adicionar produtos
 	@echo "📚 Documentação completa: services/site/docs/AUTO_PREPARE_PRODUTOS.md"
 	@echo ""
 
-check-stage:
+check-stage: ## Verifica imagens no staging
 	@$(MAKE) run-py script=scripts/check_stage_images.py
 
-prune:clean-images
+prune: ## Remove containers, volumes e imagens não utilizadas
 	docker system prune -f --volumes
 
-clean-images:
+clean-images: ## Remove TODAS as imagens Docker (cuidado!)
 	@if [ -n "$$(docker images -q)" ]; then \
 		echo "🔴 Removendo todas as imagens Docker..."; \
 		docker stop $$(docker ps -q); \

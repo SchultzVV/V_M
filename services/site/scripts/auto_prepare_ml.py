@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Script para preparar produtos automaticamente do Mercado Livre.
-Faz scraping do link, baixa imagens e gera o JSON de staging.
+Usa API oficial (com OAuth) para dados precisos + fallback para scraping.
 
 Uso:
     python scripts/auto_prepare_ml.py https://mercadolivre.com/sec/ABC123
@@ -15,7 +15,22 @@ from datetime import datetime
 from slugify import slugify
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs
+from pathlib import Path
 import re
+
+# Caminho para arquivo de tokens OAuth
+TOKEN_FILE = Path(__file__).parent.parent / "config" / "ml_tokens.json"
+
+def load_ml_token():
+    """Carrega o access token do Mercado Livre do arquivo de config."""
+    try:
+        if TOKEN_FILE.exists():
+            with open(TOKEN_FILE, 'r') as f:
+                tokens = json.load(f)
+                return tokens.get('access_token')
+    except Exception as e:
+        print(f"⚠️  Não foi possível carregar token OAuth: {e}")
+    return None
 
 def extract_ml_product_id(url):
     """Extrai o ID do produto do Mercado Livre da URL."""
@@ -95,8 +110,8 @@ def follow_affiliate_link(url):
 
 def scrape_mercadolivre_product(url):
     """
-    Faz scraping dos dados do produto no Mercado Livre.
-    Retorna dict com: title, price, old_price, images, external_id
+    Coleta dados do produto do Mercado Livre usando API oficial (prioritário) ou scraping.
+    Retorna dict com: title, price, old_price, images, videos, external_id
     """
     print(f"\n{'='*60}")
     print(f"📥 COLETANDO DADOS DO PRODUTO")
@@ -121,48 +136,99 @@ def scrape_mercadolivre_product(url):
             print(f"\n🆔 ID do produto encontrado: {external_id}")
         else:
             print(f"\n⚠️  Não foi possível extrair o ID do produto")
+            return None
         
-        # Tentar usar a API do Mercado Livre se tivermos o ID
-        if external_id:
-            try:
-                print(f"🌐 Consultando API do Mercado Livre...")
-                api_url = f"https://api.mercadolibre.com/items/{external_id}"
-                api_response = requests.get(api_url, timeout=10)
+        # ===== TENTAR API OFICIAL DO MERCADO LIVRE =====
+        print(f"\n🔑 Tentando usar API oficial do Mercado Livre...")
+        
+        # Carregar token OAuth (se disponível)
+        access_token = load_ml_token()
+        
+        api_headers = {}
+        if access_token:
+            api_headers['Authorization'] = f'Bearer {access_token}'
+            print(f"✅ Token OAuth encontrado - usando API autenticada")
+        else:
+            print(f"ℹ️  Token OAuth não encontrado - usando API pública")
+        
+        try:
+            # Buscar dados do item
+            api_url = f"https://api.mercadolibre.com/items/{external_id}"
+            api_response = requests.get(api_url, headers=api_headers, timeout=10)
+            
+            if api_response.status_code == 200:
+                data = api_response.json()
                 
-                if api_response.status_code == 200:
-                    data = api_response.json()
-                    
-                    title = data.get('title', '')
-                    price = data.get('price', 0)
-                    old_price = data.get('original_price') or price
-                    
-                    # Pegar imagens
-                    images = []
-                    pictures = data.get('pictures', [])
-                    for pic in pictures:
-                        img_url = pic.get('secure_url') or pic.get('url')
-                        if img_url:
-                            images.append(img_url)
-                    
-                    print(f"\n✅ Dados obtidos com sucesso via API!")
-                    print(f"📦 Produto: {title}")
-                    print(f"💰 Preço: R$ {price:.2f}")
-                    print(f"🖼️  Imagens encontradas: {len(images)}")
-                    print(f"🖼️  Imagens encontradas: {len(images)}")
-                    
-                    return {
-                        'title': title,
-                        'price': f"R$ {price:.2f}",
-                        'old_price': f"R$ {old_price:.2f}",
-                        'images': images,
-                        'external_id': external_id,
-                        'product_url': product_url
-                    }
-            except Exception as e:
-                print(f"⚠️  Falha na API, tentando scraping HTML: {e}")
+                # Extrair informações básicas
+                title = data.get('title', '')
+                price = data.get('price', 0)
+                original_price = data.get('original_price')
+                old_price = original_price if original_price else price
+                
+                # Detectar desconto
+                has_discount = original_price and original_price > price
+                discount_pct = 0
+                if has_discount:
+                    discount_pct = ((original_price - price) / original_price) * 100
+                
+                # Pegar TODAS as imagens em alta resolução
+                images = []
+                pictures = data.get('pictures', [])
+                for pic in pictures:
+                    # Preferir secure_url, fallback para url
+                    img_url = pic.get('secure_url') or pic.get('url')
+                    if img_url:
+                        images.append(img_url)
+                
+                # Pegar vídeo (se houver)
+                videos = []
+                video_id = data.get('video_id')
+                if video_id:
+                    videos.append(f"https://www.youtube.com/watch?v={video_id}")
+                
+                # Informações adicionais úteis
+                condition = data.get('condition', 'new')  # new, used
+                available_quantity = data.get('available_quantity', 0)
+                sold_quantity = data.get('sold_quantity', 0)
+                permalink = data.get('permalink', product_url)
+                
+                print(f"\n✅ DADOS OBTIDOS COM SUCESSO VIA API!")
+                print(f"{'='*60}")
+                print(f"📦 Produto: {title}")
+                print(f"💰 Preço atual: R$ {price:.2f}")
+                if has_discount:
+                    print(f"💰 Preço original: R$ {old_price:.2f}")
+                    print(f"🎉 Desconto: {discount_pct:.1f}% OFF")
+                print(f"📊 Condição: {'Novo' if condition == 'new' else 'Usado'}")
+                print(f"📦 Disponível: {available_quantity} unidades")
+                print(f"✅ Vendidos: {sold_quantity} unidades")
+                print(f"🖼️  Imagens: {len(images)}")
+                if videos:
+                    print(f"🎥 Vídeos: {len(videos)}")
+                print(f"{'='*60}\n")
+                
+                return {
+                    'title': title,
+                    'price': f"R$ {price:.2f}",
+                    'old_price': f"R$ {old_price:.2f}",
+                    'images': images,
+                    'videos': videos,
+                    'external_id': external_id,
+                    'product_url': permalink,
+                    'condition': condition,
+                    'available_quantity': available_quantity,
+                    'sold_quantity': sold_quantity,
+                    'has_discount': has_discount,
+                    'discount_percentage': round(discount_pct, 1) if has_discount else 0
+                }
+            else:
+                print(f"⚠️  API retornou status {api_response.status_code}")
+                
+        except Exception as e:
+            print(f"⚠️  Erro ao consultar API: {e}")
         
-        # Fallback: scraping HTML
-        print(f"\n🔄 Tentando scraping HTML da página...")
+        # ===== FALLBACK: SCRAPING HTML =====
+        print(f"\n🔄 Fazendo fallback para scraping HTML...")
         response = requests.get(product_url, headers=headers, timeout=15, allow_redirects=True)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -442,16 +508,25 @@ def ask_user_category(suggested_category):
 def generate_staging_json(product_data, images_dir, original_affiliate_link, tag):
     """
     Gera o JSON de staging com os dados do produto.
-    Usa o link completo do produto (não o link curto de afiliado).
+    IMPORTANTE: Usa o link de afiliado original para garantir comissão!
+    Nunca usar permalink ou URL limpa - isso quebra o tracking de afiliado.
     """
-    os.makedirs("staging", exist_ok=True)
+    # Detectar se está rodando dentro do container ou na raiz do projeto
+    if os.path.exists('/app/staging'):
+        staging_dir = '/app/staging'
+    elif os.path.exists('services/site/staging'):
+        staging_dir = 'services/site/staging'
+    else:
+        staging_dir = 'staging'
+    
+    os.makedirs(staging_dir, exist_ok=True)
     
     slug = slugify(product_data['title'])
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"staging/{slug}_{timestamp}.json"
+    filename = f"{staging_dir}/{slug}_{timestamp}.json"
     
-    # Usar o link completo do produto obtido durante o scraping
-    product_link = product_data.get('product_url', original_affiliate_link)
+    # SEMPRE usar link de afiliado original - garante comissão!
+    # Mesmo que tenha página intermediária, preserva tracking de afiliado
     
     data = {
         "platform": "mercadolivre",
@@ -460,13 +535,31 @@ def generate_staging_json(product_data, images_dir, original_affiliate_link, tag
         "price": product_data['price'],
         "oldPrice": product_data['old_price'],
         "images_local": images_dir,
-        "images": [],  # será preenchido pelo stage_products.py
-        "link": product_link,  # Link completo do produto, não o de afiliado
+        "images": [],
+        "link": original_affiliate_link,  # Link de afiliado original!
         "tag": tag,
         "disponivel": True,
         "criado_em": timestamp,
         "via_webhook": False
     }
+    
+    # Adicionar campos extras se vieram da API
+    if product_data.get('videos'):
+        data['videos'] = product_data['videos']
+    
+    if product_data.get('condition'):
+        data['condition'] = product_data['condition']
+    
+    if product_data.get('available_quantity') is not None:
+        data['available_quantity'] = product_data['available_quantity']
+    
+    if product_data.get('sold_quantity') is not None:
+        data['sold_quantity'] = product_data['sold_quantity']
+    
+    if product_data.get('has_discount'):
+        data['has_discount'] = product_data['has_discount']
+        data['discount_percentage'] = product_data.get('discount_percentage', 0)
+
     
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
