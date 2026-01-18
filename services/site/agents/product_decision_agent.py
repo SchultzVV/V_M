@@ -8,7 +8,7 @@ import json
 import glob
 from typing import Any, Dict, List
 from datetime import datetime
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from agents import BaseAgent
 
 

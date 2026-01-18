@@ -5,8 +5,8 @@ Segue princípios SOLID (Single Responsibility e Open/Closed)
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema import BaseMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import BaseMessage
 import redis
 import json
 import hashlib

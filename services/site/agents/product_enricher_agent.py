@@ -4,7 +4,7 @@ Enriquece os dados do produto com informações adicionais e
 prepara descrição otimizada para Instagram
 """
 from typing import Any, Dict
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from agents import BaseAgent
 import os
 

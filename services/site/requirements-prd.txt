@@ -25,6 +25,7 @@ requests>=2.31,<3.0
 # 🤖 LangChain e AI
 # ==============================
 langchain>=0.1.0
+langchain-core>=0.1.0
 langchain-openai>=0.0.5
 langchain-community>=0.0.20
 langgraph>=0.0.26
