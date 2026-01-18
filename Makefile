@@ -36,7 +36,19 @@ COMPOSE = docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml --env
 # =====================
 
 up:  ## Sobe o ambiente de desenvolvimento
-	$(COMPOSE) up --build
+	@echo "🔧 Subindo containers Docker em modo desenvolvimento..."
+	$(COMPOSE) up -d --build
+	@echo ""
+	@echo "✅ Ambiente iniciado com sucesso!"
+	@echo ""
+	@echo "🌐 Acesso local:"
+	@echo "   https://localhost:5000"
+	@echo ""
+	@echo "📋 Comandos úteis:"
+	@echo "   make logs-site        - Ver logs em tempo real"
+	@echo "   make serve-ngrok      - Expor via ngrok (para webhooks ML)"
+	@echo "   make down             - Parar containers"
+	@echo ""
 
 down:  ## Para e remove containers + volumes
 	$(COMPOSE) down -v
@@ -348,8 +360,96 @@ api-prepare-product: ## Prepara produto via API oficial (uso: make api-prepare-p
 		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
 		$(COMPOSE) up -d --build site; \
 	fi
-	@echo "🚀 Preparando produto via API oficial..."
-	@docker exec -it site python3 scripts/api_prepare_ml.py "$(URL)"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "📂 CATEGORIAS DISPONÍVEIS:"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "   1. geral    - Produtos gerais (padrão)"
+	@echo "   2. E        - Eletrônicos"
+	@echo "   3. CD       - Casa & Decoração"
+	@echo "   4. ME       - Moda & Estilo"
+	@echo "   5. PET      - Pet Shop"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@read -p "🏷️  Digite a categoria (geral/E/CD/ME/PET) ou Enter para 'geral': " CATEGORIA; \
+	CATEGORIA=$${CATEGORIA:-geral}; \
+	echo ""; \
+	echo "🚀 Preparando produto via API oficial..."; \
+	echo "📂 Categoria selecionada: $$CATEGORIA"; \
+	echo ""; \
+	docker exec -it site python3 scripts/api_prepare_ml.py "$(URL)" "$$CATEGORIA"
+
+prepare-all: ## Prepara TODOS os produtos da lista (list_to_prepare.json)
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 PREPARAÇÃO EM LOTE - TODOS OS PRODUTOS"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@TOTAL=$$(cat services/site/list_to_prepare_and_stage/list_to_prepare.json | jq '.links | length'); \
+	echo "📦 Total de produtos na fila: $$TOTAL"; \
+	echo ""; \
+	read -p "⚠️  Deseja continuar? Você escolherá a categoria de cada produto. (s/N): " CONFIRMA; \
+	if [ "$$CONFIRMA" != "s" ] && [ "$$CONFIRMA" != "S" ]; then \
+		echo "❌ Operação cancelada."; \
+		exit 0; \
+	fi; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "🔄 INICIANDO PROCESSAMENTO..."; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	CONTADOR=0; \
+	SUCESSO=0; \
+	ERRO=0; \
+	cat services/site/list_to_prepare_and_stage/list_to_prepare.json | jq -r '.links[].url' | while read URL; do \
+		CONTADOR=$$((CONTADOR + 1)); \
+		echo ""; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		echo "📦 Produto $$CONTADOR/$$TOTAL"; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		echo "🔗 URL: $$URL"; \
+		echo ""; \
+		echo "📂 CATEGORIAS DISPONÍVEIS:"; \
+		echo "   1. geral    - Produtos gerais (padrão)"; \
+		echo "   2. E        - Eletrônicos"; \
+		echo "   3. CD       - Casa & Decoração"; \
+		echo "   4. ME       - Moda & Estilo"; \
+		echo "   5. PET      - Pet Shop"; \
+		echo ""; \
+		read -p "🏷️  Categoria para este produto (ou Enter para 'geral'): " CATEGORIA; \
+		CATEGORIA=$${CATEGORIA:-geral}; \
+		echo ""; \
+		echo "✅ Categoria: $$CATEGORIA"; \
+		echo ""; \
+		if docker exec site python3 scripts/api_prepare_ml.py "$$URL" "$$CATEGORIA"; then \
+			echo ""; \
+			echo "✅ Produto $$CONTADOR preparado com sucesso!"; \
+			SUCESSO=$$((SUCESSO + 1)); \
+		else \
+			echo ""; \
+			echo "❌ Erro ao processar produto $$CONTADOR"; \
+			ERRO=$$((ERRO + 1)); \
+		fi; \
+		echo ""; \
+		read -p "⏸️  Pressione Enter para continuar com o próximo produto..."; \
+	done; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "✅ PROCESSAMENTO CONCLUÍDO!"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	echo "📊 Resumo:"; \
+	echo "   Total processados: $$TOTAL produtos"; \
+	echo ""; \
+	echo "💡 IMPORTANTE: Verifique os JSONs gerados em staging/"; \
+	echo ""; \
+	echo "📋 Próximo passo:"; \
+	echo "   make stage    # Publicar todos os produtos preparados"; \
+	echo ""
 
 migrate-tags: ## Executa a migração para adicionar coluna tags
 	@if ! docker ps | grep -q site; then \
@@ -391,7 +491,7 @@ help: ## Mostra esta ajuda
 	@awk 'BEGIN {FS = ":.*?## "} /^(prd-up|prd-down|prd-up-ghcr):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "🧹 LIMPEZA:"
-	@awk 'BEGIN {FS = ":.*?## "} /^(prune|clean-images):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*?## "} /^(prune|clean-images|clear-minio|clear-minio-force):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "💡 AJUDA DETALHADA:"
@@ -442,6 +542,20 @@ help-products: ## Mostra ajuda para adicionar produtos
 
 check-stage: ## Verifica imagens no staging
 	@$(MAKE) run-py script=scripts/check_stage_images.py
+
+clear-minio: ## Remove TODAS as imagens do MinIO (com confirmação)
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@docker exec -it site python3 scripts/clear_minio_images.py
+
+clear-minio-force: ## Remove TODAS as imagens do MinIO (SEM confirmação - cuidado!)
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@docker exec -it site python3 scripts/clear_minio_images.py --force
 
 prune: ## Remove containers, volumes e imagens não utilizadas
 	docker system prune -f --volumes

@@ -2,13 +2,13 @@
   "platform": "mercadolivre",
   "external_id": "MLB19731776",
   "title": "Robô aspirador Robot W90 varre aspira e passa pano 30w Wap cor preto",
-  "price": "R$ 514",
-  "oldPrice": "R$ 514",
+  "price": 514.0,
+  "oldPrice": 0,
   "images_local": "uploads/robo-aspirador-robot-w90-varre-aspira-e-passa-pano-30w-wap-cor-preto",
   "images": [],
-  "link": "https://www.mercadolivre.com.br/rob-aspirador-robot-w90-varre-aspira-e-passa-pano-30w-wap-cor-preto/p/MLB19731776",
-  "tag": "E",
+  "link": "https://mercadolivre.com/sec/1V2ijXV",
+  "tag": "geral",
   "disponivel": true,
-  "criado_em": "20260112_201358",
+  "criado_em": "20260113_185328",
   "via_webhook": false
 }

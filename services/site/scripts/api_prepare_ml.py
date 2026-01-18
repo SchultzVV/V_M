@@ -195,13 +195,14 @@ def enrich_with_api(product_data_html, item_id, token, original_url):
     if not api_data:
         print("\n❌ API não disponível - usando APENAS dados do scraping HTML")
         print("   💡 Os dados do scraping podem estar desatualizados ou incompletos")
+        print("   ⚠️  IMAGENS DO SCRAPING NÃO SERÃO BAIXADAS (podem estar incorretas)")
+        print("   🖼️  Será usado placeholder/fallback no staging")
         
-        # Como a API falhou, agora baixa as imagens do scraping
-        if product_data_html.get('images'):
-            print(f"\n📥 Baixando {len(product_data_html['images'])} imagens do scraping como fallback...")
-            product_slug = slugify(product_data_html['title'])
-            images_dir = download_images_from_scraping(product_data_html['images'], product_slug)
-            product_data_html['images_local'] = images_dir
+        # NÃO baixa imagens do scraping - elas estão erradas
+        # Usa placeholder para fallback
+        product_slug = slugify(product_data_html['title'])
+        product_data_html['images_local'] = f"uploads/{product_slug}"
+        product_data_html['needs_fallback_image'] = True
         
         return product_data_html
     
@@ -406,12 +407,16 @@ def main():
     
     if len(sys.argv) < 2:
         print("\n❌ URL não fornecida!")
-        print("\nUso: python3 api_prepare_ml.py <URL>")
-        print("Exemplo: python3 api_prepare_ml.py https://mercadolivre.com/sec/ABC123")
+        print("\nUso: python3 api_prepare_ml.py <URL> [CATEGORIA]")
+        print("Exemplo: python3 api_prepare_ml.py https://mercadolivre.com/sec/ABC123 E")
+        print("\nCategorias disponíveis: geral, E, CD, ME, PET")
         sys.exit(1)
     
     original_url = sys.argv[1]
-    print(f"\n🔗 URL: {original_url}\n")
+    categoria = sys.argv[2] if len(sys.argv) > 2 else 'geral'
+    
+    print(f"\n🔗 URL: {original_url}")
+    print(f"📂 Categoria: {categoria}\n")
     
     # PASSO 1: Usa scraping HTML (que funciona!) para obter dados básicos
     print("=" * 60)
@@ -427,6 +432,9 @@ def main():
         print("\n❌ Falha ao obter dados via scraping")
         print("💡 Verifique se o link do produto está correto")
         sys.exit(1)
+    
+    # Define a categoria
+    product_data_html['tag'] = categoria
     
     print(f"\n✅ Dados básicos obtidos via scraping:")
     print(f"   📦 Produto: {product_data_html['title'][:60]}...")
