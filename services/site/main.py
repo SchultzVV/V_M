@@ -29,6 +29,7 @@ from routes.index import index_bp
 from routes.webhook_routes import webhook_bp
 from routes.auth_routes import auth_bp
 from routes.sync_routes import sync_bp
+from routes.instagram_routes import instagram_bp
 
 app = Flask(__name__)
 
@@ -50,6 +51,7 @@ app.register_blueprint(ai_bp)
 app.register_blueprint(webhook_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(sync_bp)
+app.register_blueprint(instagram_bp)
 
 with app.app_context():
     db.create_all()  # ✅ Cria a tabela 'products' se não existir

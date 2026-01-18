@@ -543,6 +543,53 @@ help-products: ## Mostra ajuda para adicionar produtos
 check-stage: ## Verifica imagens no staging
 	@$(MAKE) run-py script=scripts/check_stage_images.py
 
+# =====================
+# 📸 Instagram
+# =====================
+
+instagram-post: ## Posta produto no Instagram (modo automático)
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo "📸 Postando automaticamente no Instagram..."
+	@curl -X POST "http://localhost:5000/instagram/post/auto?simulate=false" \
+		-H "Content-Type: application/json" | jq .
+
+instagram-test: ## Testa postagem Instagram (não posta de verdade)
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo "🎭 Testando postagem Instagram (modo simulação)..."
+	@curl -X POST "http://localhost:5000/instagram/post/auto?simulate=true" \
+		-H "Content-Type: application/json" | jq .
+
+instagram-status: ## Verifica status do sistema Instagram
+	@echo "🔍 Verificando status do sistema Instagram..."
+	@curl -s "http://localhost:5000/instagram/status" | jq .
+
+instagram-history: ## Mostra histórico de posts no Instagram
+	@echo "📋 Histórico de posts no Instagram..."
+	@curl -s "http://localhost:5000/instagram/history?limit=10" | jq .
+
+instagram-workflow: ## Mostra diagrama do workflow dos agentes
+	@curl -s "http://localhost:5000/instagram/workflow" | jq -r '.workflow_diagram'
+
+instagram-test-system: ## Testa todos os componentes do sistema Instagram
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo "🧪 Testando sistema completo..."
+	@docker exec -it site python3 test_instagram_system.py
+
+stage-and-post: ## Publica no ML e posta automaticamente no Instagram
+	@echo "🚀 Executando fluxo completo: ML + Instagram"
+	@$(MAKE) stage
+	@sleep 2
+	@$(MAKE) instagram-post
+
 clear-minio: ## Remove TODAS as imagens do MinIO (com confirmação)
 	@if ! docker ps | grep -q site; then \
 		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
