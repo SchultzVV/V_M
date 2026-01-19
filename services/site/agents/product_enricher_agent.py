@@ -74,100 +74,31 @@ class ProductEnricherAgent(BaseAgent):
         product: Dict[str, Any],
         custom_context: str = None
     ) -> Dict[str, Any]:
-        """Usa LLM para enriquecer os dados do produto"""
+        """Enriquece dados (modo mock - sem LLM)"""
+        
+        print("🎭 Modo MOCK: Gerando conteúdo básico")
         
         title = product.get('title', '')
         price = product.get('price', 0)
         platform = product.get('platform', 'mercadolivre')
         link = product.get('link', '')
         
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", """Você é um especialista em marketing digital para Instagram.
-            Sua tarefa é criar conteúdo engajador para posts de produtos.
-            
-            IMPORTANTE:
-            - A legenda deve ser atraente e criar desejo
-            - Use emojis de forma estratégica (mas não exagere)
-            - Inclua benefícios claros do produto
-            - Crie senso de urgência quando apropriado
-            - Mantenha tom conversacional e amigável
-            - Legenda deve ter entre 100-200 caracteres
-            
-            Retorne um JSON com:
-            - caption: legenda principal (string)
-            - hashtags: lista de 8-12 hashtags relevantes (array)
-            - call_to_action: chamada para ação (string)
-            - visual_suggestions: sugestões para a imagem (string)
-            - key_features: 3-4 características principais (array)
-            """),
-            ("user", """Produto:
-Título: {title}
-Preço: R$ {price}
-Plataforma: {platform}
-Link: {link}
-
-Contexto adicional: {context}
-
-Crie o conteúdo otimizado para Instagram.""")
-        ])
-        
-        chain = prompt | self.llm
-        
-        response = chain.invoke({
-            "title": title,
-            "price": f"{price:.2f}",
+        # Gera conteúdo básico sem usar LLM
+        return {
+            "caption": f"🔥 {title}\n\n💰 Por apenas R$ {price:.2f}\n\n✨ Aproveite esta oferta!",
+            "hashtags": ["#oferta", "#promocao", "#comprasonline", "#deals", "#mercadolivre"],
+            "call_to_action": "🛒 Link na bio!",
+            "visual_suggestions": "Imagem com preço em destaque",
+            "key_features": ["Qualidade garantida", "Melhor preço", "Entrega rápida"],
+            "original_title": title,
+            "price": price,
             "platform": platform,
-            "link": link if link else "Link na bio",
-            "context": custom_context or "Produto de alta qualidade com ótimo custo-benefício"
-        })
-        
-        # Parse do JSON retornado
-        import json
-        try:
-            # Tenta extrair JSON da resposta
-            response_text = response.content.strip()
-            
-            # Remove markdown code blocks se existirem
-            if response_text.startswith('```'):
-                response_text = response_text.split('```')[1]
-                if response_text.startswith('json'):
-                    response_text = response_text[4:]
-                response_text = response_text.strip()
-            
-            enriched_data = json.loads(response_text)
-            
-            # Adiciona dados originais
-            enriched_data['original_title'] = title
-            enriched_data['price'] = price
-            enriched_data['platform'] = platform
-            enriched_data['link'] = link
-            enriched_data['external_id'] = product.get('external_id')
-            enriched_data['images_local'] = product.get('images_local')
-            enriched_data['images'] = product.get('images', [])
-            enriched_data['_file'] = product.get('_file')
-            
-            return enriched_data
-            
-        except json.JSONDecodeError as e:
-            print(f"⚠️  Erro ao parsear JSON do LLM: {e}")
-            print(f"Resposta: {response.content[:200]}")
-            
-            # Fallback com dados básicos
-            return {
-                "caption": f"🔥 {title}\n\n💰 Por apenas R$ {price:.2f}\n\n✨ Aproveite!",
-                "hashtags": ["#oferta", "#promocao", "#comprasonline", "#deals"],
-                "call_to_action": "🛒 Link na bio!",
-                "visual_suggestions": "Imagem destacando o produto com preço em evidência",
-                "key_features": ["Qualidade garantida", "Melhor preço", "Entrega rápida"],
-                "original_title": title,
-                "price": price,
-                "platform": platform,
-                "link": link,
-                "external_id": product.get('external_id'),
-                "images_local": product.get('images_local'),
-                "images": product.get('images', []),
-                "_file": product.get('_file')
-            }
+            "link": link,
+            "external_id": product.get('external_id'),
+            "images_local": product.get('images_local'),
+            "images": product.get('images', []),
+            "_file": product.get('_file')
+        }
     
     def generate_alternative_captions(
         self,

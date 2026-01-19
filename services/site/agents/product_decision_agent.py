@@ -154,60 +154,19 @@ class ProductDecisionAgent(BaseAgent):
         products: List[Dict[str, Any]],
         criteria: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Usa LLM para selecionar o melhor produto"""
+        """Seleciona produto (modo mock - sem LLM)"""
         
-        # Cria resumo dos produtos para o LLM
-        products_summary = []
-        for i, p in enumerate(products, 1):
-            products_summary.append({
-                "index": i,
-                "id": p.get('external_id'),
-                "title": p.get('title'),
-                "price": p.get('price'),
-                "tag": p.get('tag'),
-                "platform": p.get('platform'),
-                "disponivel": p.get('disponivel', True)
-            })
+        print("🎭 Modo MOCK: Selecionando primeiro produto disponível")
         
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", """Você é um especialista em marketing de produtos no Instagram.
-            Sua tarefa é selecionar o MELHOR produto para postar baseado em:
-            
-            1. Apelo visual potencial
-            2. Preço atraente (nem muito caro, nem muito barato)
-            3. Relevância para a audiência
-            4. Variedade (evitar postar produtos similares consecutivamente)
-            5. Disponibilidade
-            
-            Analise os produtos e retorne APENAS o número do index do produto escolhido
-            seguido de uma breve justificativa (max 50 palavras).
-            
-            Formato: INDEX|Justificativa
-            Exemplo: 3|Produto com excelente relação custo-benefício e alto apelo visual para Instagram"""),
-            ("user", "Produtos disponíveis:\n{products}\n\nCritérios adicionais: {criteria}\n\nQual produto você escolhe?")
-        ])
+        # Simplesmente retorna o primeiro produto
+        # Critério: produtos mais recentes primeiro (pelo nome do arquivo)
+        products_sorted = sorted(
+            products,
+            key=lambda p: p.get('_file', ''),
+            reverse=True
+        )
         
-        chain = prompt | self.llm
+        selected = products_sorted[0].copy()
+        selected['_selection_reason'] = "Produto mais recente no staging (modo mock)"
         
-        response = chain.invoke({
-            "products": json.dumps(products_summary, ensure_ascii=False, indent=2),
-            "criteria": json.dumps(criteria, ensure_ascii=False)
-        })
-        
-        # Parse da resposta
-        response_text = response.content.strip()
-        try:
-            parts = response_text.split('|', 1)
-            selected_index = int(parts[0].strip()) - 1
-            reason = parts[1].strip() if len(parts) > 1 else "Selecionado pelo agente"
-            
-            selected_product = products[selected_index].copy()
-            selected_product['_selection_reason'] = reason
-            
-            return selected_product
-        except (ValueError, IndexError) as e:
-            # Fallback: retorna o primeiro produto
-            print(f"⚠️  Erro ao parsear resposta do LLM: {e}")
-            fallback = products[0].copy()
-            fallback['_selection_reason'] = "Seleção automática (fallback)"
-            return fallback
+        return selected

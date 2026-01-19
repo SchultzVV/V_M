@@ -3,9 +3,8 @@ Agente Postador Instagram
 Gera imagens e posta automaticamente no Instagram
 """
 from typing import Any, Dict, List, Optional
-from langchain_core.prompts import ChatPromptTemplate
 from agents import BaseAgent
-from services.instagram_image_service import InstagramImageGenerator
+from services.instagram_image_service_cv2 import InstagramImageGenerator
 import os
 import time
 

@@ -65,6 +65,9 @@ redo-site:  ## Rebuild completo apenas do site
 logs-site:  ## Logs em tempo real do site
 	$(COMPOSE) logs -f site
 
+shell-site:  ## Abre shell bash dentro do container site
+	@docker exec -it site /bin/bash
+
 serve-ngrok:  ## Inicia túnel ngrok para acessar localmente via web
 	@echo "🛑 Encerrando ngrok anterior, se existir..."
 	@pkill ngrok || true
@@ -589,6 +592,24 @@ stage-and-post: ## Publica no ML e posta automaticamente no Instagram
 	@$(MAKE) stage
 	@sleep 2
 	@$(MAKE) instagram-post
+
+insta-publish: ## Publica produto no Instagram (sem LLM, direto)
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo "📸 Publicando no Instagram..."
+	@curl -X POST "http://localhost:5000/instagram/post/auto?simulate=false" \
+		-H "Content-Type: application/json" | jq .
+
+insta-test: ## Testa publicação Instagram (modo simulação)
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo "🎭 Testando publicação Instagram (simulação)..."
+	@curl -X POST "http://localhost:5000/instagram/post/auto?simulate=true" \
+		-H "Content-Type: application/json" | jq .
 
 clear-minio: ## Remove TODAS as imagens do MinIO (com confirmação)
 	@if ! docker ps | grep -q site; then \
