@@ -599,7 +599,7 @@ insta-publish: ## Publica produto no Instagram (sem LLM, direto)
 		$(COMPOSE) up -d --build site; \
 	fi
 	@echo "📸 Publicando no Instagram..."
-	@curl -X POST "http://localhost:5000/instagram/post/auto?simulate=false" \
+	@curl -k -X POST "https://localhost:5000/instagram/post/auto?simulate=false" \
 		-H "Content-Type: application/json" | jq .
 
 insta-test: ## Testa publicação Instagram (modo simulação)
@@ -608,7 +608,7 @@ insta-test: ## Testa publicação Instagram (modo simulação)
 		$(COMPOSE) up -d --build site; \
 	fi
 	@echo "🎭 Testando publicação Instagram (simulação)..."
-	@curl -X POST "http://localhost:5000/instagram/post/auto?simulate=true" \
+	@curl -k -X POST "https://localhost:5000/instagram/post/auto?simulate=true" \
 		-H "Content-Type: application/json" | jq .
 
 clear-minio: ## Remove TODAS as imagens do MinIO (com confirmação)

@@ -79,7 +79,17 @@ class ProductEnricherAgent(BaseAgent):
         print("🎭 Modo MOCK: Gerando conteúdo básico")
         
         title = product.get('title', '')
-        price = product.get('price', 0)
+        price_raw = product.get('price', 0)
+        
+        # Trata diferentes formatos de preço
+        if isinstance(price_raw, str):
+            # Remove formatação e pega primeiro valor
+            import re
+            numbers = re.findall(r'\d+[.,]\d+', price_raw.replace(',', '.'))
+            price = float(numbers[0]) if numbers else 0.0
+        else:
+            price = float(price_raw)
+        
         platform = product.get('platform', 'mercadolivre')
         link = product.get('link', '')
         

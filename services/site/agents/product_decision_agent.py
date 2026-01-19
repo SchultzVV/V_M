@@ -25,6 +25,12 @@ class ProductDecisionAgent(BaseAgent):
             temperature=0.3  # Baixa temperatura para decisões mais consistentes
         )
         self.staging_dir = staging_dir
+        self.insta_staging_dir = "insta_staging"
+        self.posted_file = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            self.insta_staging_dir,
+            ".posted"
+        )
         
     def _load_staging_products(self) -> List[Dict[str, Any]]:
         """Carrega todos os produtos do diretório staging"""
@@ -52,17 +58,24 @@ class ProductDecisionAgent(BaseAgent):
         return products
     
     def _get_posted_history(self) -> List[str]:
-        """Recupera histórico de produtos já postados no Instagram"""
-        history_key = "instagram:posted_products"
-        posted = self.redis_client.lrange(history_key, 0, -1)
-        return [p.decode('utf-8') for p in posted]
+        """Recupera histórico de produtos já postados no Instagram do arquivo .posted"""
+        if os.path.exists(self.posted_file):
+            with open(self.posted_file, 'r', encoding='utf-8') as f:
+                # Ignora linhas vazias e comentários
+                return [line.strip() for line in f.readlines() 
+                       if line.strip() and not line.startswith('#')]
+        return []
     
-    def _mark_as_posted(self, product_id: str) -> None:
-        """Marca produto como já postado"""
-        history_key = "instagram:posted_products"
-        self.redis_client.lpush(history_key, product_id)
-        # Mantém histórico dos últimos 500 produtos
-        self.redis_client.ltrim(history_key, 0, 499)
+    def _mark_as_posted(self, product_filename: str) -> None:
+        """Marca produto como já postado no arquivo .posted"""
+        # Cria diretório se não existir
+        os.makedirs(os.path.dirname(self.posted_file), exist_ok=True)
+        
+        # Adiciona ao arquivo
+        with open(self.posted_file, 'a', encoding='utf-8') as f:
+            f.write(product_filename + '\n')
+        
+        print(f"✅ Produto registrado em .posted: {product_filename}")
     
     def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -92,7 +105,7 @@ class ProductDecisionAgent(BaseAgent):
         posted_history = self._get_posted_history()
         available_products = [
             p for p in products 
-            if p.get('external_id') not in posted_history
+            if p.get('_file') not in posted_history
         ]
         
         if not available_products:
@@ -138,8 +151,8 @@ class ProductDecisionAgent(BaseAgent):
         selected = self._llm_select_product(available_products, input_data)
         
         # Marca como postado
-        if selected.get('external_id'):
-            self._mark_as_posted(selected['external_id'])
+        if selected.get('_file'):
+            self._mark_as_posted(selected['_file'])
         
         return {
             "success": True,
