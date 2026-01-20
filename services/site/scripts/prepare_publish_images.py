@@ -184,40 +184,42 @@ class InstagramImageGenerator:
             color = tuple(int(245 - alpha * 55) for _ in range(3))
             cv2.line(canvas, (0, y_start + i), (self.IMG_SIZE[0], y_start + i), color, 1)
         
-        # Título do produto
+        # Título do produto usando PIL para suporte UTF-8
         title = product.get('title', 'Produto sem título')
-        
-        # Quebrar título em linhas
-        lines = self._wrap_text(title, 960, 1.4, 3)
-        
-        # Desenhar cada linha
-        y_text = y_start + 60
-        for line in lines[:3]:  # Máximo 3 linhas
-            text_size = cv2.getTextSize(line, cv2.FONT_HERSHEY_DUPLEX, 1.4, 3)[0]
-            x_text = (self.IMG_SIZE[0] - text_size[0]) // 2
-            
-            # Sombra
-            cv2.putText(canvas, line, (x_text + 3, y_text + 3),
-                       cv2.FONT_HERSHEY_DUPLEX, 1.4, self.COLOR_GRAY, 3)
-            # Texto principal
-            cv2.putText(canvas, line, (x_text, y_text),
-                       cv2.FONT_HERSHEY_DUPLEX, 1.4, self.COLOR_BLACK, 3)
-            
-            y_text += 50
+        self._draw_text_pil(canvas, title, y_start + 30, font_size=45, max_lines=3, color=(0, 0, 0))
         
         return y_start + header_height
     
     def _draw_text_pil(self, canvas: np.ndarray, text: str, y_pos: int, font_size: int = 32, max_lines: int = 3, color=(0, 0, 0)):
         """Desenha texto com suporte UTF-8 usando PIL e cola no canvas OpenCV."""
+        # Garantir que o texto está em UTF-8
+        if isinstance(text, bytes):
+            text = text.decode('utf-8')
+        else:
+            text = str(text)
+        
         try:
-            # Carregar fonte
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
+            # Tentar diferentes fontes com melhor suporte UTF-8
+            font_paths = [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+                "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf"
+            ]
+            font = None
+            for font_path in font_paths:
+                try:
+                    font = ImageFont.truetype(font_path, font_size)
+                    break
+                except:
+                    continue
+            if font is None:
+                font = ImageFont.load_default()
         except:
             font = ImageFont.load_default()
         
-        # Criar imagem temporária PIL
-        pil_canvas = Image.fromarray(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB))
-        draw = ImageDraw.Draw(pil_canvas)
+        # Criar imagem temporária PIL com fundo transparente
+        pil_img = Image.new('RGBA', (self.IMG_SIZE[0], self.IMG_SIZE[1]), (255, 255, 255, 0))
+        draw = ImageDraw.Draw(pil_img)
         
         # Quebrar texto em linhas
         max_width = 960
@@ -227,8 +229,13 @@ class InstagramImageGenerator:
         
         for word in words:
             test_line = ' '.join(current_line + [word])
-            bbox = draw.textbbox((0, 0), test_line, font=font)
-            if bbox[2] - bbox[0] <= max_width:
+            try:
+                bbox = draw.textbbox((0, 0), test_line, font=font)
+                text_width = bbox[2] - bbox[0]
+            except:
+                text_width = len(test_line) * font_size * 0.6
+                
+            if text_width <= max_width:
                 current_line.append(word)
             else:
                 if current_line:
@@ -240,19 +247,27 @@ class InstagramImageGenerator:
         # Desenhar linhas
         y_text = y_pos
         for line in lines[:max_lines]:
-            bbox = draw.textbbox((0, 0), line, font=font)
-            text_width = bbox[2] - bbox[0]
+            try:
+                bbox = draw.textbbox((0, 0), line, font=font)
+                text_width = bbox[2] - bbox[0]
+            except:
+                text_width = len(line) * font_size * 0.6
+                
             x_text = (self.IMG_SIZE[0] - text_width) // 2
             
-            # Sombra mais visível
-            draw.text((x_text + 3, y_text + 3), line, font=font, fill=(130, 130, 130))
-            # Texto principal
-            draw.text((x_text, y_text), line, font=font, fill=color)
+            # Desenhar texto em preto
+            draw.text((x_text, y_text), line, font=font, fill=(color[0], color[1], color[2], 255))
             
             y_text += font_size + 8
         
-        # Converter de volta para OpenCV
-        canvas[:] = cv2.cvtColor(np.array(pil_canvas), cv2.COLOR_RGB2BGR)
+        # Converter PIL RGBA para array numpy
+        pil_array = np.array(pil_img)
+        
+        # Combinar com canvas usando alpha blending
+        alpha = pil_array[:, :, 3] / 255.0
+        for c in range(3):
+            canvas[:, :, c] = (alpha * cv2.cvtColor(pil_array, cv2.COLOR_RGBA2BGR)[:, :, c] + 
+                              (1 - alpha) * canvas[:, :, c]).astype(np.uint8)
     
     def _add_product_image(self, canvas: np.ndarray, product: Dict, y_start: int) -> int:
         """Adiciona imagem principal do produto."""
