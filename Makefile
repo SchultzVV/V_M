@@ -334,6 +334,21 @@ stage: ## Executa o stage_products.py dentro do site
 	fi
 	@docker exec -it site python3 scripts/stage_products.py
 
+prepare-publish: ## Gera imagens prontas para publicação no Instagram a partir do staging
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🎨 PREPARANDO IMAGENS PARA PUBLICAÇÃO NO INSTAGRAM"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@docker exec -it site python3 scripts/prepare_publish_images.py --all
+	@echo ""
+	@echo "✅ Imagens prontas! Acesse: services/site/publish_ready/"
+	@echo ""
+
 prepare-products: ## Executa generate_staging_json.py dentro do site
 	$(MAKE) run-py script=scripts/generate_staging_json.py
 
