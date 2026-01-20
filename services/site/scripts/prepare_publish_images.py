@@ -16,12 +16,14 @@ import json
 import os
 import sys
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import cv2
 import numpy as np
 import qrcode
+from minio import Minio
 from PIL import Image, ImageDraw, ImageFont
 
 
@@ -55,6 +57,18 @@ class InstagramImageGenerator:
         
         # Criar diretório de saída se não existir
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Configurar MinIO client
+        try:
+            self.minio_client = Minio(
+                os.getenv("MINIO_ENDPOINT", "minio:9000"),
+                access_key=os.getenv("MINIO_ACCESS_KEY", "minio"),
+                secret_key=os.getenv("MINIO_SECRET_KEY", "minio123"),
+                secure=False
+            )
+        except Exception as e:
+            print(f"⚠️  MinIO não disponível: {e}")
+            self.minio_client = None
         
     def process_all_products(self) -> List[str]:
         """
@@ -162,35 +176,83 @@ class InstagramImageGenerator:
     
     def _add_header(self, canvas: np.ndarray, product: Dict, y_start: int) -> int:
         """Adiciona cabeçalho com título do produto."""
-        header_height = 180
+        header_height = 200
         
-        # Fundo gradiente para o header
+        # Fundo gradiente (cinza claro para branco)
         for i in range(header_height):
             alpha = i / header_height
-            color = tuple(int(245 - alpha * 45) for _ in range(3))  # Gradiente cinza claro
+            color = tuple(int(245 - alpha * 55) for _ in range(3))
             cv2.line(canvas, (0, y_start + i), (self.IMG_SIZE[0], y_start + i), color, 1)
         
         # Título do produto
         title = product.get('title', 'Produto sem título')
         
-        # Quebrar título em múltiplas linhas se necessário
-        lines = self._wrap_text(title, max_width=900, font_scale=1.0, thickness=2, font=cv2.FONT_HERSHEY_DUPLEX)
+        # Quebrar título em linhas
+        lines = self._wrap_text(title, 960, 1.4, 3)
         
-        y_text = y_start + 40
+        # Desenhar cada linha
+        y_text = y_start + 60
         for line in lines[:3]:  # Máximo 3 linhas
-            text_size = cv2.getTextSize(line, cv2.FONT_HERSHEY_DUPLEX, 1.0, 2)[0]
+            text_size = cv2.getTextSize(line, cv2.FONT_HERSHEY_DUPLEX, 1.4, 3)[0]
             x_text = (self.IMG_SIZE[0] - text_size[0]) // 2
             
             # Sombra
-            cv2.putText(canvas, line, (x_text + 2, y_text + 2), 
-                       cv2.FONT_HERSHEY_DUPLEX, 1.0, self.COLOR_GRAY, 2)
+            cv2.putText(canvas, line, (x_text + 3, y_text + 3),
+                       cv2.FONT_HERSHEY_DUPLEX, 1.4, self.COLOR_GRAY, 3)
             # Texto principal
-            cv2.putText(canvas, line, (x_text, y_text), 
-                       cv2.FONT_HERSHEY_DUPLEX, 1.0, self.COLOR_BLACK, 2)
+            cv2.putText(canvas, line, (x_text, y_text),
+                       cv2.FONT_HERSHEY_DUPLEX, 1.4, self.COLOR_BLACK, 3)
             
-            y_text += 45
+            y_text += 50
         
         return y_start + header_height
+    
+    def _draw_text_pil(self, canvas: np.ndarray, text: str, y_pos: int, font_size: int = 32, max_lines: int = 3, color=(0, 0, 0)):
+        """Desenha texto com suporte UTF-8 usando PIL e cola no canvas OpenCV."""
+        try:
+            # Carregar fonte
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
+        except:
+            font = ImageFont.load_default()
+        
+        # Criar imagem temporária PIL
+        pil_canvas = Image.fromarray(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB))
+        draw = ImageDraw.Draw(pil_canvas)
+        
+        # Quebrar texto em linhas
+        max_width = 960
+        words = text.split()
+        lines = []
+        current_line = []
+        
+        for word in words:
+            test_line = ' '.join(current_line + [word])
+            bbox = draw.textbbox((0, 0), test_line, font=font)
+            if bbox[2] - bbox[0] <= max_width:
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(' '.join(current_line))
+                current_line = [word]
+        if current_line:
+            lines.append(' '.join(current_line))
+        
+        # Desenhar linhas
+        y_text = y_pos
+        for line in lines[:max_lines]:
+            bbox = draw.textbbox((0, 0), line, font=font)
+            text_width = bbox[2] - bbox[0]
+            x_text = (self.IMG_SIZE[0] - text_width) // 2
+            
+            # Sombra mais visível
+            draw.text((x_text + 3, y_text + 3), line, font=font, fill=(130, 130, 130))
+            # Texto principal
+            draw.text((x_text, y_text), line, font=font, fill=color)
+            
+            y_text += font_size + 8
+        
+        # Converter de volta para OpenCV
+        canvas[:] = cv2.cvtColor(np.array(pil_canvas), cv2.COLOR_RGB2BGR)
     
     def _add_product_image(self, canvas: np.ndarray, product: Dict, y_start: int) -> int:
         """Adiciona imagem principal do produto."""
@@ -341,23 +403,124 @@ class InstagramImageGenerator:
     
     def _add_footer(self, canvas: np.ndarray, y_start: int):
         """Adiciona rodapé com call-to-action."""
-        footer_height = self.IMG_SIZE[1] - y_start
+        footer_height = 100
         
         # Fundo escuro para o footer
-        cv2.rectangle(canvas, (0, y_start), (self.IMG_SIZE[0], self.IMG_SIZE[1]),
-                     (50, 50, 50), -1)
+        cv2.rectangle(canvas, (0, y_start), (self.IMG_SIZE[0], y_start + footer_height),
+                     (40, 40, 40), -1)
         
         # Texto CTA
-        cta_text = "GARANTA JÁ O SEU! 🛒"
-        text_size = cv2.getTextSize(cta_text, cv2.FONT_HERSHEY_DUPLEX, 1.2, 2)[0]
+        cta_text = "GARANTA JA O SEU!"
+        text_size = cv2.getTextSize(cta_text, cv2.FONT_HERSHEY_DUPLEX, 1.8, 3)[0]
         x_text = (self.IMG_SIZE[0] - text_size[0]) // 2
-        y_text = y_start + footer_height // 2 + 10
+        y_text = y_start + 65
         
+        # Texto em branco
         cv2.putText(canvas, cta_text, (x_text, y_text),
-                   cv2.FONT_HERSHEY_DUPLEX, 1.2, self.COLOR_WHITE, 2)
+                   cv2.FONT_HERSHEY_DUPLEX, 1.8, self.COLOR_WHITE, 3)
     
     def _load_product_image(self, product: Dict) -> Optional[np.ndarray]:
-        """Carrega a primeira imagem disponível do produto."""
+        """Carrega a segunda imagem do produto do MinIO."""
+        platform = product.get('platform', '')
+        images_local = product.get('images_local', '')
+        
+        # Extrair nome da pasta do produto
+        if images_local:
+            # Ex: "uploads/iphone-16e-128-gb-branco" -> "iphone-16e-128-gb-branco"
+            product_folder = images_local.replace('uploads/', '').rstrip('/')
+        else:
+            print(f"  ⚠️  Sem images_local definido")
+            return None
+        
+        print(f"  🔍 Buscando no MinIO: bucket={platform}, pasta={product_folder}")
+        
+        # Buscar imagens do MinIO
+        if not self.minio_client:
+            print(f"  ❌ MinIO não disponível")
+            return None
+        
+        try:
+            # Listar objetos na pasta do produto
+            objects = list(self.minio_client.list_objects(platform, prefix=f"{product_folder}/", recursive=True))
+            
+            if not objects:
+                print(f"  ⚠️  Nenhuma imagem encontrada no MinIO")
+                return None
+            
+            # Ordenar por nome (para pegar sempre na mesma ordem)
+            objects.sort(key=lambda x: x.object_name)
+            
+            print(f"  🖼️  Encontradas {len(objects)} imagens no MinIO")
+            
+            # Usar segunda imagem (índice 1) se existir, senão primeira
+            target_index = 1 if len(objects) >= 2 else 0
+            selected_obj = objects[target_index]
+            
+            print(f"  ⬇️  Baixando: {selected_obj.object_name}")
+            
+            # Baixar imagem
+            image_bytes = BytesIO()
+            data = self.minio_client.get_object(platform, selected_obj.object_name)
+            for chunk in data.stream(32*1024):
+                image_bytes.write(chunk)
+            image_bytes.seek(0)
+            
+            # Converter para OpenCV
+            pil_image = Image.open(image_bytes)
+            img_array = np.array(pil_image)
+            
+            # Converter RGB para BGR
+            if len(img_array.shape) == 3 and img_array.shape[2] == 3:
+                img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+            elif len(img_array.shape) == 3 and img_array.shape[2] == 4:
+                img_array = cv2.cvtColor(img_array, cv2.COLOR_RGBA2BGR)
+            
+            print(f"  ✅ Imagem carregada com sucesso ({img_array.shape[1]}x{img_array.shape[0]})")
+            return img_array
+            
+        except Exception as e:
+            print(f"  ❌ Erro ao carregar do MinIO: {e}")
+            return None
+    
+    def _load_from_minio_or_url(self, image_path: str) -> Optional[np.ndarray]:
+        """Carrega imagem do MinIO ou de uma URL."""
+        try:
+            if image_path.startswith('http'):
+                # URL completa - baixar diretamente
+                print(f"     Baixando de URL: {image_path[:60]}...")
+                response = requests.get(image_path, timeout=10)
+                response.raise_for_status()
+                image_bytes = BytesIO(response.content)
+            else:
+                # Caminho relativo no bucket - usar MinIO client
+                if not self.minio_client:
+                    print(f"     MinIO client não disponível")
+                    return None
+                print(f"     Baixando do bucket: {image_path}")
+                image_bytes = BytesIO()
+                data = self.minio_client.get_object('products', image_path)
+                for d in data.stream(32*1024):
+                    image_bytes.write(d)
+                image_bytes.seek(0)
+            
+            # Converter para OpenCV
+            pil_image = Image.open(image_bytes)
+            img_array = np.array(pil_image)
+            
+            # Converter RGB para BGR
+            if len(img_array.shape) == 3 and img_array.shape[2] == 3:
+                img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+            elif len(img_array.shape) == 3 and img_array.shape[2] == 4:
+                # RGBA - converter para BGR
+                img_array = cv2.cvtColor(img_array, cv2.COLOR_RGBA2BGR)
+            
+            return img_array
+        except Exception as e:
+            print(f"     ❌ Erro: {str(e)[:100]}")
+            return None
+    
+    def _load_from_local(self, product: Dict) -> Optional[np.ndarray]:
+        """Carrega a primeira imagem disponível da pasta local."""
         images_local = product.get('images_local', '')
         
         if not images_local:
