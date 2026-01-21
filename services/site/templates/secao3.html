@@ -38,6 +38,39 @@
     .sort-btn.active {
       background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     }
+    
+    .subcategory-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 25px 0 15px 0;
+    }
+    
+    .subcat-btn {
+      background: rgba(255, 255, 255, 0.9);
+      color: #333;
+      border: 2px solid #667eea;
+      padding: 10px 18px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .subcat-btn:hover {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    
+    .subcat-btn.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -49,6 +82,20 @@
     <button class="nav-btn" onclick="window.location.href='/secao4'">🐾 PetShop</button>
   </div>
   <p style="margin-top: 40px; font-weight: bold; font-size: 50px;">V&M - Eletrônicos</p>
+  
+  <!-- Botões de subcategoria -->
+  <div class="subcategory-buttons">
+    <button class="subcat-btn active" onclick="filterBySubcategory('todos')">📱 Todos</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('smartphones')">📱 Smartphones</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('computadores')">💻 Computadores</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('audio')">🎧 Áudio</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('tv')">📺 TVs</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('games')">🎮 Games</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('cameras')">📷 Câmeras</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('smartwatch')">⌚ Smartwatch</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('acessorios')">🔌 Acessórios</button>
+  </div>
+  
   <p style="margin-top: 20px; font-weight: bold; font-size: 19px;">
     Tecnologia com os melhores preços 📱💻
   </p>
@@ -179,6 +226,66 @@
     }
 
     let allProducts = []; // Variável global para armazenar todos os produtos
+    let currentSubcategory = 'todos'; // Subcategoria atual
+
+    function filterBySubcategory(subcategory) {
+      currentSubcategory = subcategory;
+      
+      // Remove active class de todos os botões de subcategoria
+      document.querySelectorAll('.subcat-btn').forEach(btn => btn.classList.remove('active'));
+      
+      // Adiciona active class ao botão clicado
+      event.target.classList.add('active');
+      
+      // Filtra os produtos pela subcategoria
+      let filteredProducts = allProducts;
+      if (subcategory !== 'todos') {
+        filteredProducts = allProducts.filter(product => {
+          const title = product.title.toLowerCase();
+          
+          switch(subcategory) {
+            case 'smartphones':
+              return title.includes('smartphone') || title.includes('celular') || title.includes('iphone') || 
+                     title.includes('galaxy') || title.includes('motorola') || title.includes('xiaomi');
+            case 'computadores':
+              return title.includes('notebook') || title.includes('computador') || title.includes('pc') || 
+                     title.includes('desktop') || title.includes('macbook') || title.includes('laptop');
+            case 'audio':
+              return title.includes('fone') || title.includes('headphone') || title.includes('caixa de som') || 
+                     title.includes('speaker') || title.includes('jbl') || title.includes('áudio');
+            case 'tv':
+              return title.includes('tv') || title.includes('televisão') || title.includes('smart tv') || 
+                     title.includes('monitor');
+            case 'games':
+              return title.includes('playstation') || title.includes('xbox') || title.includes('nintendo') || 
+                     title.includes('game') || title.includes('console') || title.includes('controle');
+            case 'cameras':
+              return title.includes('câmera') || title.includes('gopro') || title.includes('filmadora') || 
+                     title.includes('canon') || title.includes('nikon');
+            case 'smartwatch':
+              return title.includes('smartwatch') || title.includes('relógio inteligente') || title.includes('apple watch') || 
+                     title.includes('galaxy watch');
+            case 'acessorios':
+              return title.includes('cabo') || title.includes('carregador') || title.includes('capa') || 
+                     title.includes('película') || title.includes('adaptador') || title.includes('suporte');
+            default:
+              return true;
+          }
+        });
+      }
+      
+      // Renderiza os produtos filtrados
+      const container = document.getElementById('products-container');
+      container.innerHTML = '';
+      if (filteredProducts.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #666; font-size: 18px; margin-top: 40px;">Nenhum produto encontrado nesta categoria 😢</p>';
+      } else {
+        filteredProducts.forEach(product => {
+          const card = createProductCard(product);
+          container.appendChild(card);
+        });
+      }
+    }
 
     function getNumericPrice(priceStr) {
       return parseFloat(priceStr.replace("R$", "").replace(",", ".").trim());

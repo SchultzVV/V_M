@@ -38,6 +38,39 @@
     .sort-btn.active {
       background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     }
+    
+    .subcategory-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 25px 0 15px 0;
+    }
+    
+    .subcat-btn {
+      background: rgba(255, 255, 255, 0.9);
+      color: #333;
+      border: 2px solid #667eea;
+      padding: 10px 18px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .subcat-btn:hover {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    
+    .subcat-btn.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -49,6 +82,19 @@
     <button class="nav-btn active" onclick="window.location.href='/secao4'">🐾 PetShop</button>
   </div>
   <p style="margin-top: 40px; font-weight: bold; font-size: 50px;">V&M - PetShop</p>
+  
+  <!-- Botões de subcategoria -->
+  <div class="subcategory-buttons">
+    <button class="subcat-btn active" onclick="filterBySubcategory('todos')">🐾 Todos</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('caes')">🐶 Cães</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('gatos')">🐱 Gatos</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('racao')">🍖 Ração</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('brinquedos')">🧸 Brinquedos</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('higiene')">🛁 Higiene</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('acessorios')">🦴 Acessórios</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('saude')">💉 Saúde</button>
+  </div>
+  
   <p style="margin-top: 20px; font-weight: bold; font-size: 19px;">
     Tudo para o seu melhor amigo 🐾❤️
   </p>
@@ -179,6 +225,63 @@
     }
 
     let allProducts = []; // Variável global para armazenar todos os produtos
+    let currentSubcategory = 'todos'; // Subcategoria atual
+
+    function filterBySubcategory(subcategory) {
+      currentSubcategory = subcategory;
+      
+      // Remove active class de todos os botões de subcategoria
+      document.querySelectorAll('.subcat-btn').forEach(btn => btn.classList.remove('active'));
+      
+      // Adiciona active class ao botão clicado
+      event.target.classList.add('active');
+      
+      // Filtra os produtos pela subcategoria
+      let filteredProducts = allProducts;
+      if (subcategory !== 'todos') {
+        filteredProducts = allProducts.filter(product => {
+          const title = product.title.toLowerCase();
+          
+          switch(subcategory) {
+            case 'caes':
+              return title.includes('cão') || title.includes('cachorro') || title.includes('dog') || 
+                     title.includes('canino');
+            case 'gatos':
+              return title.includes('gato') || title.includes('cat') || title.includes('felino');
+            case 'racao':
+              return title.includes('ração') || title.includes('comida') || title.includes('alimento') || 
+                     title.includes('petisco') || title.includes('sachê');
+            case 'brinquedos':
+              return title.includes('brinquedo') || title.includes('bolinha') || title.includes('mordedor') || 
+                     title.includes('arranhador');
+            case 'higiene':
+              return title.includes('shampoo') || title.includes('sabonete') || title.includes('escova') || 
+                     title.includes('pente') || title.includes('toalha') || title.includes('higiene');
+            case 'acessorios':
+              return title.includes('coleira') || title.includes('guia') || title.includes('caminha') || 
+                     title.includes('comedouro') || title.includes('bebedouro') || title.includes('casinha') || 
+                     title.includes('roupa');
+            case 'saude':
+              return title.includes('medicamento') || title.includes('vitamina') || title.includes('antipulgas') || 
+                     title.includes('vermífugo') || title.includes('saúde');
+            default:
+              return true;
+          }
+        });
+      }
+      
+      // Renderiza os produtos filtrados
+      const container = document.getElementById('products-container');
+      container.innerHTML = '';
+      if (filteredProducts.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #666; font-size: 18px; margin-top: 40px;">Nenhum produto encontrado nesta categoria 😢</p>';
+      } else {
+        filteredProducts.forEach(product => {
+          const card = createProductCard(product);
+          container.appendChild(card);
+        });
+      }
+    }
 
     function getNumericPrice(priceStr) {
       return parseFloat(priceStr.replace("R$", "").replace(",", ".").trim());
