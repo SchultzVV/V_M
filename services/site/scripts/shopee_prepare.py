@@ -559,10 +559,10 @@ def download_images(image_urls, product_slug, base_path="/app/uploads"):
     return str(product_dir), downloaded
 
 
-def create_product_json(product_data, product_dir, original_url):
+def create_product_json(product_data, product_dir, original_url, tag="geral", subcategory=""):
     """
-    Cria JSON do produto no formato esperado pelo sistema.
-    Similar ao formato usado para produtos do Mercado Livre.
+    Cria JSON do produto no formato padrão do sistema.
+    Salva na pasta staging/TAG/SUBCATEGORY/
     """
     # Gera slug do nome do produto
     product_slug = slugify(product_data['title'])
@@ -570,64 +570,62 @@ def create_product_json(product_data, product_dir, original_url):
     
     # Nome do arquivo JSON
     json_filename = f"{product_slug}_{timestamp}.json"
-    json_path = Path("/app/list_to_prepare_and_stage/list_to_prepare.json")
     
-    # Determinar categoria (pode ser melhorado com lógica mais sofisticada)
-    category = "geral"
-    
-    # Estrutura do JSON
-    product_json = {
-        "nome_produto": product_data['title'],
-        "descricao": product_data.get('description', ''),
-        "preco": product_data['price'],
-        "preco_original": product_data.get('original_price', product_data['price']),
-        "desconto_percentual": product_data.get('discount_percent', 0),
-        "estoque": product_data.get('stock', 0),
-        "vendidos": product_data.get('sold', 0),
-        "avaliacao": product_data.get('rating', 0),
-        "total_avaliacoes": product_data.get('rating_count', 0),
-        "categoria": category,
-        "origem": "shopee",
-        "shop_id": product_data.get('shop_id', ''),
-        "item_id": product_data.get('item_id', ''),
-        "condicao": product_data.get('condition', 'new'),
-        "link_original": original_url,
-        "pasta_imagens": str(product_dir),
-        "timestamp": timestamp,
-        "data_coleta": datetime.now().isoformat()
+    # Mapear tags para nomes de pasta
+    tag_folders = {
+        "E": "eletronicos",
+        "CD": "casa-decoracao",
+        "ME": "moda-estilo",
+        "PET": "pet",
+        "geral": "geral"
     }
     
-    # Salvar JSON individual
-    individual_json_path = Path("/app/list_to_prepare_and_stage") / json_filename
-    individual_json_path.parent.mkdir(parents=True, exist_ok=True)
+    tag_folder = tag_folders.get(tag.upper(), "geral")
     
-    with open(individual_json_path, 'w', encoding='utf-8') as f:
+    # Determinar caminho do JSON
+    if subcategory:
+        staging_dir = Path(f"/app/staging/{tag_folder}/{subcategory}")
+    else:
+        staging_dir = Path(f"/app/staging/{tag_folder}")
+    
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    json_path = staging_dir / json_filename
+    
+    # External ID: shop_id-item_id
+    external_id = f"{product_data.get('shop_id', '')}-{product_data.get('item_id', '')}"
+    
+    # Formatar preços no formato "R$ X"
+    price_value = product_data['price']
+    old_price_value = product_data.get('original_price', price_value)
+    
+    price_str = f"R$ {price_value:.0f}" if price_value == int(price_value) else f"R$ {price_value:.2f}"
+    old_price_str = f"R$ {old_price_value:.0f}" if old_price_value == int(old_price_value) else f"R$ {old_price_value:.2f}"
+    
+    # Estrutura do JSON no formato padrão
+    product_json = {
+        "platform": "shopee",
+        "external_id": external_id,
+        "title": product_data['title'],
+        "price": price_str,
+        "oldPrice": old_price_str,
+        "images_local": str(product_dir).replace('/app/', ''),
+        "images": [],
+        "link": original_url,
+        "tag": tag.upper(),
+        "subcategory": subcategory,
+        "disponivel": product_data.get('stock', 0) > 0,
+        "criado_em": timestamp,
+        "via_webhook": False
+    }
+    
+    # Salvar JSON
+    with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(product_json, f, indent=2, ensure_ascii=False)
     
-    print(f"\n💾 JSON individual salvo:")
-    print(f"   📄 {individual_json_path}")
+    print(f"\n💾 JSON salvo:")
+    print(f"   📄 {json_path}")
     
-    # Adicionar à lista de preparação (se o arquivo existir)
-    if json_path.exists():
-        try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                product_list = json.load(f)
-            
-            if not isinstance(product_list, list):
-                product_list = []
-        except Exception:
-            product_list = []
-    else:
-        product_list = []
-    
-    product_list.append(product_json)
-    
-    # Salvar lista atualizada
-    json_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(json_path, 'w', encoding='utf-8') as f:
-        json.dump(product_list, f, indent=2, ensure_ascii=False)
-    
-    return individual_json_path, product_json
+    return json_path, product_json
 
 
 def main():
@@ -635,7 +633,7 @@ def main():
     Função principal: prepara produto da Shopee.
     """
     if len(sys.argv) < 2:
-        print("❌ Uso: python shopee_prepare.py <URL_DO_PRODUTO> [PRECO] [PRECO_ANTIGO]")
+        print("❌ Uso: python shopee_prepare.py <URL_DO_PRODUTO> [PRECO] [PRECO_ANTIGO] [TAG] [SUBCATEGORY]")
         sys.exit(1)
     
     original_url = sys.argv[1]
@@ -643,6 +641,8 @@ def main():
     # Preços manuais (opcionais)
     manual_price = None
     manual_old_price = None
+    tag = "geral"
+    subcategory = ""
     
     if len(sys.argv) > 2 and sys.argv[2].strip():
         try:
@@ -657,6 +657,14 @@ def main():
             print(f"💸 Preço antigo manual informado: R$ {manual_old_price:.2f}")
         except ValueError:
             print(f"⚠️  Preço antigo inválido: {sys.argv[3]}")
+    
+    if len(sys.argv) > 4 and sys.argv[4].strip():
+        tag = sys.argv[4].strip().upper()
+        print(f"🏷️  Tag: {tag}")
+    
+    if len(sys.argv) > 5 and sys.argv[5].strip():
+        subcategory = sys.argv[5].strip().lower()
+        print(f"📁 Subcategoria: {subcategory}")
     
     print("="*70)
     print("🛍️  PREPARAÇÃO DE PRODUTO DA SHOPEE")
@@ -709,7 +717,9 @@ def main():
     json_path, product_json = create_product_json(
         product_data,
         product_dir,
-        original_url
+        original_url,
+        tag,
+        subcategory
     )
     
     # 7. Resumo final
@@ -717,17 +727,15 @@ def main():
     print("✅ PREPARAÇÃO CONCLUÍDA COM SUCESSO!")
     print("="*70)
     print(f"\n✅ JSON criado: {json_path.name}")
-    print(f"📂 Categoria: {product_json['categoria']}")
-    print(f"📦 Produto: {product_json['nome_produto']}")
-    print(f"💰 Preço: R$ {product_json['preco']:.2f}")
-    if product_json['desconto_percentual'] > 0:
-        print(f"🔥 Desconto: {product_json['desconto_percentual']}%")
-    print(f"📊 Estoque: {product_json['estoque']}")
-    print(f"🛒 Vendidos: {product_json['vendidos']}")
-    if product_json['avaliacao'] > 0:
-        print(f"⭐ Avaliação: {product_json['avaliacao']}/5 ({product_json['total_avaliacoes']} avaliações)")
+    print(f"📂 Categoria: {product_json['tag']} / {product_json.get('subcategory', 'N/A')}")
+    print(f"📦 Produto: {product_json['title']}")
+    print(f"💰 Preço: {product_json['price']}")
+    if product_json['oldPrice'] != product_json['price']:
+        print(f"🔥 Preço antigo: {product_json['oldPrice']}")
+    print(f"📊 Disponível: {'Sim' if product_json['disponivel'] else 'Não'}")
     print(f"🖼️  Imagens: {product_dir} ({len(downloaded_images)} imagens)")
     print(f"🔗 Link: {original_url}")
+    print(f"📁 Pasta: {json_path.parent}")
     print("\n" + "="*70)
 
 

@@ -413,15 +413,36 @@ shopee-prepare-product: ## Prepara produto da Shopee via scraping (uso: make sho
 	@echo "🛍️  PREPARAÇÃO DE PRODUTO DA SHOPEE"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
-	@echo "🚀 Preparando produto via scraping..."
-	@echo "🔗 URL: $(URL)"
+	@echo "� URL: $(URL)"
 	@echo ""
-	@echo "💰 Informe os preços do produto:"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "📂 CATEGORIAS DISPONÍVEIS:"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "   1. E        - Eletrônicos"
+	@echo "   2. CD       - Casa & Decoração"
+	@echo "   3. ME       - Moda & Estilo"
+	@echo "   4. PET      - Pet Shop"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
-	@read -p "   Preço atual (ex: 49.99): " PRICE; \
+	@echo "📁 SUBCATEGORIAS SUGERIDAS:"
+	@echo "   CD: area-servico, quarto, banheiro, cozinha, sala"
+	@echo "   E:  eletrodomesticos, informatica, celulares, audio"
+	@echo "   ME: roupas, calcados, acessorios"
+	@echo "   PET: caes, gatos, aquarios"
+	@echo ""
+	@read -p "🏷️  Digite a categoria (E/CD/ME/PET): " TAG; \
+	read -p "📁 Digite a subcategoria: " SUBCATEGORY; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "💰 INFORMAÇÕES DE PREÇO:"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	read -p "   Preço atual (ex: 49.99): " PRICE; \
 	read -p "   Preço antigo/promocional (ex: 167.99, ou deixe vazio): " OLD_PRICE; \
 	echo ""; \
-	docker exec -it site python3 scripts/shopee_prepare.py "$(URL)" "$$PRICE" "$$OLD_PRICE"
+	echo "🚀 Preparando produto..."; \
+	echo ""; \
+	docker exec -it site python3 scripts/shopee_prepare.py "$(URL)" "$$PRICE" "$$OLD_PRICE" "$$TAG" "$$SUBCATEGORY"
 
 shopee-update-prices: ## Atualiza preços e disponibilidade de produto da Shopee (uso: make shopee-update-prices URL="...")
 	@if [ -z "$(URL)" ]; then \
