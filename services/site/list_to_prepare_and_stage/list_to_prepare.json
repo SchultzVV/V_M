@@ -1,24 +1,42 @@
-{
-  "platform": "mercadolivre",
-  "links": [
-    { "url": "https://mercadolivre.com/sec/2qwzLrz"},
-    { "url": "https://mercadolivre.com/sec/2hje5eP"},
-    { "url": "https://mercadolivre.com/sec/17b7oLQ"},
-    { "url": "https://mercadolivre.com/sec/2SVjp9A"},
-    { "url": "https://mercadolivre.com/sec/2fFNb5P"},
-    { "url": "https://mercadolivre.com/sec/1X6vfBw"},
-    { "url": "https://mercadolivre.com/sec/32WvvzX"},
-    { "url": "https://mercadolivre.com/sec/1x3jP9Y"},
-    { "url": "https://mercadolivre.com/sec/14v7NLx"},
-    { "url": "https://mercadolivre.com/sec/1ec76em"},
-    { "url": "https://mercadolivre.com/sec/2RuRNfg"},
-    { "url": "https://mercadolivre.com/sec/2EcVrPC"},
-    { "url": "https://mercadolivre.com/sec/1gKbPUV"},
-    { "url": "https://mercadolivre.com/sec/2Vss8s7"},
-    { "url": "https://mercadolivre.com/sec/2Q2nxbf"},
-    { "url": "https://mercadolivre.com/sec/1JzXwqh"},
-    { "url": "https://mercadolivre.com/sec/1Jac7kb"},
-    { "url": "https://mercadolivre.com/sec/2QJPcaZ"},
-    { "url": "https://mercadolivre.com/sec/1Jko8e4"}
-  ]
-}
+[
+  {
+    "nome_produto": "Robô Varredora/Aspirador De Pó 1200PA Automática 3 Em 1 Limpeza Doméstica Robótico Inteligente E Silencioso",
+    "descricao": "",
+    "preco": 49.99,
+    "preco_original": 167.99,
+    "desconto_percentual": 0,
+    "estoque": 0,
+    "vendidos": 0,
+    "avaliacao": 0,
+    "total_avaliacoes": 0,
+    "categoria": "geral",
+    "origem": "shopee",
+    "shop_id": "1103946075",
+    "item_id": "22597120770",
+    "condicao": "new",
+    "link_original": "https://s.shopee.com.br/8Uy0Bqs7ap",
+    "pasta_imagens": "/app/uploads/robo-varredora-aspirador-de-po-1200pa-automatica-3-em-1-limpeza-domestica-robotico-inteligente-e-silencioso",
+    "timestamp": "20260122_214506",
+    "data_coleta": "2026-01-22T21:45:06.005005"
+  },
+  {
+    "nome_produto": "Robô Varredora/Aspirador De Pó 1200PA Automática 3 Em 1 Limpeza Doméstica Robótico Inteligente E Silencioso",
+    "descricao": "",
+    "preco": 500.0,
+    "preco_original": 5001.0,
+    "desconto_percentual": 0,
+    "estoque": 0,
+    "vendidos": 0,
+    "avaliacao": 0,
+    "total_avaliacoes": 0,
+    "categoria": "geral",
+    "origem": "shopee",
+    "shop_id": "1103946075",
+    "item_id": "22597120770",
+    "condicao": "new",
+    "link_original": "https://s.shopee.com.br/8Uy0Bqs7ap",
+    "pasta_imagens": "/app/uploads/robo-varredora-aspirador-de-po-1200pa-automatica-3-em-1-limpeza-domestica-robotico-inteligente-e-silencioso",
+    "timestamp": "20260122_222215",
+    "data_coleta": "2026-01-22T22:22:15.071445"
+  }
+]

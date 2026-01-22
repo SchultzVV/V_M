@@ -659,7 +659,24 @@ def main():
             print(f"⚠️  Preço antigo inválido: {sys.argv[3]}")
     
     if len(sys.argv) > 4 and sys.argv[4].strip():
-        tag = sys.argv[4].strip().upper()
+        tag_input = sys.argv[4].strip().upper()
+        
+        # Converter número para tag
+        tag_map = {
+            "1": "E",
+            "2": "CD",
+            "3": "ME",
+            "4": "PET"
+        }
+        
+        tag = tag_map.get(tag_input, tag_input)
+        
+        # Validar tag
+        if tag not in ["E", "CD", "ME", "PET"]:
+            print(f"⚠️  Tag inválida: {tag_input}")
+            print(f"💡 Use: 1/E (Eletrônicos), 2/CD (Casa), 3/ME (Moda), 4/PET")
+            tag = "E"  # Padrão
+        
         print(f"🏷️  Tag: {tag}")
     
     if len(sys.argv) > 5 and sys.argv[5].strip():
