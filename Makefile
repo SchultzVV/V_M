@@ -396,7 +396,27 @@ api-prepare-product: ## Prepara produto via API oficial (uso: make api-prepare-p
 	echo "📂 Categoria selecionada: $$CATEGORIA"; \
 	echo ""; \
 	docker exec -it site python3 scripts/api_prepare_ml.py "$(URL)" "$$CATEGORIA"
-
+shopee-prepare-product: ## Prepara produto da Shopee via scraping (uso: make shopee-prepare-product URL=https://...)
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make shopee-prepare-product URL=https://shopee.com.br/product/123456/7890123456"; \
+		echo "     make shopee-prepare-product URL=https://shope.ee/ABC123"; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🛍️  PREPARAÇÃO DE PRODUTO DA SHOPEE"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🚀 Preparando produto via scraping..."
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@docker exec -it site python3 scripts/shopee_prepare.py "$(URL)"
 prepare-all: ## Prepara TODOS os produtos da lista (list_to_prepare.json)
 	@if ! docker ps | grep -q site; then \
 		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
