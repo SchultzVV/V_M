@@ -21,6 +21,7 @@ from urllib.parse import urlparse, parse_qs, unquote
 import re
 from slugify import slugify
 from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
 
 def resolve_shopee_link(url):
@@ -91,6 +92,218 @@ def extract_product_ids(url):
 
 
 def scrape_shopee_product(url, shop_id=None, item_id=None):
+    """
+    Faz scraping da página do produto na Shopee usando Playwright.
+    Extrai: título, preço, descrição, imagens, estoque, etc.
+    """
+    print(f"\n📥 Fazendo scraping do produto com Playwright...")
+    
+    try:
+        with sync_playwright() as p:
+            # Lançar navegador headless
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                locale='pt-BR',
+                timezone_id='America/Sao_Paulo',
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            )
+            
+            page = context.new_page()
+            
+            # Navegar para a URL
+            print(f"   🌐 Carregando página...")
+            page.goto(url, wait_until='networkidle', timeout=30000)
+            
+            # Aguardar JavaScript renderizar
+            page.wait_for_timeout(3000)
+            
+            print(f"   ✅ Página carregada com sucesso")
+            
+            # Extrair dados da página renderizada
+            product_data = extract_from_playwright_page(page)
+            
+            # Salvar HTML para debug
+            html_content = page.content()
+            debug_html_path = Path("/tmp/shopee_playwright_debug.html")
+            with open(debug_html_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            print(f"   🐛 HTML renderizado salvo em: {debug_html_path}")
+            
+            browser.close()
+            
+            if product_data and product_data.get('title'):
+                return product_data
+            else:
+                print("   ⚠️ Não foi possível extrair dados completos")
+                return product_data
+                
+    except Exception as e:
+        print(f"   ❌ Erro no Playwright: {e}")
+        print(f"   💡 Tentando scraping HTML simples como fallback...")
+        return scrape_shopee_product_fallback(url, shop_id, item_id)
+
+
+def extract_from_playwright_page(page):
+    """
+    Extrai dados do produto da página renderizada pelo Playwright.
+    Baseado na lógica do shopee_update_prices.py que funciona.
+    """
+    product_data = {
+        'title': '',
+        'price': 0,
+        'original_price': 0,
+        'discount_percent': 0,
+        'stock': 0,
+        'sold': 0,
+        'rating': 0,
+        'rating_count': 0,
+        'description': '',
+        'images': [],
+        'condition': 'new'
+    }
+    
+    try:
+        # Aguardar JavaScript carregar
+        page.wait_for_timeout(3000)
+        
+        # Obter HTML renderizado
+        html_content = page.content()
+        
+        print(f"   📊 Extraindo dados do HTML...")
+        
+        # Estratégia 1: Extrair título
+        title_match = re.search(r'"title":"([^"]+)"', html_content)
+        if title_match:
+            product_data['title'] = title_match.group(1)
+            print(f"   ✅ Título: {product_data['title'][:60]}...")
+        
+        # Estratégia 2: Extrair estoque
+        stock_match = re.search(r'"stock":(\d+)', html_content)
+        if stock_match:
+            product_data['stock'] = int(stock_match.group(1))
+            print(f"   ✅ Estoque: {product_data['stock']}")
+        
+        # Estratégia 3: Extrair vendidos
+        sold_patterns = [
+            r'"sold":(\d+)',
+            r'"historical_sold":(\d+)',
+        ]
+        for pattern in sold_patterns:
+            sold_match = re.search(pattern, html_content)
+            if sold_match:
+                product_data['sold'] = int(sold_match.group(1))
+                print(f"   ✅ Vendidos: {product_data['sold']}")
+                break
+        
+        # Estratégia 4: Extrair imagens
+        image_pattern = r'"image":"([a-z0-9\-]+)"'
+        image_matches = re.findall(image_pattern, html_content)
+        if image_matches:
+            base_url = "https://down-br.img.susercontent.com/file/"
+            # Pegar apenas imagens únicas
+            unique_images = list(dict.fromkeys(image_matches))[:10]
+            product_data['images'] = [f"{base_url}{img}" for img in unique_images]
+            print(f"   ✅ {len(product_data['images'])} imagens encontradas")
+        
+        # Estratégia 5: Verificar disponibilidade
+        unavailable_texts = ['esgotado', 'sold out', 'indisponível', 'faça login']
+        page_text = html_content.lower()
+        is_available = not any(text in page_text for text in unavailable_texts)
+        
+        if not is_available:
+            product_data['stock'] = 0
+            print(f"   ⚠️ Produto indisponível ou acesso bloqueado")
+        
+        return product_data
+        
+    except Exception as e:
+        print(f"   ⚠️ Erro ao extrair dados: {e}")
+        return product_data
+
+
+def parse_shopee_item_data(item):
+    """
+    Parse de dados do item encontrado no JSON.
+    """
+    data = {}
+    
+    # Título
+    if 'name' in item:
+        data['title'] = item['name']
+    
+    # Preço (Shopee guarda em centavos * 1000)
+    if 'price' in item and item['price']:
+        data['price'] = item['price'] / 100000
+    
+    if 'price_before_discount' in item and item['price_before_discount']:
+        data['original_price'] = item['price_before_discount'] / 100000
+    
+    # Estoque
+    if 'stock' in item:
+        data['stock'] = item['stock']
+    
+    # Vendidos
+    if 'sold' in item:
+        data['sold'] = item['sold']
+    elif 'historical_sold' in item:
+        data['sold'] = item['historical_sold']
+    
+    # Avaliação
+    if 'item_rating' in item:
+        rating_data = item['item_rating']
+        if 'rating_star' in rating_data:
+            data['rating'] = rating_data['rating_star']
+        if 'rating_count' in rating_data:
+            data['rating_count'] = rating_data['rating_count'][0] if rating_data['rating_count'] else 0
+    
+    # Descrição
+    if 'description' in item:
+        data['description'] = item['description']
+    
+    # Imagens
+    if 'images' in item:
+        data['images'] = [f"https://cf.shopee.com.br/file/{img}" for img in item['images']]
+    elif 'image' in item:
+        data['images'] = [f"https://cf.shopee.com.br/file/{item['image']}"]
+    
+    return data
+
+
+def find_item_in_json(data, depth=0, max_depth=5):
+    """
+    Procura recursivamente por dados do produto no JSON.
+    """
+    if depth > max_depth:
+        return None
+    
+    if isinstance(data, dict):
+        # Procurar por campos típicos de produto
+        if 'itemid' in data and 'name' in data:
+            return data
+        
+        # Chaves comuns onde os dados podem estar
+        common_keys = ['item', 'product', 'itemDetail', 'productDetail', 'data']
+        for key in common_keys:
+            if key in data:
+                result = find_item_in_json(data[key], depth + 1, max_depth)
+                if result:
+                    return result
+        
+        # Busca genérica
+        for key, value in data.items():
+            if isinstance(value, (dict, list)):
+                result = find_item_in_json(value, depth + 1, max_depth)
+                if result:
+                    return result
+    
+    elif isinstance(data, list) and len(data) > 0:
+        # Tentar o primeiro item da lista
+        return find_item_in_json(data[0], depth + 1, max_depth)
+    
+    return None
+
+
+def scrape_shopee_product_fallback(url, shop_id=None, item_id=None):
     """
     Faz scraping da página do produto na Shopee.
     Extrai: título, preço, descrição, imagens, estoque, etc.
@@ -212,77 +425,6 @@ def try_shopee_api(shop_id, item_id):
         print(f"   ⚠️  Erro ao tentar API pública: {e}, continuando com HTML...")
         return None
 
-
-def find_item_in_json(data, depth=0, max_depth=5):
-    """
-    Procura recursivamente por dados do produto no JSON.
-    """
-    if depth > max_depth:
-        return None
-    
-    if isinstance(data, dict):
-        # Procurar por campos típicos de produto
-        if 'itemid' in data and 'name' in data and 'price' in data:
-            return data
-        
-        for key, value in data.items():
-            result = find_item_in_json(value, depth + 1, max_depth)
-            if result:
-                return result
-    
-    elif isinstance(data, list):
-        for item in data:
-            result = find_item_in_json(item, depth + 1, max_depth)
-            if result:
-                return result
-    
-    return None
-
-
-def parse_shopee_item(item):
-    """
-    Parse dos dados do item da Shopee extraídos do JSON.
-    """
-    print(f"   ✅ Dados encontrados no JSON da página!")
-    
-    product_data = {
-        'title': item.get('name', ''),
-        'price': item.get('price', 0) / 100000,  # Shopee armazena preço em centavos * 1000
-        'original_price': item.get('price_before_discount', 0) / 100000,
-        'description': item.get('description', ''),
-        'stock': item.get('stock', 0),
-        'sold': item.get('sold', 0),
-        'rating': item.get('item_rating', {}).get('rating_star', 0),
-        'rating_count': item.get('item_rating', {}).get('rating_count', [0])[0] if item.get('item_rating') else 0,
-        'images': [],
-        'shop_id': item.get('shopid', ''),
-        'item_id': item.get('itemid', ''),
-        'condition': 'new' if item.get('is_cc_installment_payment_eligible') else 'new',
-    }
-    
-    # Extrair URLs das imagens
-    images = item.get('images', [])
-    if images:
-        base_img_url = 'https://cf.shopee.com.br/file/'
-        product_data['images'] = [f"{base_img_url}{img}" for img in images]
-    
-    # Calcular desconto
-    if product_data['original_price'] > 0 and product_data['original_price'] > product_data['price']:
-        discount_percent = ((product_data['original_price'] - product_data['price']) / product_data['original_price']) * 100
-        product_data['discount_percent'] = round(discount_percent, 2)
-    else:
-        product_data['discount_percent'] = 0
-    
-    print(f"   📦 Produto: {product_data['title']}")
-    print(f"   💰 Preço: R$ {product_data['price']:.2f}")
-    if product_data['discount_percent'] > 0:
-        print(f"   🔥 Desconto: {product_data['discount_percent']}%")
-    print(f"   📊 Estoque: {product_data['stock']}")
-    print(f"   🛒 Vendidos: {product_data['sold']}")
-    print(f"   ⭐ Avaliação: {product_data['rating']} ({product_data['rating_count']} avaliações)")
-    print(f"   🖼️  Imagens: {len(product_data['images'])}")
-    
-    return product_data
 
 
 def scrape_from_html(soup):
@@ -493,10 +635,28 @@ def main():
     Função principal: prepara produto da Shopee.
     """
     if len(sys.argv) < 2:
-        print("❌ Uso: python shopee_prepare.py <URL_DO_PRODUTO>")
+        print("❌ Uso: python shopee_prepare.py <URL_DO_PRODUTO> [PRECO] [PRECO_ANTIGO]")
         sys.exit(1)
     
     original_url = sys.argv[1]
+    
+    # Preços manuais (opcionais)
+    manual_price = None
+    manual_old_price = None
+    
+    if len(sys.argv) > 2 and sys.argv[2].strip():
+        try:
+            manual_price = float(sys.argv[2].replace(',', '.'))
+            print(f"💰 Preço manual informado: R$ {manual_price:.2f}")
+        except ValueError:
+            print(f"⚠️  Preço inválido: {sys.argv[2]}")
+    
+    if len(sys.argv) > 3 and sys.argv[3].strip():
+        try:
+            manual_old_price = float(sys.argv[3].replace(',', '.'))
+            print(f"💸 Preço antigo manual informado: R$ {manual_old_price:.2f}")
+        except ValueError:
+            print(f"⚠️  Preço antigo inválido: {sys.argv[3]}")
     
     print("="*70)
     print("🛍️  PREPARAÇÃO DE PRODUTO DA SHOPEE")
@@ -515,6 +675,18 @@ def main():
         print("\n❌ Não foi possível coletar dados do produto!")
         print("💡 Verifique se a URL está correta e acessível.")
         sys.exit(1)
+    
+    # Substituir preços com valores manuais se fornecidos
+    if manual_price is not None:
+        product_data['price'] = manual_price
+    
+    if manual_old_price is not None:
+        product_data['original_price'] = manual_old_price
+    
+    # Se temos old_price mas não temos price normal, avisar
+    if product_data.get('price', 0) == 0 and manual_price is None:
+        print("\n⚠️  ATENÇÃO: Preço atual não foi encontrado e não foi informado manualmente!")
+        print("💡 O produto será criado com preço R$ 0.00")
     
     # 4. Adicionar IDs ao product_data
     if shop_id and item_id:

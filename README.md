@@ -21,7 +21,13 @@ Isso vai:
 # 1. Preparar produto do Mercado Livre (automático)
 make prepare-auto URL="https://produto.mercadolivre.com.br/MLB-..."
 
-# 2. Publicar no site
+# 2. Preparar produto da Shopee (com entrada manual de preços)
+make shopee-prepare-product URL="https://s.shopee.com.br/..."
+# O comando vai perguntar:
+# - Preço atual (ex: 49.99)
+# - Preço antigo/promocional (opcional, ex: 167.99)
+
+# 3. Publicar no site
 make stage
 ```
 

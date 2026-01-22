@@ -416,7 +416,35 @@ shopee-prepare-product: ## Prepara produto da Shopee via scraping (uso: make sho
 	@echo "🚀 Preparando produto via scraping..."
 	@echo "🔗 URL: $(URL)"
 	@echo ""
-	@docker exec -it site python3 scripts/shopee_prepare.py "$(URL)"
+	@echo "💰 Informe os preços do produto:"
+	@echo ""
+	@read -p "   Preço atual (ex: 49.99): " PRICE; \
+	read -p "   Preço antigo/promocional (ex: 167.99, ou deixe vazio): " OLD_PRICE; \
+	echo ""; \
+	docker exec -it site python3 scripts/shopee_prepare.py "$(URL)" "$$PRICE" "$$OLD_PRICE"
+
+shopee-update-prices: ## Atualiza preços e disponibilidade de produto da Shopee (uso: make shopee-update-prices URL="...")
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make shopee-update-prices URL=\"https://s.shopee.com.br/...\""; \
+		echo ""; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔄 ATUALIZAÇÃO DE PREÇOS SHOPEE"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "📊 Verificando preço e disponibilidade..."
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@docker exec -it site python3 scripts/shopee_update_prices.py "$(URL)"
+
 prepare-all: ## Prepara TODOS os produtos da lista (list_to_prepare.json)
 	@if ! docker ps | grep -q site; then \
 		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
