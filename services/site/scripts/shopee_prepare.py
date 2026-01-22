@@ -57,6 +57,7 @@ def extract_product_ids(url):
     
     Formato típico: https://shopee.com.br/product/{shop_id}/{item_id}
     Ou: https://shopee.com.br/{product-name}-i.{shop_id}.{item_id}
+    Ou: https://shopee.com.br/{shop_name}/{shop_id}/{item_id}
     """
     print(f"\n🔍 Extraindo IDs do produto...")
     
@@ -76,26 +77,60 @@ def extract_product_ids(url):
         print(f"   ✅ Item ID: {item_id}")
         return shop_id, item_id
     
+    # Padrão 3: /{shop_name}/{shop_id}/{item_id}
+    match = re.search(r'/([^/]+)/(\d+)/(\d+)', url)
+    if match:
+        shop_name, shop_id, item_id = match.groups()
+        print(f"   ✅ Shop: {shop_name}")
+        print(f"   ✅ Shop ID: {shop_id}")
+        print(f"   ✅ Item ID: {item_id}")
+        return shop_id, item_id
+    
     print(f"   ⚠️  Não foi possível extrair IDs da URL")
     return None, None
 
 
-def scrape_shopee_product(url):
+def scrape_shopee_product(url, shop_id=None, item_id=None):
     """
     Faz scraping da página do produto na Shopee.
     Extrai: título, preço, descrição, imagens, estoque, etc.
     """
     print(f"\n📥 Fazendo scraping do produto...")
     
+    # Se temos shop_id e item_id, podemos tentar usar a API pública diretamente
+    if shop_id and item_id:
+        print(f"   💡 Tentando API pública da Shopee...")
+        api_data = try_shopee_api(shop_id, item_id)
+        if api_data:
+            return api_data
+    
+    # Fallback: scraping do HTML
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
     }
     
+    print(f"   📄 Fazendo scraping da página HTML...")
+    
     try:
-        response = requests.get(url, headers=headers, timeout=20)
+        # Remover parâmetros mobile para obter versão desktop
+        clean_url = url.split('?')[0] if '?' in url else url
+        
+        response = requests.get(clean_url, headers=headers, timeout=20, allow_redirects=True)
         response.raise_for_status()
+        
+        print(f"   ✅ Página carregada com sucesso (status: {response.status_code})")
+        
+        # Debug: salvar HTML em caso de falha
+        debug_html_path = Path("/tmp/shopee_debug.html")
+        with open(debug_html_path, 'w', encoding='utf-8') as f:
+            f.write(response.text)
+        print(f"   🐛 HTML salvo em: {debug_html_path}")
         
         soup = BeautifulSoup(response.text, 'html.parser')
         
@@ -133,13 +168,48 @@ def scrape_shopee_product(url):
                         continue
         
         # Fallback: tentar extrair do HTML se não encontrou no JSON
-        if not product_data:
+        if not product_data or not product_data.get('title'):
             product_data = scrape_from_html(soup)
         
         return product_data
     
     except requests.exceptions.RequestException as e:
         print(f"   ❌ Erro ao fazer scraping: {e}")
+        return None
+
+
+def try_shopee_api(shop_id, item_id):
+    """
+    Tenta usar a API pública/interna da Shopee para obter dados do produto.
+    Esta API não requer autenticação para consultas básicas.
+    """
+    try:
+        # URL da API pública da Shopee (usada pelo próprio site)
+        api_url = f"https://shopee.com.br/api/v4/item/get?shopid={shop_id}&itemid={item_id}"
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://shopee.com.br/',
+            'Accept': 'application/json',
+            'Accept-Language': 'pt-BR,pt;q=0.9',
+            'X-Requested-With': 'XMLHttpRequest',
+        }
+        
+        response = requests.get(api_url, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            if data and 'data' in data and data['data']:
+                item = data['data']
+                print(f"   ✅ Dados obtidos via API pública!")
+                return parse_shopee_item(item)
+        
+        print(f"   ⚠️  API pública não disponível (status: {response.status_code}), continuando com HTML...")
+        return None
+    
+    except Exception as e:
+        print(f"   ⚠️  Erro ao tentar API pública: {e}, continuando com HTML...")
         return None
 
 
@@ -229,20 +299,49 @@ def scrape_from_html(soup):
         'images': [],
         'stock': 0,
         'sold': 0,
+        'rating': 0,
+        'rating_count': 0,
     }
     
     # Título geralmente está em meta tags
     title_meta = soup.find('meta', property='og:title')
     if title_meta:
         product_data['title'] = title_meta.get('content', '')
+        print(f"   ✅ Título encontrado: {product_data['title'][:50]}...")
+    
+    # Tentar extrair título do HTML se não encontrou em meta
+    if not product_data['title']:
+        title_elem = soup.find('h1') or soup.find('span', class_=re.compile('title|name', re.I))
+        if title_elem:
+            product_data['title'] = title_elem.get_text(strip=True)
+            print(f"   ✅ Título (HTML): {product_data['title'][:50]}...")
     
     # Preço em meta tags
     price_meta = soup.find('meta', property='product:price:amount')
     if price_meta:
         try:
             product_data['price'] = float(price_meta.get('content', 0))
+            print(f"   ✅ Preço encontrado: R$ {product_data['price']:.2f}")
         except ValueError:
             pass
+    
+    # Tentar extrair preço do HTML
+    if not product_data['price']:
+        # Procurar por elementos com classe relacionada a preço
+        price_elems = soup.find_all(class_=re.compile('price|valor', re.I))
+        for elem in price_elems:
+            text = elem.get_text(strip=True)
+            # Extrair números do texto (formato: R$ 49,99 ou 49.99)
+            price_match = re.search(r'[\d.,]+', text.replace('.', '').replace(',', '.'))
+            if price_match:
+                try:
+                    price_value = float(price_match.group().replace(',', '.'))
+                    if price_value > 0:
+                        product_data['price'] = price_value
+                        print(f"   ✅ Preço (HTML): R$ {price_value:.2f}")
+                        break
+                except ValueError:
+                    continue
     
     # Imagens
     image_metas = soup.find_all('meta', property='og:image')
@@ -251,10 +350,29 @@ def scrape_from_html(soup):
         if img_url and img_url not in product_data['images']:
             product_data['images'].append(img_url)
     
+    # Procurar imagens no HTML também
+    if not product_data['images']:
+        img_tags = soup.find_all('img')
+        for img in img_tags:
+            src = img.get('src') or img.get('data-src')
+            if src and 'shopee' in src and src not in product_data['images']:
+                # Garantir que é URL completa
+                if not src.startswith('http'):
+                    src = 'https:' + src if src.startswith('//') else 'https://cf.shopee.com.br/file/' + src
+                product_data['images'].append(src)
+    
+    if product_data['images']:
+        print(f"   ✅ Imagens encontradas: {len(product_data['images'])}")
+    
     # Descrição
     desc_meta = soup.find('meta', property='og:description')
     if desc_meta:
         product_data['description'] = desc_meta.get('content', '')
+    
+    if not product_data['description']:
+        desc_elem = soup.find(class_=re.compile('description|desc', re.I))
+        if desc_elem:
+            product_data['description'] = desc_elem.get_text(strip=True)[:500]
     
     return product_data
 
@@ -391,7 +509,7 @@ def main():
     shop_id, item_id = extract_product_ids(final_url)
     
     # 3. Fazer scraping do produto
-    product_data = scrape_shopee_product(final_url)
+    product_data = scrape_shopee_product(final_url, shop_id, item_id)
     
     if not product_data or not product_data.get('title'):
         print("\n❌ Não foi possível coletar dados do produto!")
