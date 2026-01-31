@@ -720,3 +720,165 @@ clean-images: ## Remove TODAS as imagens Docker (cuidado!)
 	else \
 		echo "✅ Nenhuma imagem para remover."; \
 	fi
+
+# =====================
+# 🎯 Sistema de Recomendações
+# =====================
+
+COMPOSE_RECS = docker-compose -f docker-compose.recommendations.yaml
+
+recs-up: ## Sobe sistema de recomendações completo
+	@echo "🚀 Iniciando sistema de recomendações..."
+	$(COMPOSE_RECS) up -d --build
+	@echo ""
+	@echo "✅ Sistema iniciado!"
+	@echo ""
+	@echo "🌐 Endpoints disponíveis:"
+	@echo "   API Gateway:        http://localhost:8000"
+	@echo "   Docs (Swagger):     http://localhost:8000/docs"
+	@echo "   Auth Service:       http://localhost:8001"
+	@echo "   Ingest Service:     http://localhost:8002"
+	@echo "   Tracking Service:   http://localhost:8003"
+	@echo "   Recommendations:    http://localhost:8005"
+	@echo ""
+	@echo "📊 Infraestrutura:"
+	@echo "   PostgreSQL:         localhost:5432"
+	@echo "   Redis:              localhost:6379"
+	@echo "   Kafka:              localhost:9092"
+	@echo ""
+	@echo "🔍 Verificar saúde: make recs-health"
+
+recs-down: ## Para sistema de recomendações
+	@echo "🛑 Parando sistema de recomendações..."
+	$(COMPOSE_RECS) down
+
+recs-restart: ## Reinicia sistema de recomendações
+	@echo "🔄 Reiniciando sistema de recomendações..."
+	$(COMPOSE_RECS) restart
+
+recs-health: ## Verifica saúde de todos os serviços
+	@echo "🏥 Verificando saúde dos serviços..."
+	@curl -s http://localhost:8000/health | jq '.' || echo "❌ API Gateway não respondeu"
+
+recs-logs: ## Mostra logs de todos os serviços
+	$(COMPOSE_RECS) logs -f
+
+recs-logs-gateway: ## Logs do API Gateway
+	$(COMPOSE_RECS) logs -f api-gateway
+
+recs-logs-auth: ## Logs do Auth Service
+	$(COMPOSE_RECS) logs -f auth-service
+
+recs-logs-ingest: ## Logs do Ingest Service
+	$(COMPOSE_RECS) logs -f ingest-service
+
+recs-logs-tracking: ## Logs do Tracking Service
+	$(COMPOSE_RECS) logs -f tracking-service
+
+recs-logs-profile: ## Logs do Profile Builder
+	$(COMPOSE_RECS) logs -f profile-builder
+
+recs-logs-recommendations: ## Logs do Recommendations Service
+	$(COMPOSE_RECS) logs -f recommendations-service
+
+recs-init-db: ## Inicializa banco e popula com dados de teste
+	@echo "🗄️  Inicializando banco de dados..."
+	@sleep 5  # Aguarda PostgreSQL estar pronto
+	@docker exec -it api-gateway python /app/shared/../scripts/init_recommendations_db.py || \
+		python scripts/init_recommendations_db.py
+
+recs-profile-batch: ## Executa Profile Builder em modo batch
+	@echo "🔨 Executando Profile Builder em modo batch..."
+	@docker exec profile-builder python main.py batch
+
+recs-psql: ## Acessa PostgreSQL
+	@docker exec -it postgres-db psql -U user -d recommendations_db
+
+recs-redis: ## Acessa Redis CLI
+	@docker exec -it redis-cache redis-cli
+
+recs-kafka-topics: ## Lista tópicos do Kafka
+	@docker exec kafka kafka-topics --list --bootstrap-server localhost:9092
+
+recs-kafka-consume: ## Consome eventos do Kafka
+	@docker exec kafka kafka-console-consumer \
+		--bootstrap-server localhost:9092 \
+		--topic user-events \
+		--from-beginning
+
+recs-test-auth: ## Testa endpoint de auth (requer INSTAGRAM_CODE)
+	@if [ -z "$(INSTAGRAM_CODE)" ]; then \
+		echo "❌ Defina INSTAGRAM_CODE: make recs-test-auth INSTAGRAM_CODE=xxx"; \
+		exit 1; \
+	fi
+	@curl -X POST http://localhost:8000/auth/instagram \
+		-H "Content-Type: application/json" \
+		-d '{"code": "$(INSTAGRAM_CODE)", "redirect_uri": "http://localhost:8000/auth/callback"}' | jq '.'
+
+recs-test-track: ## Testa tracking (requer USER_ID e ITEM_ID)
+	@if [ -z "$(USER_ID)" ] || [ -z "$(ITEM_ID)" ]; then \
+		echo "❌ Defina USER_ID e ITEM_ID: make recs-test-track USER_ID=xxx ITEM_ID=yyy"; \
+		exit 1; \
+	fi
+	@curl -X POST http://localhost:8000/track \
+		-H "Content-Type: application/json" \
+		-d '{"user_id": "$(USER_ID)", "event_type": "click", "item_id": "$(ITEM_ID)"}' | jq '.'
+
+recs-test-recommendations: ## Testa recomendações (requer USER_ID)
+	@if [ -z "$(USER_ID)" ]; then \
+		echo "❌ Defina USER_ID: make recs-test-recommendations USER_ID=xxx"; \
+		exit 1; \
+	fi
+	@curl -s "http://localhost:8000/recommendations?user_id=$(USER_ID)&limit=5" | jq '.'
+
+recs-rebuild: ## Rebuild completo (down + build + up)
+	@echo "🔄 Rebuild completo do sistema..."
+	$(COMPOSE_RECS) down -v
+	$(COMPOSE_RECS) build --no-cache
+	$(COMPOSE_RECS) up -d
+	@echo "✅ Rebuild completo!"
+
+# =====================
+# 🎯 Sistema Unificado (Imagem Única)
+# =====================
+
+recs-unified-build: ## Build da imagem unificada
+	@echo "📦 Building unified recommendations system..."
+	cd services/recommendations-system && ./build.sh
+
+recs-unified-push: ## Build e push da imagem para registry
+	@echo "📦 Building and pushing to registry..."
+	@if [ -z "$(DOCKER_USER)" ]; then \
+		echo "❌ Defina DOCKER_USER: make recs-unified-push DOCKER_USER=seuusuario"; \
+		exit 1; \
+	fi
+	cd services/recommendations-system && \
+	DOCKER_USER=$(DOCKER_USER) DOCKER_REGISTRY=$(DOCKER_REGISTRY) ./build.sh --push
+
+recs-unified-test: ## Testa imagem unificada localmente
+	@echo "🧪 Testing unified image locally..."
+	@docker run -d --name recommendations-test \
+		-p 8000:8000 -p 8001:8001 -p 8002:8002 -p 8003:8003 -p 8005:8005 \
+		-e INSTAGRAM_APP_ID=$(INSTAGRAM_APP_ID) \
+		-e INSTAGRAM_APP_SECRET=$(INSTAGRAM_APP_SECRET) \
+		-e OPENAI_API_KEY=$(OPENAI_API_KEY) \
+		-e SERVICE=all \
+		recommendations-system:latest
+	@echo "⏳ Waiting for services to start..."
+	@sleep 10
+	@echo "🔍 Health check:"
+	@curl -s http://localhost:8000/health | jq '.'
+	@echo "\n✅ Test complete! Container running as 'recommendations-test'"
+	@echo "📋 View logs: docker logs -f recommendations-test"
+	@echo "🛑 Stop: docker rm -f recommendations-test"
+
+recs-unified-stop-test: ## Para container de teste
+	@docker rm -f recommendations-test || true
+
+recs-unified-docs: ## Abre documentação
+	@echo "📚 Opening documentation..."
+	@if [ -f services/recommendations-system/README.md ]; then \
+		cat services/recommendations-system/README.md; \
+	else \
+		echo "❌ README not found"; \
+	fi

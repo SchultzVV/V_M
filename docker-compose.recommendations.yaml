@@ -1,0 +1,201 @@
+version: '3.8'
+
+services:
+  # ============= Infrastructure =============
+  
+  postgres:
+    image: postgres:15
+    container_name: postgres-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: recommendations_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - recommendations-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - recommendations-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - recommendations-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - recommendations-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ============= Microservices =============
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    container_name: auth-service
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/recommendations_db
+      INSTAGRAM_APP_ID: ${INSTAGRAM_APP_ID}
+      INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET}
+      INSTAGRAM_REDIRECT_URI: ${INSTAGRAM_REDIRECT_URI}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - recommendations-network
+    restart: unless-stopped
+
+  ingest-service:
+    build:
+      context: .
+      dockerfile: services/ingest-service/Dockerfile
+    container_name: ingest-service
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/recommendations_db
+      REDIS_URL: redis://redis:6379/0
+      INSTAGRAM_APP_ID: ${INSTAGRAM_APP_ID}
+      INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET}
+      INGEST_COOLDOWN_SECONDS: 3600
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - recommendations-network
+    restart: unless-stopped
+
+  tracking-service:
+    build:
+      context: .
+      dockerfile: services/tracking-service/Dockerfile
+    container_name: tracking-service
+    ports:
+      - "8003:8003"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC_EVENTS: user-events
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - recommendations-network
+    restart: unless-stopped
+
+  profile-builder:
+    build:
+      context: .
+      dockerfile: services/profile-builder/Dockerfile
+    container_name: profile-builder
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/recommendations_db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC_EVENTS: user-events
+      KAFKA_TOPIC_PROFILES: user-profiles
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      EMBEDDING_MODEL: text-embedding-3-small
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - recommendations-network
+    restart: unless-stopped
+    # Pode rodar como consumer ou batch job
+    command: python main.py  # Consumer mode
+
+  recommendations-service:
+    build:
+      context: .
+      dockerfile: services/recommendations-service/Dockerfile
+    container_name: recommendations-service
+    ports:
+      - "8005:8005"
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/recommendations_db
+      REDIS_URL: redis://redis:6379/0
+      REDIS_CACHE_TTL: 3600
+      RECOMMENDATION_LATENCY_TARGET_MS: 150
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - recommendations-network
+    restart: unless-stopped
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:8001
+      INGEST_SERVICE_URL: http://ingest-service:8002
+      TRACKING_SERVICE_URL: http://tracking-service:8003
+      RECOMMENDATIONS_SERVICE_URL: http://recommendations-service:8005
+    depends_on:
+      - auth-service
+      - ingest-service
+      - tracking-service
+      - recommendations-service
+    networks:
+      - recommendations-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  recommendations-network:
+    driver: bridge

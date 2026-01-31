@@ -1,0 +1,155 @@
+version: '3.8'
+
+# Este é um exemplo de como integrar o sistema de recomendações no docker-compose do site
+
+services:
+  # ============= Infrastructure (necessária) =============
+  
+  postgres-recommendations:
+    image: postgres:15
+    container_name: postgres-recommendations
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: recommendations_db
+    ports:
+      - "5433:5432"  # Porta diferente para não conflitar
+    volumes:
+      - recommendations_postgres_data:/var/lib/postgresql/data
+    networks:
+      - site-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-recommendations:
+    image: redis:7-alpine
+    container_name: redis-recommendations
+    ports:
+      - "6380:6379"  # Porta diferente para não conflitar
+    volumes:
+      - recommendations_redis_data:/data
+    networks:
+      - site-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper-recommendations:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper-recommendations
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - site-network
+
+  kafka-recommendations:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-recommendations
+    depends_on:
+      - zookeeper-recommendations
+    ports:
+      - "9093:9092"  # Porta diferente para não conflitar
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-recommendations:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-recommendations:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - site-network
+
+  # ============= Sistema de Recomendações (IMAGEM ÚNICA) =============
+  
+  recommendations:
+    image: ${DOCKER_REGISTRY:-docker.io}/recommendations-system:latest
+    # OU build local:
+    # build: ./services/recommendations-system
+    container_name: recommendations-system
+    ports:
+      - "8000:8000"  # API Gateway
+      - "8001:8001"  # Auth Service
+      - "8002:8002"  # Ingest Service
+      - "8003:8003"  # Tracking Service
+      - "8005:8005"  # Recommendations Service
+    environment:
+      # Controle de serviços
+      SERVICE: all  # Inicia todos os serviços
+      ENV: production
+      
+      # Database
+      DATABASE_URL: postgresql://user:password@postgres-recommendations:5432/recommendations_db
+      
+      # Redis
+      REDIS_URL: redis://redis-recommendations:6379/0
+      REDIS_CACHE_TTL: 3600
+      
+      # Kafka
+      KAFKA_BOOTSTRAP_SERVERS: kafka-recommendations:9092
+      KAFKA_TOPIC_EVENTS: user-events
+      KAFKA_TOPIC_PROFILES: user-profiles
+      
+      # Instagram API (do .env)
+      INSTAGRAM_APP_ID: ${INSTAGRAM_APP_ID}
+      INSTAGRAM_APP_SECRET: ${INSTAGRAM_APP_SECRET}
+      INSTAGRAM_REDIRECT_URI: ${INSTAGRAM_REDIRECT_URI:-http://localhost:8000/auth/callback}
+      
+      # OpenAI
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      EMBEDDING_MODEL: text-embedding-3-small
+      
+      # Performance
+      RECOMMENDATION_LATENCY_TARGET_MS: 150
+      MAX_RECOMMENDATIONS: 50
+      
+      # Rate Limiting
+      INGEST_COOLDOWN_SECONDS: 3600
+    depends_on:
+      postgres-recommendations:
+        condition: service_healthy
+      redis-recommendations:
+        condition: service_healthy
+      kafka-recommendations:
+        condition: service_started
+    networks:
+      - site-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============= Seu Site (exemplo) =============
+  
+  site:
+    build: ./services/site
+    container_name: site-app
+    ports:
+      - "8080:8080"
+    environment:
+      # URL do sistema de recomendações
+      RECOMMENDATIONS_API_URL: http://recommendations:8000
+      
+      # Outras configs do site
+      DATABASE_URL: postgresql://...
+      # etc
+    depends_on:
+      - recommendations
+    networks:
+      - site-network
+    restart: unless-stopped
+
+volumes:
+  recommendations_postgres_data:
+  recommendations_redis_data:
+
+networks:
+  site-network:
+    driver: bridge
