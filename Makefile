@@ -45,9 +45,15 @@ up:  ## Sobe o ambiente de desenvolvimento
 	@echo "   https://localhost:5000"
 	@echo ""
 	@echo "📋 Comandos úteis:"
-	@echo "   make logs-site        - Ver logs em tempo real"
-	@echo "   make serve-ngrok      - Expor via ngrok (para webhooks ML)"
-	@echo "   make down             - Parar containers"
+	@echo "   make logs-site           - Ver logs em tempo real"
+	@echo ""
+	@echo "🌍 Expor com HTTPS público (para OAuth/Webhooks do ML):"
+	@echo "   make serve-cloudflare    - Cloudflare Tunnel (RECOMENDADO, sem limites)"
+	@echo "   make serve-localtunnel   - LocalTunnel (simples, rápido)"
+	@echo "   make serve-serveo        - Serveo SSH (sem instalar nada)"
+	@echo "   make serve-ngrok         - Ngrok (limitado no plano free)"
+	@echo ""
+	@echo "   make down                - Parar containers"
 	@echo ""
 
 down:  ## Para e remove containers + volumes
@@ -82,6 +88,164 @@ serve-ngrok:  ## Inicia túnel ngrok para acessar localmente via web
 	@echo "⚠️  IMPORTANTE: Copie a URL acima e adicione no painel do Mercado Livre:"
 	@echo "   https://developers.mercadolivre.com.br/devcenter"
 	@echo "   Redirect URI: <URL_ACIMA>/auth/mercadolivre/callback"
+
+unserve-ngrok:  ## Desliga o túnel ngrok (economiza tempo do trial)
+	@echo "🛑 Encerrando ngrok..."
+	@if pkill ngrok 2>/dev/null; then \
+		echo "✅ Ngrok encerrado com sucesso!"; \
+		echo "💰 Trial salvo - você pode usar make serve-ngrok quando precisar"; \
+	else \
+		echo "⚠️  Ngrok não estava rodando"; \
+	fi
+
+serve-cloudflare:  ## Inicia túnel Cloudflare (GRATUITO, sem limites!)
+	@echo "🌐 Iniciando túnel Cloudflare..."
+	@echo ""
+	@if ! command -v cloudflared &> /dev/null; then \
+		echo "❌ Cloudflared não está instalado!"; \
+		echo ""; \
+		echo "Execute primeiro: chmod +x setup_cloudflare.sh && ./setup_cloudflare.sh"; \
+		exit 1; \
+	fi
+	@if [ ! -f ~/.cloudflared/config.yml ]; then \
+		echo "❌ Configuração não encontrada!"; \
+		echo ""; \
+		echo "Execute primeiro: chmod +x setup_cloudflare.sh && ./setup_cloudflare.sh"; \
+		exit 1; \
+	fi
+	@echo "🔧 Subindo containers Docker..."
+	@$(COMPOSE) up -d
+	@echo ""
+	@echo "🚀 Iniciando túnel Cloudflare..."
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🌐 IMPORTANTE: Copie a URL que aparecer abaixo (https://...)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@cloudflared tunnel run vm-site
+
+stop-cloudflare:  ## Para o túnel Cloudflare
+	@echo "🛑 Encerrando túnel Cloudflare..."
+	@pkill cloudflared || true
+	@echo "✅ Túnel encerrado!"
+
+setup-cloudflare:  ## Configuração inicial do Cloudflare Tunnel (executar apenas uma vez)
+	@chmod +x setup_cloudflare.sh
+	@./setup_cloudflare.sh
+
+install-cloudflared:  ## Instala cloudflared (necessário para Cloudflare Tunnel)
+	@echo "📦 Instalando Cloudflared..."
+	@echo ""
+	@if command -v cloudflared &> /dev/null; then \
+		echo "✅ Cloudflared já está instalado!"; \
+		cloudflared --version; \
+		exit 0; \
+	fi
+	@echo "🔽 Baixando cloudflared..."
+	@wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -O /tmp/cloudflared.deb
+	@echo "📦 Instalando..."
+	@sudo dpkg -i /tmp/cloudflared.deb
+	@rm /tmp/cloudflared.deb
+	@echo ""
+	@echo "✅ Cloudflared instalado com sucesso!"
+	@cloudflared --version
+	@echo ""
+	@echo "🚀 Agora você pode usar:"
+	@echo "   make serve-cloudflare-quick  - Túnel rápido (sem configuração)"
+	@echo "   make setup-cloudflare        - Configurar túnel permanente"
+
+serve-cloudflare-quick:  ## Inicia Cloudflare Tunnel rápido (sem setup, gera URL aleatória)
+	@if [ ! -f /usr/local/bin/cloudflared ]; then \
+		echo "❌ Cloudflared não está instalado!"; \
+		echo ""; \
+		echo "Execute primeiro: make install-cloudflared"; \
+		exit 1; \
+	fi
+	@echo "🔧 Subindo containers Docker..."
+	@$(COMPOSE) up -d
+	@echo ""
+	@echo "� Iniciando proxy HTTP (porta 8000)..."
+	@pkill -f "proxy_http.py" 2>/dev/null || true
+	@python3 proxy_http.py > /dev/null 2>&1 &
+	@sleep 2
+	@echo "✅ Proxy HTTP rodando (8000 → 5000 HTTPS)"
+	@echo ""
+	@echo "🚀 Iniciando Cloudflare Quick Tunnel..."
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🌐 IMPORTANTE: Copie a URL https://...trycloudflare.com que aparecer"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@/usr/local/bin/cloudflared tunnel --url http://localhost:8000
+
+stop-cloudflare-quick:  ## Para o túnel Cloudflare Quick
+	@echo "🛑 Encerrando túnel Cloudflare..."
+	@pkill cloudflared || true
+	@pkill -f "proxy_http.py" || true
+	@echo "✅ Túnel e proxy encerrados!"
+
+serve-localtunnel:  ## Inicia túnel LocalTunnel (GRATUITO, super simples!)
+	@echo "🌐 Iniciando túnel LocalTunnel..."
+	@echo ""
+	@if ! command -v lt &> /dev/null; then \
+		echo "❌ LocalTunnel não está instalado!"; \
+		echo ""; \
+		echo "Execute primeiro: make setup-localtunnel"; \
+		exit 1; \
+	fi
+	@echo "🔧 Subindo containers Docker..."
+	@$(COMPOSE) up -d
+	@echo ""
+	@echo "🔄 Iniciando proxy HTTP→HTTPS..."
+	@python3 proxy_http.py > /dev/null 2>&1 &
+	@sleep 2
+	@echo "✅ Proxy rodando (porta 8000 → 5000)"
+	@echo ""
+	@echo "🚀 Iniciando LocalTunnel..."
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🌐 Sua URL pública: https://vm-site.loca.lt"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "📋 Configure no Mercado Livre:"
+	@echo "   Redirect URI: https://vm-site.loca.lt/auth/mercadolivre/callback"
+	@echo ""
+	@echo "⚠️  Na primeira vez, pode aparecer uma página pedindo para clicar"
+	@echo "    em 'Click to Continue' - é só clicar uma vez"
+	@echo ""
+	@lt --port 8000 --subdomain vm-site
+
+stop-localtunnel:  ## Para o túnel LocalTunnel
+	@echo "🛑 Encerrando túnel LocalTunnel..."
+	@pkill -f "lt --port" || true
+	@pkill -f "proxy_http.py" || true
+	@echo "✅ Túnel e proxy encerrados!"
+
+setup-localtunnel:  ## Configuração inicial do LocalTunnel
+	@chmod +x setup_localtunnel.sh
+	@./setup_localtunnel.sh
+
+serve-serveo:  ## Inicia túnel Serveo via SSH (GRATUITO, sem instalar nada!)
+	@echo "🌐 Iniciando túnel Serveo (SSH)..."
+	@echo ""
+	@echo "🔧 Subindo containers Docker..."
+	@$(COMPOSE) up -d
+	@echo ""
+	@echo "🚀 Iniciando túnel via SSH..."
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🌐 Sua URL pública será: https://vmsite.serveo.net"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -R vmsite:80:localhost:5000 serveo.net
+
+stop-serveo:  ## Para o túnel Serveo
+	@echo "🛑 Encerrando túnel Serveo..."
+	@pkill -f "ssh.*serveo.net" || true
+	@echo "✅ Túnel encerrado!"
+
+help-tuneis:  ## Exibe guia completo das alternativas gratuitas ao ngrok
+	@./guia_tuneis.sh
 
 test-oauth:  ## Testa o fluxo OAuth - Abre navegador para autorizar
 	@echo "🔑 Testando OAuth do Mercado Livre..."
@@ -396,6 +560,7 @@ api-prepare-product: ## Prepara produto via API oficial (uso: make api-prepare-p
 	echo "📂 Categoria selecionada: $$CATEGORIA"; \
 	echo ""; \
 	docker exec -it site python3 scripts/api_prepare_ml.py "$(URL)" "$$CATEGORIA"
+
 shopee-prepare-product: ## Prepara produto da Shopee via scraping (uso: make shopee-prepare-product URL=https://...)
 	@if [ -z "$(URL)" ]; then \
 		echo "❌ Erro: URL não fornecida"; \
@@ -413,36 +578,11 @@ shopee-prepare-product: ## Prepara produto da Shopee via scraping (uso: make sho
 	@echo "🛍️  PREPARAÇÃO DE PRODUTO DA SHOPEE"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
-	@echo "� URL: $(URL)"
+	@echo "🔗 URL: $(URL)"
 	@echo ""
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "📂 CATEGORIAS DISPONÍVEIS:"
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "   1. E        - Eletrônicos"
-	@echo "   2. CD       - Casa & Decoração"
-	@echo "   3. ME       - Moda & Estilo"
-	@echo "   4. PET      - Pet Shop"
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "📥 Coletando informações do produto..."
 	@echo ""
-	@echo "📁 SUBCATEGORIAS SUGERIDAS:"
-	@echo "   CD: area-servico, quarto, banheiro, cozinha, sala"
-	@echo "   E:  eletrodomesticos, informatica, celulares, audio"
-	@echo "   ME: roupas, calcados, acessorios"
-	@echo "   PET: caes, gatos, aquarios"
-	@echo ""
-	@read -p "🏷️  Digite a categoria (E/CD/ME/PET): " TAG; \
-	read -p "📁 Digite a subcategoria: " SUBCATEGORY; \
-	echo ""; \
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-	echo "💰 INFORMAÇÕES DE PREÇO:"; \
-	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-	echo ""; \
-	read -p "   Preço atual (ex: 49.99): " PRICE; \
-	read -p "   Preço antigo/promocional (ex: 167.99, ou deixe vazio): " OLD_PRICE; \
-	echo ""; \
-	echo "🚀 Preparando produto..."; \
-	echo ""; \
-	docker exec -it site python3 scripts/shopee_prepare.py "$(URL)" "$$PRICE" "$$OLD_PRICE" "$$TAG" "$$SUBCATEGORY"
+	@docker exec -it site python3 scripts/shopee_prepare.py "$(URL)"
 
 shopee-update-prices: ## Atualiza preços e disponibilidade de produto da Shopee (uso: make shopee-update-prices URL="...")
 	@if [ -z "$(URL)" ]; then \

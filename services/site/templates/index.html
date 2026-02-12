@@ -3,7 +3,36 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>V&M - Lojinha</title>
+  
+  <!-- Meta Tags Otimizadas para SEO -->
+  <title>{{ meta_tags.title if meta_tags else 'V&M - Lojinha' }}</title>
+  <meta name="description" content="{{ meta_tags.description if meta_tags else 'As melhores promoções da internet' }}" />
+  <meta name="keywords" content="{{ meta_tags.keywords if meta_tags else 'promoções, ofertas, descontos' }}" />
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="{{ meta_tags['og:type'] if meta_tags else 'website' }}" />
+  <meta property="og:title" content="{{ meta_tags['og:title'] if meta_tags else 'V&M - Lojinha' }}" />
+  <meta property="og:description" content="{{ meta_tags['og:description'] if meta_tags else 'As melhores promoções' }}" />
+  <meta property="og:image" content="{{ meta_tags['og:image'] if meta_tags else '/static/default-image.jpg' }}" />
+  <meta property="og:url" content="{{ meta_tags['og:url'] if meta_tags else 'https://seusite.com' }}" />
+  <meta property="og:site_name" content="{{ meta_tags['og:site_name'] if meta_tags else 'V&M' }}" />
+  
+  <!-- Twitter -->
+  <meta name="twitter:card" content="{{ meta_tags['twitter:card'] if meta_tags else 'summary_large_image' }}" />
+  <meta name="twitter:title" content="{{ meta_tags['twitter:title'] if meta_tags else 'V&M - Lojinha' }}" />
+  <meta name="twitter:description" content="{{ meta_tags['twitter:description'] if meta_tags else 'As melhores promoções' }}" />
+  <meta name="twitter:image" content="{{ meta_tags['twitter:image'] if meta_tags else '/static/default-image.jpg' }}" />
+  
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://seusite.com/" />
+  
+  <!-- Schema.org Structured Data (JSON-LD) -->
+  {% if organization_schema %}
+  <script type="application/ld+json">
+  {{ organization_schema | safe }}
+  </script>
+  {% endif %}
+  
   <link rel="stylesheet" href="/static/style.css" />
   <style>
     .sort-buttons {
