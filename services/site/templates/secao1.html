@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/static/style.css" />
   <style>
     body {
-      background-image: url('/static/background_CD.png');
+      background-image: url('/static/bg.png');
     }
     
     .sort-buttons {
@@ -85,15 +85,15 @@
   
   <!-- Botões de subcategoria -->
   <div class="subcategory-buttons">
-    <button class="subcat-btn active" onclick="filterBySubcategory('todos')">🏠 Todos</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('banheiro')">🚿 Banheiro</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('sala')">🛋️ Sala</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('quarto')">🛏️ Quarto</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('cozinha')">🍳 Cozinha</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('corredor')">🚪 Corredor</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('garagem')">🚗 Garagem</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('sacada')">🌿 Sacada</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('area-servico')">🧺 Área de Serviço</button>
+    <button class="subcat-btn active" onclick="filterBySubcategory('todos', this)">🏠 Todos</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('banheiro', this)">🚿 Banheiro</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('sala', this)">🛋️ Sala</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('quarto', this)">🛏️ Quarto</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('cozinha', this)">🍳 Cozinha</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('corredor', this)">🚪 Corredor</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('garagem', this)">🚗 Garagem</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('sacada', this)">🌿 Sacada</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('area-servico', this)">🧺 Área de Serviço</button>
   </div>
   
   <p style="margin-top: 20px; font-weight: bold; font-size: 19px;">
@@ -102,9 +102,9 @@
   
   <!-- Botões de ordenação -->
   <div class="sort-buttons" style="text-align: center; margin: 20px 0;">
-    <button class="sort-btn" onclick="sortProducts('price-asc')">💰 Mais Baratos!</button>
-    <button class="sort-btn" onclick="sortProducts('price-desc')">💸 Mais Caros!</button>
-    <button class="sort-btn" onclick="sortProducts('discount')">🔥 Maior Desconto!</button>
+    <button class="sort-btn" onclick="sortProducts('price-asc', this)">💰 Mais Baratos!</button>
+    <button class="sort-btn" onclick="sortProducts('price-desc', this)">💸 Mais Caros!</button>
+    <button class="sort-btn" onclick="sortProducts('discount', this)">🔥 Maior Desconto!</button>
   </div>
   
   <div class="grid" id="products-container"></div>
@@ -228,14 +228,14 @@
     let allProducts = []; // Variável global para armazenar todos os produtos
     let currentSubcategory = 'todos'; // Subcategoria atual
 
-    function filterBySubcategory(subcategory) {
+    function filterBySubcategory(subcategory, clickedButton) {
       currentSubcategory = subcategory;
       
       // Remove active class de todos os botões de subcategoria
       document.querySelectorAll('.subcat-btn').forEach(btn => btn.classList.remove('active'));
       
       // Adiciona active class ao botão clicado
-      event.target.classList.add('active');
+      if (clickedButton) clickedButton.classList.add('active');
       
       // Filtra os produtos pela subcategoria
       let filteredProducts = allProducts;
@@ -308,12 +308,12 @@
       return 0;
     }
 
-    function sortProducts(type) {
+    function sortProducts(type, clickedButton) {
       // Remove active class de todos os botões
       document.querySelectorAll('.sort-btn').forEach(btn => btn.classList.remove('active'));
       
       // Adiciona active class ao botão clicado
-      event.target.classList.add('active');
+      if (clickedButton) clickedButton.classList.add('active');
 
       let sortedProducts = [...allProducts];
       

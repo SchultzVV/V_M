@@ -49,8 +49,16 @@ echo -e "${GREEN}✅ Login realizado com sucesso!${NC}"
 echo ""
 
 # Criar túnel
-TUNNEL_NAME="vm-site"
-echo -e "${YELLOW}🔧 Passo 2: Criando túnel '${TUNNEL_NAME}'${NC}"
+echo -e "${YELLOW}🔧 Passo 2: Criando túnel${NC}"
+echo ""
+echo "Escolha um nome para seu túnel (ex: arsenal-vem, bunker-ofertas):"
+read -p "Nome do túnel: " TUNNEL_NAME
+
+if [ -z "$TUNNEL_NAME" ]; then
+    TUNNEL_NAME="arsenal-vem"
+    echo "Usando nome padrão: $TUNNEL_NAME"
+fi
+
 echo ""
 
 # Verificar se túnel já existe

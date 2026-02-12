@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/static/style.css" />
   <style>
     body {
-      background-image: url('/static/background_E.png');
+      background-image: url('/static/bg.png');
     }
     
     .sort-buttons {
@@ -85,15 +85,15 @@
   
   <!-- Botões de subcategoria -->
   <div class="subcategory-buttons">
-    <button class="subcat-btn active" onclick="filterBySubcategory('todos')">📱 Todos</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('smartphones')">📱 Smartphones</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('computadores')">💻 Computadores</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('audio')">🎧 Áudio</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('tv')">📺 TVs</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('games')">🎮 Games</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('cameras')">📷 Câmeras</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('smartwatch')">⌚ Smartwatch</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('acessorios')">🔌 Acessórios</button>
+    <button class="subcat-btn active" onclick="filterBySubcategory('todos', this)">📱 Todos</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('smartphones', this)">📱 Smartphones</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('computadores', this)">💻 Computadores</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('audio', this)">🎧 Áudio</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('tv', this)">📺 TVs</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('games', this)">🎮 Games</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('cameras', this)">📷 Câmeras</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('smartwatch', this)">⌚ Smartwatch</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('acessorios', this)">🔌 Acessórios</button>
   </div>
   
   <p style="margin-top: 20px; font-weight: bold; font-size: 19px;">
@@ -102,9 +102,9 @@
   
   <!-- Botões de ordenação -->
   <div class="sort-buttons" style="text-align: center; margin: 20px 0;">
-    <button class="sort-btn" onclick="sortProducts('price-asc')">💰 Mais Baratos!</button>
-    <button class="sort-btn" onclick="sortProducts('price-desc')">💸 Mais Caros!</button>
-    <button class="sort-btn" onclick="sortProducts('discount')">🔥 Maior Desconto!</button>
+    <button class="sort-btn" onclick="sortProducts('price-asc', this)">💰 Mais Baratos!</button>
+    <button class="sort-btn" onclick="sortProducts('price-desc', this)">💸 Mais Caros!</button>
+    <button class="sort-btn" onclick="sortProducts('discount', this)">🔥 Maior Desconto!</button>
   </div>
   
   <div class="grid" id="products-container"></div>
@@ -228,14 +228,14 @@
     let allProducts = []; // Variável global para armazenar todos os produtos
     let currentSubcategory = 'todos'; // Subcategoria atual
 
-    function filterBySubcategory(subcategory) {
+    function filterBySubcategory(subcategory, clickedButton) {
       currentSubcategory = subcategory;
       
       // Remove active class de todos os botões de subcategoria
       document.querySelectorAll('.subcat-btn').forEach(btn => btn.classList.remove('active'));
       
       // Adiciona active class ao botão clicado
-      event.target.classList.add('active');
+      if (clickedButton) clickedButton.classList.add('active');
       
       // Filtra os produtos pela subcategoria
       let filteredProducts = allProducts;
@@ -301,12 +301,12 @@
       return 0;
     }
 
-    function sortProducts(type) {
+    function sortProducts(type, clickedButton) {
       // Remove active class de todos os botões
       document.querySelectorAll('.sort-btn').forEach(btn => btn.classList.remove('active'));
       
       // Adiciona active class ao botão clicado
-      event.target.classList.add('active');
+      if (clickedButton) clickedButton.classList.add('active');
 
       let sortedProducts = [...allProducts];
       

@@ -88,6 +88,12 @@ serve-ngrok:  ## Inicia túnel ngrok para acessar localmente via web
 	@echo "⚠️  IMPORTANTE: Copie a URL acima e adicione no painel do Mercado Livre:"
 	@echo "   https://developers.mercadolivre.com.br/devcenter"
 	@echo "   Redirect URI: <URL_ACIMA>/auth/mercadolivre/callback"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "💡 LEMBRE-SE: Ngrok tem limite de horas no plano free!"
+	@echo "   Quando terminar de usar, desligue com:"
+	@echo "   make unserve-ngrok"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 unserve-ngrok:  ## Desliga o túnel ngrok (economiza tempo do trial)
 	@echo "🛑 Encerrando ngrok..."

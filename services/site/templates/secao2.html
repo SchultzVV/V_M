@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/static/style.css" />
   <style>
     body {
-      background-image: url('/static/background_ME.png');
+      background-image: url('/static/bg.png');
     }
     
     .sort-buttons {
@@ -85,14 +85,14 @@
   
   <!-- Botões de subcategoria -->
   <div class="subcategory-buttons">
-    <button class="subcat-btn active" onclick="filterBySubcategory('todos')">✨ Todos</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('feminino')">👗 Feminino</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('masculino')">👔 Masculino</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('infantil')">👶 Infantil</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('calcados')">👟 Calçados</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('acessorios')">💍 Acessórios</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('bolsas')">👜 Bolsas</button>
-    <button class="subcat-btn" onclick="filterBySubcategory('relogios')">⌚ Relógios</button>
+    <button class="subcat-btn active" onclick="filterBySubcategory('todos', this)">✨ Todos</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('feminino', this)">👗 Feminino</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('masculino', this)">👔 Masculino</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('infantil', this)">👶 Infantil</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('calcados', this)">👟 Calçados</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('acessorios', this)">💍 Acessórios</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('bolsas', this)">👜 Bolsas</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('relogios', this)">⌚ Relógios</button>
   </div>
   
   <p style="margin-top: 20px; font-weight: bold; font-size: 19px;">
@@ -101,9 +101,9 @@
   
   <!-- Botões de ordenação -->
   <div class="sort-buttons" style="text-align: center; margin: 20px 0;">
-    <button class="sort-btn" onclick="sortProducts('price-asc')">💰 Mais Baratos!</button>
-    <button class="sort-btn" onclick="sortProducts('price-desc')">💸 Mais Caros!</button>
-    <button class="sort-btn" onclick="sortProducts('discount')">🔥 Maior Desconto!</button>
+    <button class="sort-btn" onclick="sortProducts('price-asc', this)">💰 Mais Baratos!</button>
+    <button class="sort-btn" onclick="sortProducts('price-desc', this)">💸 Mais Caros!</button>
+    <button class="sort-btn" onclick="sortProducts('discount', this)">🔥 Maior Desconto!</button>
   </div>
   
   <div class="grid" id="products-container"></div>
@@ -227,14 +227,14 @@
     let allProducts = []; // Variável global para armazenar todos os produtos
     let currentSubcategory = 'todos'; // Subcategoria atual
 
-    function filterBySubcategory(subcategory) {
+    function filterBySubcategory(subcategory, clickedButton) {
       currentSubcategory = subcategory;
       
       // Remove active class de todos os botões de subcategoria
       document.querySelectorAll('.subcat-btn').forEach(btn => btn.classList.remove('active'));
       
       // Adiciona active class ao botão clicado
-      event.target.classList.add('active');
+      if (clickedButton) clickedButton.classList.add('active');
       
       // Filtra os produtos pela subcategoria
       let filteredProducts = allProducts;
@@ -297,12 +297,12 @@
       return 0;
     }
 
-    function sortProducts(type) {
+    function sortProducts(type, clickedButton) {
       // Remove active class de todos os botões
       document.querySelectorAll('.sort-btn').forEach(btn => btn.classList.remove('active'));
       
       // Adiciona active class ao botão clicado
-      event.target.classList.add('active');
+      if (clickedButton) clickedButton.classList.add('active');
 
       let sortedProducts = [...allProducts];
       
