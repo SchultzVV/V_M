@@ -238,13 +238,15 @@ def scrape_mercadolivre_product(url):
         title = title_tag.text.strip() if title_tag else "Produto Mercado Livre"
         
         # ===== PREÇOS - Estratégia aprimorada =====
-        print(f"\n🔍 Analisando preços...")
+        print(f"\n🔍 Analisando preços e descontos...")
         
         # Procurar container principal de preços
         price_container = soup.find('div', class_='ui-pdp-price')
         
         price = None
         old_price = None
+        discount_percent = 0
+        discount_value = 0
         
         if price_container:
             # Pegar todos os elementos de preço dentro do container
@@ -257,12 +259,19 @@ def scrape_mercadolivre_product(url):
                 # Tem desconto: primeiro preço é o promocional
                 price_text = all_prices[0].text.strip().replace('.', '').replace(',', '.')
                 price = f"R$ {price_text}"
+                price_float = float(price_text)
                 
                 # Preço riscado é o original
                 old_price_fraction = old_price_element.find('span', class_='andes-money-amount__fraction')
                 if old_price_fraction:
                     old_price_text = old_price_fraction.text.strip().replace('.', '').replace(',', '.')
                     old_price = f"R$ {old_price_text}"
+                    old_price_float = float(old_price_text)
+                    
+                    # Calcular desconto
+                    if old_price_float > price_float:
+                        discount_value = old_price_float - price_float
+                        discount_percent = (discount_value / old_price_float) * 100
                 else:
                     old_price = price
             elif len(all_prices) > 0:
@@ -285,8 +294,8 @@ def scrape_mercadolivre_product(url):
         print(f"💰 Preços detectados:")
         print(f"   Preço atual (promocional): {price}")
         print(f"   Preço original: {old_price}")
-        if price != old_price:
-            print(f"   🎉 Produto com desconto!")
+        if discount_value > 0:
+            print(f"   🎉 DESCONTO: R$ {discount_value:.2f} ({discount_percent:.0f}% OFF)")
         
         # ===== IMAGENS E VÍDEOS =====
         print(f"\n🖼️  Coletando mídias...")

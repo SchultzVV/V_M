@@ -339,6 +339,79 @@ update-ngrok-url:  ## Atualiza .env e reinicia containers com nova URL do ngrok
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 
+update-cloudflare-url:  ## Atualiza .env com URL do Cloudflare Tunnel e reinicia container
+	@echo ""
+	@echo "🔄 Atualizando configuração do Cloudflare Tunnel..."
+	@echo ""
+	@CLOUDFLARE_URL=$$(grep "https://" /tmp/cloudflare_tunnel.log 2>/dev/null | grep "trycloudflare.com" | grep -oP 'https://[^\s|]+' | head -1); \
+	if [ -z "$$CLOUDFLARE_URL" ]; then \
+		echo "❌ Cloudflare Tunnel não está rodando!"; \
+		echo ""; \
+		echo "Execute primeiro: make serve-cloudflare-quick"; \
+		exit 1; \
+	fi; \
+	OLD_URL=$$(grep "^ML_REDIRECT_URI=" .env | cut -d'=' -f2); \
+	NEW_URL="$$CLOUDFLARE_URL/auth/mercadolivre/callback"; \
+	echo "🔗 URL antiga: $$OLD_URL"; \
+	echo "🔗 URL nova:   $$NEW_URL"; \
+	echo ""; \
+	if [ "$$OLD_URL" = "$$NEW_URL" ]; then \
+		echo "✅ URL já está atualizada!"; \
+		exit 0; \
+	fi; \
+	echo "📝 Atualizando .env..."; \
+	sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=$$NEW_URL|" .env; \
+	echo "✅ .env atualizado"; \
+	echo ""; \
+	echo "🔄 Reiniciando container site para carregar nova URL..."; \
+	$(COMPOSE) stop site > /dev/null 2>&1; \
+	$(COMPOSE) rm -f site > /dev/null 2>&1; \
+	$(COMPOSE) up -d site > /dev/null 2>&1; \
+	sleep 3; \
+	echo "✅ Container reiniciado"; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "⚠️  PRÓXIMOS PASSOS:"; \
+	echo ""; \
+	echo "1. Cadastre no painel ML: https://developers.mercadolivre.com.br/devcenter"; \
+	echo "   Redirect URI: $$NEW_URL"; \
+	echo ""; \
+	echo "2. Autorize com: make oauth-cloudflare"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+
+oauth-cloudflare:  ## Gera URL OAuth usando Cloudflare Tunnel
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔑 URL DE AUTENTICAÇÃO OAUTH - MERCADO LIVRE (Cloudflare)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@CLOUDFLARE_URL=$$(grep "https://" /tmp/cloudflare_tunnel.log 2>/dev/null | grep "trycloudflare.com" | grep -oP 'https://[^\s|]+' | head -1); \
+	if [ -z "$$CLOUDFLARE_URL" ]; then \
+		echo "❌ Cloudflare Tunnel não está rodando!"; \
+		echo ""; \
+		echo "Execute primeiro: make serve-cloudflare-quick"; \
+		exit 1; \
+	fi; \
+	APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2); \
+	AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$CLOUDFLARE_URL/auth/mercadolivre/callback"; \
+	echo "🌐 URL do Cloudflare Tunnel:"; \
+	echo "   $$CLOUDFLARE_URL"; \
+	echo ""; \
+	echo "🔗 Cole esta URL no navegador para autorizar:"; \
+	echo ""; \
+	echo "$$AUTH_URL"; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "⚠️  IMPORTANTE: Cadastre no painel do Mercado Livre:"
+	@echo "   https://developers.mercadolivre.com.br/devcenter"
+	@echo ""
+	@echo "   Redirect URI: $$CLOUDFLARE_URL/auth/mercadolivre/callback"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "✅ Após autorizar no navegador, verifique com: make check-tokens"
+	@echo ""
+
 check-tokens:  ## Verifica se os tokens OAuth foram salvos
 	@echo "🔍 Verificando tokens salvos..."
 	@echo ""
@@ -542,6 +615,26 @@ api-prepare-product: ## Prepara produto via API oficial (uso: make api-prepare-p
 		echo ""; \
 		echo "Uso: make api-prepare-product URL=https://mercadolivre.com/sec/ABC123"; \
 		echo "     make api-prepare-product URL=https://produto.mercadolivre.com.br/MLB-..."; \
+		echo ""; \
+		echo "💡 O script irá resolver o link, obter dados da API e perguntar a categoria"; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo ""
+	@echo "🚀 Preparando produto via API oficial (link de afiliado preservado)..."
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@docker exec -it site python3 scripts/api_prepare_ml.py "$(URL)"
+
+api-update-product: ## Atualiza produto existente (preço, desconto, disponibilidade, mídias) via API ML
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make api-update-product URL=https://mercadolivre.com/sec/ABC123"; \
+		echo "     make api-update-product URL=https://produto.mercadolivre.com.br/MLB-..."; \
 		exit 1; \
 	fi
 	@if ! docker ps | grep -q site; then \
@@ -550,22 +643,14 @@ api-prepare-product: ## Prepara produto via API oficial (uso: make api-prepare-p
 	fi
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "📂 CATEGORIAS DISPONÍVEIS:"
-	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "   1. geral    - Produtos gerais (padrão)"
-	@echo "   2. E        - Eletrônicos"
-	@echo "   3. CD       - Casa & Decoração"
-	@echo "   4. ME       - Moda & Estilo"
-	@echo "   5. PET      - Pet Shop"
+	@echo "🔄 ATUALIZAÇÃO DE PRODUTO EXISTENTE"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
-	@read -p "🏷️  Digite a categoria (geral/E/CD/ME/PET) ou Enter para 'geral': " CATEGORIA; \
-	CATEGORIA=$${CATEGORIA:-geral}; \
-	echo ""; \
-	echo "🚀 Preparando produto via API oficial..."; \
-	echo "📂 Categoria selecionada: $$CATEGORIA"; \
-	echo ""; \
-	docker exec -it site python3 scripts/api_prepare_ml.py "$(URL)" "$$CATEGORIA"
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@echo "📊 Atualizando: preços, descontos, disponibilidade e imagens..."
+	@echo ""
+	@docker exec -it site python3 scripts/api_update_ml.py "$(URL)"
 
 shopee-prepare-product: ## Prepara produto da Shopee via scraping (uso: make shopee-prepare-product URL=https://...)
 	@if [ -z "$(URL)" ]; then \
