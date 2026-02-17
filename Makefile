@@ -48,10 +48,11 @@ up:  ## Sobe o ambiente de desenvolvimento
 	@echo "   make logs-site           - Ver logs em tempo real"
 	@echo ""
 	@echo "🌍 Expor com HTTPS público (para OAuth/Webhooks do ML):"
-	@echo "   make serve-cloudflare    - Cloudflare OTIMIZADO (RECOMENDADO, rápido!)"
-	@echo "   make serve-ngrok         - Ngrok (rápido, limitado no plano free)"
-	@echo "   make serve-localtunnel   - LocalTunnel (simples)"
-	@echo "   make serve-serveo        - Serveo SSH (sem instalar nada)"
+	@echo "   make serve-cloudflare        - Cloudflare rápido (URL aleatória)"
+	@echo "   make serve-cloudflare-fixed  - Cloudflare URL FIXA (recomendado produção!)"
+	@echo "   make serve-ngrok             - Ngrok (rápido, limitado no plano free)"
+	@echo "   make serve-localtunnel       - LocalTunnel (simples)"
+	@echo "   make serve-serveo            - Serveo SSH (sem instalar nada)"
 	@echo ""
 	@echo "   make down                - Parar containers"
 	@echo ""
@@ -139,7 +140,108 @@ stop-cloudflare:  ## Para o túnel Cloudflare
 	@pkill cloudflared || true
 	@echo "✅ Túnel encerrado!"
 
-setup-cloudflare:  ## Configuração inicial do Cloudflare Tunnel (executar apenas uma vez)
+serve-cloudflare-fixed:  ## Cloudflare com URL FIXA (requer setup inicial)
+	@echo "🌐 Iniciando túnel Cloudflare com URL FIXA..."
+	@echo ""
+	@CLOUDFLARED_BIN=$$(command -v cloudflared 2>/dev/null || echo /usr/local/bin/cloudflared); \
+	if [ ! -x "$$CLOUDFLARED_BIN" ]; then \
+		echo "❌ Cloudflared não está instalado!"; \
+		echo ""; \
+		echo "Execute primeiro: make install-cloudflared"; \
+		exit 1; \
+	fi; \
+	if [ ! -f ~/.cloudflared/config.yml ]; then \
+		echo "❌ Túnel não configurado!"; \
+		echo ""; \
+		echo "Execute primeiro: make setup-cloudflare-fixed"; \
+		echo ""; \
+		echo "Isso vai criar um túnel permanente com URL fixa."; \
+		exit 1; \
+	fi; \
+	echo "🔧 Subindo containers Docker..."; \
+	$(COMPOSE) up -d; \
+	sleep 2; \
+	echo "✅ Site rodando em https://localhost:5000"; \
+	echo ""; \
+	echo "🚀 Iniciando túnel com URL PERMANENTE..."; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "🌐 A URL será a mesma sempre que você reiniciar"; \
+	echo "⚡ OTIMIZADO: Conexão direta ao HTTPS + timeouts aumentados"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	$$CLOUDFLARED_BIN tunnel run
+
+setup-cloudflare-fixed:  ## Configurar túnel Cloudflare com URL FIXA (executar 1x)
+	@echo "🔧 Configurando túnel Cloudflare com URL permanente..."
+	@echo ""
+	@CLOUDFLARED_BIN=$$(command -v cloudflared 2>/dev/null || echo /usr/local/bin/cloudflared); \
+	if [ ! -x "$$CLOUDFLARED_BIN" ]; then \
+		echo "❌ Cloudflared não está instalado!"; \
+		echo ""; \
+		echo "Execute primeiro: make install-cloudflared"; \
+		exit 1; \
+	fi; \
+	if [ -f ~/.cloudflared/config.yml ]; then \
+		echo "✅ Túnel já está configurado!"; \
+		echo ""; \
+		echo "Para reconfigurar, remova: rm -rf ~/.cloudflared"; \
+		echo "Depois execute novamente: make setup-cloudflare-fixed"; \
+		exit 0; \
+	fi; \
+	echo "🔑 Passo 1: Login no Cloudflare"; \
+	echo "(Uma página do navegador vai abrir)"; \
+	echo ""; \
+	$$CLOUDFLARED_BIN tunnel login; \
+	echo ""; \
+	echo "✅ Login realizado!"; \
+	echo ""; \
+	echo "🌐 Passo 2: Criando túnel..."; \
+	TUNNEL_NAME="vm-site-$$(date +%s)"; \
+	if $$CLOUDFLARED_BIN tunnel list 2>/dev/null | grep -q "vm-site"; then \
+		echo "⚠️  Túnel vm-site já existe, usando ele..."; \
+		TUNNEL_NAME="vm-site"; \
+	else \
+		$$CLOUDFLARED_BIN tunnel create vm-site; \
+		TUNNEL_NAME="vm-site"; \
+	fi; \
+	TUNNEL_ID=$$($$CLOUDFLARED_BIN tunnel list | grep "$$TUNNEL_NAME" | awk '{print $$1}' | head -1); \
+	echo "✅ Túnel criado: $$TUNNEL_ID"; \
+	echo ""; \
+	echo "📄 Passo 3: Criando configuração..."; \
+	mkdir -p ~/.cloudflared; \
+	CRED_FILE=$$(ls ~/.cloudflared/*.json 2>/dev/null | grep "$$TUNNEL_ID" | head -1); \
+	cat > ~/.cloudflared/config.yml << EOF$$'\n'\
+tunnel: $$TUNNEL_ID$$'\n'\
+credentials-file: $$CRED_FILE$$'\n'\
+$$'\n'\
+ingress:$$'\n'\
+  - service: https://localhost:5000$$'\n'\
+    originRequest:$$'\n'\
+      noTLSVerify: true$$'\n'\
+      connectTimeout: 60s$$'\n'\
+      keepaliveTimeout: 5m$$'\n'\
+      keepaliveConnections: 200$$'\n'\
+      tcpKeepAlive: 60s$$'\n'\
+  - service: http_status:404$$'\n'\
+EOF$$'\n'\
+	; \
+	echo "✅ Configuração criada em ~/.cloudflared/config.yml"; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "✅ Setup concluído!"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	echo "🚀 Agora execute:"; \
+	echo "   make serve-cloudflare-fixed"; \
+	echo ""; \
+	echo "🌐 A URL do túnel aparecerá ao iniciar e será SEMPRE A MESMA!"; \
+	echo ""
+
+setup-cloudflare:  ## [ANTIGO] Configuração inicial do Cloudflare Tunnel
+	@echo "⚠️  Este comando está obsoleto. Use:"
+	@echo "   make setup-cloudflare-fixed  - Para túnel com URL fixa"
+	@echo ""
 	@chmod +x setup_cloudflare.sh
 	@./setup_cloudflare.sh
 
