@@ -48,10 +48,10 @@ up:  ## Sobe o ambiente de desenvolvimento
 	@echo "   make logs-site           - Ver logs em tempo real"
 	@echo ""
 	@echo "🌍 Expor com HTTPS público (para OAuth/Webhooks do ML):"
-	@echo "   make serve-cloudflare    - Cloudflare Tunnel (RECOMENDADO, sem limites)"
-	@echo "   make serve-localtunnel   - LocalTunnel (simples, rápido)"
+	@echo "   make serve-cloudflare    - Cloudflare OTIMIZADO (RECOMENDADO, rápido!)"
+	@echo "   make serve-ngrok         - Ngrok (rápido, limitado no plano free)"
+	@echo "   make serve-localtunnel   - LocalTunnel (simples)"
 	@echo "   make serve-serveo        - Serveo SSH (sem instalar nada)"
-	@echo "   make serve-ngrok         - Ngrok (limitado no plano free)"
 	@echo ""
 	@echo "   make down                - Parar containers"
 	@echo ""
@@ -104,31 +104,35 @@ unserve-ngrok:  ## Desliga o túnel ngrok (economiza tempo do trial)
 		echo "⚠️  Ngrok não estava rodando"; \
 	fi
 
-serve-cloudflare:  ## Inicia túnel Cloudflare (GRATUITO, sem limites!)
-	@echo "🌐 Iniciando túnel Cloudflare..."
+serve-cloudflare:  ## Inicia túnel Cloudflare otimizado (RÁPIDO, conecta direto ao HTTPS!)
+	@echo "🌐 Iniciando túnel Cloudflare OTIMIZADO..."
 	@echo ""
-	@if ! command -v cloudflared &> /dev/null; then \
+	@if ! command -v cloudflared &> /dev/null && [ ! -f /usr/local/bin/cloudflared ]; then \
 		echo "❌ Cloudflared não está instalado!"; \
 		echo ""; \
-		echo "Execute primeiro: chmod +x setup_cloudflare.sh && ./setup_cloudflare.sh"; \
-		exit 1; \
-	fi
-	@if [ ! -f ~/.cloudflared/config.yml ]; then \
-		echo "❌ Configuração não encontrada!"; \
-		echo ""; \
-		echo "Execute primeiro: chmod +x setup_cloudflare.sh && ./setup_cloudflare.sh"; \
+		echo "Execute primeiro: make install-cloudflared"; \
 		exit 1; \
 	fi
 	@echo "🔧 Subindo containers Docker..."
 	@$(COMPOSE) up -d
+	@sleep 2
+	@echo "✅ Site rodando em https://localhost:5000"
 	@echo ""
-	@echo "🚀 Iniciando túnel Cloudflare..."
+	@echo "🚀 Iniciando túnel Cloudflare Quick (conexão direta HTTPS)..."
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "🌐 IMPORTANTE: Copie a URL que aparecer abaixo (https://...)"
+	@echo "🌐 IMPORTANTE: Copie a URL https://...trycloudflare.com que aparecer"
+	@echo "⚡ OTIMIZADO: Conexão direta ao HTTPS + timeouts aumentados"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
-	@cloudflared tunnel run vm-site
+	@CLOUDFLARED_BIN=$$(command -v cloudflared 2>/dev/null || echo /usr/local/bin/cloudflared); \
+	$$CLOUDFLARED_BIN tunnel \
+		--url https://localhost:5000 \
+		--no-tls-verify \
+		--proxy-connect-timeout 60s \
+		--proxy-keepalive-timeout 5m \
+		--proxy-keepalive-connections 200 \
+		--proxy-tcp-keepalive 60s
 
 stop-cloudflare:  ## Para o túnel Cloudflare
 	@echo "🛑 Encerrando túnel Cloudflare..."
@@ -157,11 +161,12 @@ install-cloudflared:  ## Instala cloudflared (necessário para Cloudflare Tunnel
 	@cloudflared --version
 	@echo ""
 	@echo "🚀 Agora você pode usar:"
-	@echo "   make serve-cloudflare-quick  - Túnel rápido (sem configuração)"
+	@echo "   make serve-cloudflare        - Túnel otimizado (RECOMENDADO!)"
+	@echo "   make serve-cloudflare-proxy  - Com proxy HTTP (fallback)"
 	@echo "   make setup-cloudflare        - Configurar túnel permanente"
 
-serve-cloudflare-quick:  ## Inicia Cloudflare Tunnel rápido (sem setup, gera URL aleatória)
-	@if [ ! -f /usr/local/bin/cloudflared ]; then \
+serve-cloudflare-proxy:  ## Cloudflare com proxy HTTP (usar se serve-cloudflare falhar)
+	@if ! command -v cloudflared &> /dev/null; then \
 		echo "❌ Cloudflared não está instalado!"; \
 		echo ""; \
 		echo "Execute primeiro: make install-cloudflared"; \
@@ -170,21 +175,22 @@ serve-cloudflare-quick:  ## Inicia Cloudflare Tunnel rápido (sem setup, gera UR
 	@echo "🔧 Subindo containers Docker..."
 	@$(COMPOSE) up -d
 	@echo ""
-	@echo "� Iniciando proxy HTTP (porta 8000)..."
+	@echo "🔎 Iniciando proxy HTTP (porta 8000)..."
 	@pkill -f "proxy_http.py" 2>/dev/null || true
 	@python3 proxy_http.py > /dev/null 2>&1 &
 	@sleep 2
 	@echo "✅ Proxy HTTP rodando (8000 → 5000 HTTPS)"
 	@echo ""
-	@echo "🚀 Iniciando Cloudflare Quick Tunnel..."
+	@echo "🚀 Iniciando Cloudflare com proxy HTTP..."
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "🌐 IMPORTANTE: Copie a URL https://...trycloudflare.com que aparecer"
+	@echo "⚠️  Usa proxy HTTP (pode ser mais lento que serve-cloudflare)"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
-	@/usr/local/bin/cloudflared tunnel --url http://localhost:8000
+	@cloudflared tunnel --url http://localhost:8000
 
-stop-cloudflare-quick:  ## Para o túnel Cloudflare Quick
+stop-cloudflare-proxy:  ## Para o túnel Cloudflare com proxy
 	@echo "🛑 Encerrando túnel Cloudflare..."
 	@pkill cloudflared || true
 	@pkill -f "proxy_http.py" || true

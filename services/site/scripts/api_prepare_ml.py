@@ -73,6 +73,46 @@ def get_product_from_api(item_id, token):
         return None
 
 
+def get_sale_price_from_api(item_id, token):
+    """Busca preço de venda oficial (com promoção) via /sale_price endpoint.
+    Retorna: {'price': float, 'oldPrice': float, 'promotion_id': str}
+    """
+    if not token:
+        print("   ⚠️  Token necessário para /sale_price")
+        return None
+    
+    clean_id = item_id.replace('-', '')
+    url = f"https://api.mercadolibre.com/items/{clean_id}/sale_price"
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'User-Agent': 'Mozilla/5.0'
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        print(f"   💰 API Preços: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            price = float(data.get('amount', 0))
+            regular = float(data.get('regular_amount', 0))
+            promo_id = data.get('metadata', {}).get('promotion_id')
+            
+            # Se tem regular_amount, é promoção
+            if regular and regular > price:
+                print(f"   🎉 Promoção detectada: R$ {regular:.2f} → R$ {price:.2f}")
+                return {'price': price, 'oldPrice': regular, 'promotion_id': promo_id}
+            else:
+                print(f"   💵 Preço normal: R$ {price:.2f}")
+                return {'price': price, 'oldPrice': 0, 'promotion_id': None}
+        
+        print(f"   ⚠️  Endpoint /sale_price não disponível")
+        return None
+    except Exception as e:
+        print(f"   ❌ Erro ao buscar preços: {e}")
+        return None
+
+
 def download_images_hq(image_urls, product_slug, base_path="/app/uploads"):
     """Baixa imagens em alta qualidade."""
     product_dir = Path(base_path) / product_slug
@@ -230,15 +270,31 @@ def main():
                         'condition': 'new'
                     }
             else:
-                # Item com preços
-                final_data = {
-                    'external_id': api_data.get('id'),
-                    'title': api_data.get('title', ''),
-                    'price': api_data.get('price', 0),
-                    'old_price': api_data.get('original_price', 0),
-                    'available_quantity': api_data.get('available_quantity', 0),
-                    'condition': api_data.get('condition', 'new')
-                }
+                # Item com preços - USAR /sale_price endpoint (oficial)
+                print(f"\n📊 Buscando preços promocionais via API oficial...")
+                sale_price = get_sale_price_from_api(item_id, token)
+                
+                if sale_price:
+                    # Usa preços do endpoint oficial /sale_price
+                    final_data = {
+                        'external_id': api_data.get('id'),
+                        'title': api_data.get('title', ''),
+                        'price': sale_price['price'],
+                        'old_price': sale_price['oldPrice'],
+                        'available_quantity': api_data.get('available_quantity', 0),
+                        'condition': api_data.get('condition', 'new'),
+                        'promotion_id': sale_price.get('promotion_id')
+                    }
+                else:
+                    # Fallback: usa campos price/original_price do /items
+                    final_data = {
+                        'external_id': api_data.get('id'),
+                        'title': api_data.get('title', ''),
+                        'price': api_data.get('price', 0),
+                        'old_price': api_data.get('original_price', 0),
+                        'available_quantity': api_data.get('available_quantity', 0),
+                        'condition': api_data.get('condition', 'new')
+                    }
             
             print(f"\n📦 {final_data['title'][:60]}...")
             print(f"💰 Preço: R$ {final_data['price']:.2f}" if isinstance(final_data['price'], (int, float)) else f"💰 Preço: {final_data['price']}")
