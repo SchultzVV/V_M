@@ -34,6 +34,7 @@
   {% endif %}
   
   <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/search-styles.css" />
   <style>
     .sort-buttons {
       display: flex;
@@ -86,6 +87,22 @@
   </p>  
   <!-- <p><a class="button" href="/ai">Ir para integração IA</a></p> -->
 
+  <!-- Barra de Busca -->
+  <div class="search-container">
+    <div class="search-wrapper">
+      <span class="search-icon">🔍</span>
+      <input 
+        type="text" 
+        class="search-input" 
+        id="searchInput"
+        placeholder="Buscar produtos... (ex: robô aspirador, vestido, café)"
+        autocomplete="off"
+      />
+      <button class="clear-btn" id="clearBtn" onclick="clearSearch()">✕ Limpar</button>
+    </div>
+    <div class="search-results-count" id="resultsCount"></div>
+  </div>
+
   <!-- Botões de ordenação -->
   <div class="sort-buttons" style="text-align: center; margin: 20px 0;">
     <button class="sort-btn" onclick="sortProducts('price-asc')">💰 Mais Baratos!</button>
@@ -94,6 +111,7 @@
   </div>
 
   <div class="grid" id="products-container"></div>
+  
   <script>
     const FALLBACK_IMG = "/media/fallbacks/aa.png";
 
@@ -214,19 +232,75 @@
     }
 
     let allProducts = []; // Variável global para armazenar todos os produtos
+    let currentSearchTerm = ''; // Termo de busca atual
 
     function getNumericPrice(priceStr) {
       return parseFloat(priceStr.replace("R$", "").replace(",", ".").trim());
     }
 
     function getDiscountPercentage(product) {
-      if (!product.oldPrice || product.oldPrice === product.price) return 0;
+      if (!product.oldPrice ||product.oldPrice === product.price) return 0;
       const oldPrice = getNumericPrice(product.oldPrice);
       const currentPrice = getNumericPrice(product.price);
       if (oldPrice > currentPrice) {
         return Math.round((1 - currentPrice / oldPrice) * 100);
       }
       return 0;
+    }
+
+    function updateResultsCount(count, total, searchTerm = '') {
+      const resultsDiv = document.getElementById('resultsCount');
+      if (searchTerm) {
+        resultsDiv.textContent = `🔍 ${count} produto${count !== 1 ? 's' : ''} encontrado${count !== 1 ? 's' : ''} para "${searchTerm}"`;
+      } else if (count !== total) {
+        resultsDiv.textContent = `Mostrando ${count} de ${total} produtos`;
+      } else {
+        resultsDiv.textContent = '';
+      }
+    }
+
+    function displayProducts(products) {
+      const container = document.getElementById("products-container");
+      container.innerHTML = '';
+      products.forEach(product => {
+        const card = createProductCard(product);
+        container.appendChild(card);
+      });
+      updateResultsCount(products.length, allProducts.length, currentSearchTerm);
+    }
+
+    function searchProducts(searchTerm) {
+      currentSearchTerm = searchTerm.trim();
+      const clearBtn = document.getElementById('clearBtn');
+      
+      if (currentSearchTerm) {
+        clearBtn.classList.add('visible');
+        
+        // Busca no backend (mais eficiente para grandes volumes)
+        fetch(`/api/products?search=${encodeURIComponent(currentSearchTerm)}`, {
+          headers: {
+            "ngrok-skip-browser-warning": "true"
+          }
+        })
+        .then(res => res.json())
+        .then(products => {
+          displayProducts(products);
+        })
+        .catch(err => {
+          console.error("Erro ao buscar produtos:", err);
+        });
+      } else {
+        clearBtn.classList.remove('visible');
+        displayProducts(allProducts);
+      }
+    }
+
+    function clearSearch() {
+      document.getElementById('searchInput').value = '';
+      currentSearchTerm = '';
+      document.getElementById('clearBtn').classList.remove('visible');
+      displayProducts(allProducts);
+      document.getElementById('searchInput').focus();
     }
 
     function sortProducts(type) {
@@ -236,7 +310,20 @@
       // Adiciona active class ao botão clicado
       event.target.classList.add('active');
 
-      let sortedProducts = [...allProducts];
+      // Pega os produtos atualmente exibidos
+      const container = document.getElementById("products-container");
+      const displayedProducts = Array.from(container.children).map(card => {
+        const titleEl = card.querySelector('.title');
+        const priceEl = card.querySelector('.price');
+        const oldPriceEl = card.querySelector('.old-price');
+        
+        return allProducts.find(p => 
+          p.title === titleEl.innerText && 
+          p.price === priceEl.innerText
+        );
+      }).filter(p => p); // Remove nulls
+
+      let sortedProducts = [...displayedProducts];
       
       switch(type) {
         case 'price-asc':
@@ -251,7 +338,6 @@
       }
       
       // Limpa o container e adiciona produtos ordenados
-      const container = document.getElementById("products-container");
       container.innerHTML = '';
       sortedProducts.forEach(product => {
         const card = createProductCard(product);
@@ -259,6 +345,7 @@
       });
     }
 
+    // Carregar produtos ao iniciar
     fetch("/api/products", {
       headers: {
         "ngrok-skip-browser-warning": "true"
@@ -267,14 +354,27 @@
     .then(res => res.json())
     .then(products => {
       allProducts = products; // Armazena os produtos globalmente
-      const container = document.getElementById("products-container");
-      products.forEach(p => {
-        const card = createProductCard(p);
-        container.appendChild(card);
-      });
+      displayProducts(products);
     })
     .catch(err => {
       console.error("Erro ao carregar produtos:", err);
+    });
+    
+    // Inicializa a busca
+    let searchTimeout;
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        searchProducts(e.target.value);
+      }, 300); // Aguarda 300ms após o usuário parar de digitar
+    });
+
+    // Busca ao pressionar Enter
+    document.getElementById('searchInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        clearTimeout(searchTimeout);
+        searchProducts(e.target.value);
+      }
     });
   </script>
 </body>

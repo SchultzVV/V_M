@@ -128,8 +128,14 @@ def auto_categorize_product(title):
 def api_products():
     try:
         tag = request.args.get('tag', 'all')
+        search = request.args.get('search', '').strip()
         
-        if tag == 'all':
+        if search:
+            # Busca por nome (case-insensitive)
+            products = Product.query.filter(
+                Product.title.ilike(f'%{search}%')
+            ).all()
+        elif tag == 'all':
             products = get_all_products()
         else:
             products = get_products_by_tag(tag)
