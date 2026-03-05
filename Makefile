@@ -48,8 +48,8 @@ up:  ## Sobe o ambiente de desenvolvimento
 	@echo "   make logs-site           - Ver logs em tempo real"
 	@echo ""
 	@echo "🌍 Expor com HTTPS público (para OAuth/Webhooks do ML):"
-	@echo "   make serve-cloudflare        - Cloudflare rápido (URL aleatória)"
-	@echo "   make serve-cloudflare-fixed  - Cloudflare URL FIXA (recomendado produção!)"
+	@echo "   make serve-cloudflare        - Cloudflare rápido (URL aleatória, TEMPORÁRIO 2-4h)"
+	@echo "   make serve-cloudflare-fixed  - Cloudflare URL FIXA (PERMANENTE, recomendado!)"
 	@echo "   make serve-ngrok             - Ngrok (rápido, limitado no plano free)"
 	@echo "   make serve-localtunnel       - LocalTunnel (simples)"
 	@echo "   make serve-serveo            - Serveo SSH (sem instalar nada)"
@@ -105,8 +105,12 @@ unserve-ngrok:  ## Desliga o túnel ngrok (economiza tempo do trial)
 		echo "⚠️  Ngrok não estava rodando"; \
 	fi
 
-serve-cloudflare:  ## Inicia túnel Cloudflare otimizado (RÁPIDO, conecta direto ao HTTPS!)
-	@echo "🌐 Iniciando túnel Cloudflare OTIMIZADO..."
+serve-cloudflare:  ## Inicia túnel Cloudflare Quick (TEMPORÁRIO 2-4h, só para testes)
+	@echo "⚠️  ATENÇÃO: Quick Tunnel é TEMPORÁRIO (desconecta após 2-4 horas)"
+	@echo ""
+	@echo "   Para túnel PERMANENTE use: make serve-cloudflare-fixed"
+	@echo ""
+	@echo "🌐 Iniciando túnel Cloudflare Quick (apenas para testes rápidos)..."
 	@echo ""
 	@if ! command -v cloudflared &> /dev/null && [ ! -f /usr/local/bin/cloudflared ]; then \
 		echo "❌ Cloudflared não está instalado!"; \

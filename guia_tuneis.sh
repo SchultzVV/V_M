@@ -17,10 +17,14 @@ cat << 'EOF'
 
 ✅ Vantagens:
    • Completamente GRATUITO
-   • Sem limites de tempo ou conexões
-   • URL estável (não muda)
+   • URL permanente (não expira)
+   • Requer setup inicial (2 minutos)
    • Perfeito para produção
    • HTTPS automático
+
+⚠️  ATENÇÃO: O comando "make serve-cloudflare" usa Quick Tunnel que
+    desconecta após 2-4 horas. Para uso prolongado, use:
+    make serve-cloudflare-fixed (requer setup inicial)
 
 📦 Setup (executar apenas uma vez):
    make setup-cloudflare

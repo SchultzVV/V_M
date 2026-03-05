@@ -18,9 +18,10 @@
 - **Otimizado**: Timeouts aumentados, keepalive otimizado
 
 ### ❌ Desvantagens
+- **⚠️ TEMPORÁRIO**: Desconecta após 2-4 horas (limitação do Quick Tunnel)
 - **URL muda sempre**: Ex: `https://abc123.trycloudflare.com` → `https://xyz789.trycloudflare.com`
 - **Problema para OAuth**: Precisa reconfigurar o Mercado Livre toda vez
-- **Não recomendado para produção**
+- **Não recomendado para produção**: Apenas para testes rápidos
 
 ### 📝 Como Usar
 ```bash
