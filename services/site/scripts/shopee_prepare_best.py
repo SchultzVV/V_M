@@ -1,0 +1,608 @@
+#!/usr/bin/env python3
+"""
+Preparação COMPLETA de produtos da Shopee.
+Combina API + screenshot + OCR para dados mais precisos.
+
+Fluxo:
+1. Resolve link de afiliado da Shopee
+2. Tenta API pública da Shopee
+3. Tira screenshot da página
+4. Usa OCR para complementar dados faltantes (preços promocionais, descontos)
+5. Baixa imagens do produto
+6. Gera JSON de staging
+
+Uso:
+    python scripts/shopee_prepare_best.py https://s.shopee.com.br/ABC123
+"""
+
+import os
+import sys
+import json
+import requests
+import tempfile
+import re
+from urllib.parse import urlparse, urlencode, urlunparse, parse_qs
+from pathlib import Path
+from datetime import datetime
+from slugify import slugify
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+from playwright_stealth import Stealth
+
+# Importar funções do shopee_prepare
+sys.path.insert(0, os.path.dirname(__file__))
+from shopee_prepare import (
+    resolve_shopee_link,
+    extract_product_ids,
+    try_shopee_api,
+    download_images,
+    create_product_json
+)
+
+
+def _is_login_page(page) -> bool:
+    """Verifica se o Playwright caiu na página de login/home da Shopee."""
+    try:
+        current_url = page.url
+        if any(x in current_url for x in ['/login', 'buyer/login', 'shopee.com.br/?']):
+            return True
+        # Checa texto da página: página de produto tem preço (R$), login não
+        body_text = page.inner_text('body')[:1000]
+        has_price = 'R$' in body_text
+        has_login_markers = any(x in body_text for x in [
+            'Fazer login com SMS', 'Esqueci minha senha',
+            'Fazer login com Facebook', 'Entrar com Google'
+        ])
+        return has_login_markers and not has_price
+    except Exception:
+        return False
+
+
+def take_screenshot_shopee(final_url: str, affiliate_url: str = None) -> str:
+    """
+    Tira screenshot da página do produto da Shopee usando Playwright.
+
+    Ordem de tentativas:
+      1. final_url com slug do shop (ex: shopee.com.br/opaanlp/shop/item) - sem query params
+      2. affiliate_url (s.shopee.com.br/...) - sem query params
+
+    Returns:
+        Caminho do arquivo de screenshot temporário, ou None
+    """
+    print(f"\n📸 Tirando screenshot da página...")
+
+    urls_to_try = [u for u in [final_url, affiliate_url] if u]
+
+    stealth = Stealth()
+
+    with sync_playwright() as p:
+        # hook_playwright_context aplica o stealth diretamente no método .launch()
+        # garantindo que TODA página criada já tenha os init_scripts injetados
+        stealth.hook_playwright_context(p)
+
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                '--no-sandbox',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage',
+                '--disable-web-security',
+                '--disable-extensions',
+            ]
+        )
+        context = browser.new_context(
+            viewport={'width': 1366, 'height': 768},
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            locale='pt-BR',
+            timezone_id='America/Sao_Paulo',
+            extra_http_headers={
+                'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+            }
+        )
+        # Script extra: remove navigator.webdriver e corrige outros sinais
+        context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
+            Object.defineProperty(navigator, 'languages', { get: () => ['pt-BR', 'pt', 'en-US'] });
+            window.chrome = { runtime: {} };
+        """)
+
+        page = context.new_page()
+
+        screenshot_path = None
+
+        for attempt, url in enumerate(urls_to_try, 1):
+            try:
+                # Remove query params de tracking (__mobile__=1, utm_*, gads_t_sig, etc)
+                # que forçam redirect para login
+                parsed = urlparse(url)
+                clean_url = urlunparse(parsed._replace(query=''))
+                print(f"   🌐 Tentativa {attempt}: {clean_url}")
+                page.goto(clean_url, wait_until='domcontentloaded', timeout=35000)
+
+                try:
+                    page.wait_for_load_state('networkidle', timeout=12000)
+                except Exception:
+                    pass
+
+                page.wait_for_timeout(3000)
+
+                current_url = page.url
+                print(f"   📍 URL atual: {current_url[:100]}")
+
+                if _is_login_page(page):
+                    print(f"   ⚠️  Página de login detectada, tentando próxima URL...")
+                    continue
+
+                # Fechar popup de cookies/LGPD se aparecer
+                try:
+                    page.keyboard.press('Escape')
+                    page.wait_for_timeout(500)
+                except Exception:
+                    pass
+
+                # Aguardar elemento de preço para confirmar página do produto
+                try:
+                    page.wait_for_selector(
+                        '[class*="price" i], [class*="Price"], [class*="priceSale"], '
+                        '.pqTWkA, .HFf5M2, [class*="discount"]',
+                        timeout=8000
+                    )
+                    print(f"   ✅ Elemento de preço detectado — página do produto ok!")
+                except Exception:
+                    print(f"   ⚠️  Seletor de preço não encontrado, mas continuando...")
+
+                # Scroll para disparar lazy-loading
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight / 3)")
+                page.wait_for_timeout(1500)
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight * 2 / 3)")
+                page.wait_for_timeout(1500)
+                page.evaluate("window.scrollTo(0, 0)")
+                page.wait_for_timeout(1500)
+
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+                screenshot_path = temp_file.name
+                temp_file.close()
+
+                print(f"   📷 Capturando imagem...")
+                page.screenshot(path=screenshot_path, full_page=False)
+                print(f"   ✅ Screenshot salvo: {screenshot_path}")
+                break
+
+            except Exception as e:
+                print(f"   ❌ Erro na tentativa {attempt}: {e}")
+                continue
+
+        browser.close()
+        return screenshot_path
+
+
+def extract_info_from_screenshot(screenshot_path: str) -> dict:
+    """
+    Envia screenshot para o serviço info-scrap e extrai informações via OCR.
+    
+    Args:
+        screenshot_path: Caminho do arquivo de screenshot
+        
+    Returns:
+        Dicionário com dados extraídos via OCR
+    """
+    print(f"\n🔍 Extraindo informações do screenshot via OCR...")
+    
+    # Endpoint do serviço info-scrap
+    url = "http://info-scrap:8000/extract"
+    
+    try:
+        with open(screenshot_path, 'rb') as f:
+            files = {'file': (os.path.basename(screenshot_path), f, 'image/png')}
+            
+            print(f"   📤 Enviando para serviço de extração...")
+            response = requests.post(url, files=files, timeout=60)
+        
+        if response.status_code == 200:
+            result = response.json()
+            
+            print(f"   ✅ Extração realizada com sucesso!")
+            print(f"   📄 Linhas extraídas: {result.get('line_count', 0)}")
+            
+            lines = result.get('lines', [])
+            if lines:
+                print(f"\n   📝 Conteúdo extraído:")
+                for i, line in enumerate(lines, 1):
+                    print(f"      {i:2}. {line}")
+            
+            return result
+        else:
+            print(f"   ❌ Erro na extração: Status {response.status_code}")
+            return None
+            
+    except requests.exceptions.ConnectionError:
+        print(f"   ❌ Não foi possível conectar ao serviço info-scrap")
+        print(f"   💡 Verifique se o container está rodando: docker ps | grep info-scrap")
+        return None
+        
+    except Exception as e:
+        print(f"   ❌ Erro inesperado: {e}")
+        return None
+
+
+def enrich_shopee_data_with_ocr(scraping_data: dict, ocr_data: dict) -> dict:
+    """
+    Enriquece dados do scraping com informações extraídas via OCR.
+    OCR é usado apenas para complementar dados faltantes ou validar preços.
+    
+    Args:
+        scraping_data: Dados extraídos via scraping/API
+        ocr_data: Dados extraídos via OCR do screenshot
+        
+    Returns:
+        Dados enriquecidos
+    """
+    print(f"\n🔄 Enriquecendo dados com OCR...")
+    
+    enriched_data = scraping_data.copy()
+    
+    if not ocr_data or not ocr_data.get('success'):
+        print(f"   ⚠️  Dados OCR não disponíveis, usando apenas scraping")
+        return enriched_data
+    
+    ocr_text = ocr_data.get('text', '')
+    ocr_lines = ocr_data.get('lines', [])
+    
+    # 1. Procurar preços que podem ter sido perdidos
+    price_pattern = r'R\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)'
+    prices_found = re.findall(price_pattern, ocr_text)
+    
+    if prices_found:
+        print(f"   💰 Preços encontrados no OCR: {len(prices_found)}")
+        
+        # Se não temos preço do scraping, tentar pegar do OCR
+        if enriched_data['price'] == 0 and prices_found:
+            try:
+                # Pegar o primeiro preço válido
+                price_str = prices_found[0].replace('.', '').replace(',', '.')
+                price_value = float(price_str)
+                if price_value > 0:
+                    enriched_data['price'] = price_value
+                    print(f"   ✨ Preço adicionado via OCR: R$ {price_value:.2f}")
+            except:
+                pass
+        
+        # Verificar se existem múltiplos preços (possível preço antigo)
+        if len(prices_found) >= 2 and enriched_data['original_price'] == 0:
+            try:
+                price1 = float(prices_found[0].replace('.', '').replace(',', '.'))
+                price2 = float(prices_found[1].replace('.', '').replace(',', '.'))
+                
+                # O maior deve ser o preço antigo
+                if price2 > price1:
+                    enriched_data['original_price'] = price2
+                    print(f"   ✨ Preço antigo detectado via OCR: R$ {price2:.2f}")
+            except:
+                pass
+    
+    # 2. Procurar percentuais de desconto
+    discount_pattern = r'(\d{1,2})%\s*(?:OFF|off|desconto)'
+    discounts_found = re.findall(discount_pattern, ocr_text)
+    
+    if discounts_found:
+        print(f"   🎉 Descontos encontrados no OCR: {discounts_found}")
+        try:
+            discount_pct = int(discounts_found[0])
+            enriched_data['discount_percent'] = discount_pct
+            
+            # Se temos desconto mas não temos preço antigo, calcular
+            if enriched_data['price'] > 0 and enriched_data['original_price'] == 0:
+                enriched_data['original_price'] = enriched_data['price'] / (1 - discount_pct / 100)
+                print(f"   ✨ Preço antigo calculado: R$ {enriched_data['original_price']:.2f}")
+        except:
+            pass
+    
+    # 3. Procurar informações de frete
+    if any(word in ocr_text.lower() for word in ['frete grátis', 'frete gratis', 'envio grátis']):
+        enriched_data['free_shipping'] = True
+        print(f"   📦 Frete grátis detectado via OCR")
+    
+    # 4. Procurar cupons
+    cupom_pattern = r'(?:cupom|cupão|código)\s*[:-]?\s*([A-Z0-9]{4,})'
+    cupons_found = re.findall(cupom_pattern, ocr_text, re.IGNORECASE)
+    if cupons_found:
+        enriched_data['cupons'] = cupons_found
+        print(f"   🎫 Cupons detectados: {', '.join(cupons_found)}")
+    
+    # 5. Adicionar texto OCR completo para referência
+    enriched_data['ocr_text'] = ocr_text
+    enriched_data['ocr_lines'] = ocr_lines
+    
+    print(f"   ✅ Enriquecimento concluído!")
+    
+    return enriched_data
+
+
+def ask_user_category_shopee() -> tuple:
+    """
+    Pergunta ao usuário a categoria e subcategoria do produto.
+    
+    Returns:
+        Tupla (tag, subcategory)
+    """
+    print("\n" + "="*70)
+    print("📂 CATEGORIZAÇÃO DO PRODUTO")
+    print("="*70)
+    print("\n📂 CATEGORIAS DISPONÍVEIS:")
+    print("   1. E   - Eletrônicos")
+    print("   2. CD  - Casa & Decoração")
+    print("   3. ME  - Moda & Estilo")
+    print("   4. PET - Pet Shop")
+    
+    tag_map = {
+        "1": "E",
+        "2": "CD",
+        "3": "ME",
+        "4": "PET",
+        "E": "E",
+        "CD": "CD",
+        "ME": "ME",
+        "PET": "PET"
+    }
+    
+    while True:
+        tag_input = input("\n🏷️  Digite a categoria (1/2/3/4 ou E/CD/ME/PET): ").strip().upper()
+        tag = tag_map.get(tag_input)
+        if tag:
+            break
+        print("   ❌ Categoria inválida! Use: 1, 2, 3, 4 ou E, CD, ME, PET")
+    
+    print(f"\n✅ Categoria selecionada: {tag}")
+
+    # Lista subpastas existentes no staging para a tag selecionada
+    tag_folders = {
+        "E":   "eletronicos",
+        "CD":  "casa-decoracao",
+        "ME":  "moda-estilo",
+        "PET": "petshop",
+    }
+    tag_folder = tag_folders.get(tag, "geral")
+    tag_path = Path(f"/app/staging/{tag_folder}")
+    existing_subs = sorted([d.name for d in tag_path.iterdir() if d.is_dir()]) if tag_path.exists() else []
+
+    print(f"\n📁 Subcategorias existentes em '{tag_folder}':")
+    for i, sub in enumerate(existing_subs, 1):
+        print(f"   {i:2}. {sub}")
+    print(f"\n   Digite o número de uma opção, ou o nome de uma NOVA subcategoria")
+    print(f"   (Enter para não usar subcategoria)")
+
+    sub_input = input("📁 Subcategoria: ").strip().lower()
+
+    if not sub_input:
+        subcategory = ""
+        print("⚠️  Nenhuma subcategoria definida")
+    elif sub_input.isdigit():
+        idx = int(sub_input) - 1
+        if 0 <= idx < len(existing_subs):
+            subcategory = existing_subs[idx]
+            print(f"✅ Subcategoria: {subcategory}")
+        else:
+            print("⚠️  Número inválido, sem subcategoria")
+            subcategory = ""
+    else:
+        subcategory = sub_input
+        print(f"✅ Nova subcategoria: {subcategory}")
+
+    return tag, subcategory
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("❌ Uso: python shopee_prepare_best.py <URL_SHOPEE> [--screenshot PATH]")
+        print("\nExemplo:")
+        print("  python scripts/shopee_prepare_best.py https://s.shopee.com.br/ABC123")
+        print("  python scripts/shopee_prepare_best.py https://s.shopee.com.br/ABC123 --screenshot /tmp/screen.png")
+        sys.exit(1)
+
+    original_url = sys.argv[1]
+    screenshot_path = None
+
+    # Suporte a --screenshot PATH (tirado no host com browser real)
+    provided_screenshot = None
+    if '--screenshot' in sys.argv:
+        idx = sys.argv.index('--screenshot')
+        if idx + 1 < len(sys.argv):
+            provided_screenshot = sys.argv[idx + 1]
+            if os.path.exists(provided_screenshot):
+                print(f"   📸 Screenshot fornecido pelo host: {provided_screenshot}")
+            else:
+                print(f"   ⚠️  Screenshot fornecido não encontrado: {provided_screenshot}")
+                provided_screenshot = None
+    
+    try:
+        print("=" * 70)
+        print("🚀 PREPARAÇÃO COMPLETA DE PRODUTO - SHOPEE")
+        print("   (API + Scraping + Screenshot + OCR)")
+        print("=" * 70)
+        print(f"\n🔗 URL: {original_url}\n")
+        
+        # ========================================
+        # ETAPA 1: Resolver link de afiliado
+        # ========================================
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("ETAPA 1: Resolvendo link de afiliado")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        final_url = resolve_shopee_link(original_url)
+        
+        # ========================================
+        # ETAPA 2: Extrair IDs do produto
+        # ========================================
+        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("ETAPA 2: Extraindo IDs do produto")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        shop_id, item_id = extract_product_ids(final_url)
+        
+        # ========================================
+        # ETAPA 3: Tentar API da Shopee
+        # ========================================
+        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("ETAPA 3: Tentando API da Shopee")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        product_data = None
+        if shop_id and item_id:
+            product_data = try_shopee_api(shop_id, item_id)
+
+        # Se API falhou, inicializar esqueleto vazio para OCR preencher
+        if not product_data or not product_data.get('title'):
+            print("\n⚠️  API não retornou dados. OCR será a fonte principal...")
+            product_data = {
+                'title': '',
+                'price': 0,
+                'original_price': 0,
+                'discount_percent': 0,
+                'stock': 0,
+                'sold': 0,
+                'rating': 0,
+                'rating_count': 0,
+                'description': '',
+                'images': [],
+                'condition': 'new',
+                'shop_id': shop_id,
+                'item_id': item_id
+            }
+
+        # ========================================
+        # ETAPA 4: Screenshot da página
+        # ========================================
+        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("ETAPA 4: Capturando screenshot")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        if provided_screenshot:
+            # Screenshot já foi tirado no HOST com browser real — usar direto
+            screenshot_path = provided_screenshot
+            print(f"   ✅ Usando screenshot do host: {screenshot_path}")
+        else:
+            # Fallback: tentar Playwright headless interno (pode ser bloqueado)
+            print(f"   🖥️  URL primária (slug): {final_url[:80]}")
+            print(f"   🔗 URL afiliado (fallback): {original_url}")
+            screenshot_path = take_screenshot_shopee(final_url, affiliate_url=original_url)
+
+        # ========================================
+        # ETAPA 5: Extração via OCR
+        # ========================================
+        ocr_data = None
+        if screenshot_path:
+            print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            print("ETAPA 5: Extração de informações via OCR")
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            ocr_data = extract_info_from_screenshot(screenshot_path)
+        else:
+            print("\n⚠️  Screenshot não disponível, continuando sem OCR...")
+
+        # ========================================
+        # ETAPA 6: Enriquecer dados com OCR
+        # ========================================
+        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("ETAPA 6: Enriquecimento de dados")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        product_data = enrich_shopee_data_with_ocr(product_data, ocr_data)
+
+        # Se ainda sem título após OCR, pedir ao usuário
+        if not product_data.get('title'):
+            print("\n⚠️  Não foi possível detectar o título automaticamente.")
+            title_input = input("📝 Digite o título do produto: ").strip()
+            if not title_input:
+                print("❌ Título obrigatório. Encerrando.")
+                sys.exit(1)
+            product_data['title'] = title_input
+
+        # ========================================
+        # ETAPA 7: Perguntar categoria
+        # ========================================
+        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("ETAPA 7: Categorização")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        tag, subcategory = ask_user_category_shopee()
+
+        # ========================================
+        # ETAPA 8: Download de imagens
+        # ========================================
+        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("ETAPA 8: Download de imagens")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        
+        product_slug = slugify(product_data['title'])
+        if product_data.get('images'):
+            product_dir, downloaded_images = download_images(
+                product_data['images'],
+                product_slug
+            )
+        else:
+            print("\n⚠️  Nenhuma imagem disponível")
+            product_dir = f"uploads/{product_slug}"
+            downloaded_images = []
+        
+        # ========================================
+        # ETAPA 9: Gerar JSON de staging
+        # ========================================
+        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("ETAPA 9: Geração do JSON de staging")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        json_path, product_json = create_product_json(
+            product_data,
+            product_dir,
+            original_url,
+            tag,
+            subcategory
+        )
+        
+        # ========================================
+        # RESUMO FINAL
+        # ========================================
+        print("\n" + "=" * 70)
+        print("✅ PREPARAÇÃO COMPLETA CONCLUÍDA COM SUCESSO!")
+        print("=" * 70)
+        print(f"\n📝 Arquivo gerado: {json_path}")
+        print(f"🎯 Dados utilizados: API + Screenshot + OCR")
+        print(f"📦 Produto: {product_data['title']}")
+        print(f"💰 Preço: R$ {product_data['price']:.2f}")
+        if product_data.get('original_price', 0) > product_data['price']:
+            discount = ((product_data['original_price'] - product_data['price']) / product_data['original_price']) * 100
+            print(f"🔥 Desconto: {discount:.0f}% OFF (de R$ {product_data['original_price']:.2f})")
+        print(f"📊 Estoque: {product_data.get('stock', 0)} unidades")
+        print(f"🛒 Vendidos: {product_data.get('sold', 0)} unidades")
+        print(f"🖼️  Imagens: {len(downloaded_images)} baixadas")
+        print(f"\n📋 Próximo passo: execute 'make stage' para publicar no site\n")
+        
+    except KeyboardInterrupt:
+        print("\n\n⚠️  Operação cancelada pelo usuário")
+        sys.exit(1)
+        
+    except Exception as e:
+        print(f"\n❌ Erro durante a preparação: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+        
+    finally:
+        # Copiar screenshot para disco local e remover do /tmp
+        if screenshot_path and os.path.exists(screenshot_path):
+            try:
+                fotos_dir = Path('/app/fotos')
+                fotos_dir.mkdir(parents=True, exist_ok=True)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                dest = fotos_dir / f'shopee_{timestamp}.png'
+                import shutil
+                shutil.copy2(screenshot_path, dest)
+                os.chmod(dest, 0o644)
+                print(f"💾 Screenshot salvo em: {dest}")
+            except Exception as e:
+                print(f"⚠️  Não foi possível salvar screenshot: {e}")
+            try:
+                os.remove(screenshot_path)
+                print(f"🧹 Screenshot temporário removido do /tmp")
+            except:
+                pass
+
+
+if __name__ == "__main__":
+    main()

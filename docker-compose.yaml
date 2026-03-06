@@ -60,6 +60,15 @@ services:
       - backend
     restart: always
 
+  info-scrap:
+    image: ghcr.io/schultzvv/info_scrap:sha-d337627
+    container_name: info-scrap
+    ports:
+      - "8001:8000"
+    networks:
+      - backend
+    restart: always
+
 networks:
   backend:
     driver: bridge

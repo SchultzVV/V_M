@@ -2,14 +2,15 @@
   "platform": "mercadolivre",
   "external_id": "MLB44113908",
   "title": "Celular Samsung Galaxy A16 128gb 4gb Ram Câmera de Até 50mp Tela 6.7 Nfc Ip54 Bateria 5000 Mah Cinza",
-  "price": "R$ 1166",
-  "oldPrice": "R$ 1166",
+  "price": "R$ 1099.00",
+  "oldPrice": "R$ 1099.00",
   "images_local": "uploads/celular-samsung-galaxy-a16-128gb-4gb-ram-camera-de-ate-50mp-tela-6-7-nfc-ip54-bateria-5000-mah-cinza",
   "images": [],
   "link": "https://mercadolivre.com/sec/32WvvzX",
   "tag": "E",
   "subcategory": "smartphones",
   "disponivel": true,
-  "criado_em": "20260121_164552",
-  "via_webhook": false
+  "criado_em": "20260306_181533",
+  "via_webhook": false,
+  "free_shipping": true
 }

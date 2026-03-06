@@ -114,29 +114,60 @@ def get_sale_price_from_api(item_id, token):
 
 
 def download_images_hq(image_urls, product_slug, base_path="/app/uploads"):
-    """Baixa imagens em alta qualidade."""
+    """Baixa imagens em alta qualidade, descartando imagens pequenas (< 20KB ou < 300x300px)."""
+    from PIL import Image
+    import io
+
+    MIN_SIZE_KB = 20        # descarta < 20 KB
+    MIN_DIMENSION = 300    # descarta se largura ou altura < 300px
+
     product_dir = Path(base_path) / product_slug
     product_dir.mkdir(parents=True, exist_ok=True)
     
-    print(f"\n📥 Baixando {len(image_urls)} imagens HQ...")
+    print(f"\n📥 Baixando {len(image_urls)} imagens HQ (filtrando imagens pequenas)...")
     
     downloaded = []
+    skipped = 0
+    saved_index = 1
     for i, img_url in enumerate(image_urls, 1):
         try:
             response = requests.get(img_url, timeout=15)
             response.raise_for_status()
             
-            img_filename = f"image_{i}.jpg"
+            content = response.content
+            size_kb = len(content) / 1024
+
+            # Filtro 1: tamanho do arquivo
+            if size_kb < MIN_SIZE_KB:
+                print(f"   ⏩ {i}/{len(image_urls)} - {size_kb:.1f}KB — muito pequena, ignorada")
+                skipped += 1
+                continue
+
+            # Filtro 2: dimensões da imagem
+            try:
+                img = Image.open(io.BytesIO(content))
+                w, h = img.size
+                if w < MIN_DIMENSION or h < MIN_DIMENSION:
+                    print(f"   ⏩ {i}/{len(image_urls)} - {w}x{h}px — dimensões insuficientes, ignorada")
+                    skipped += 1
+                    continue
+            except Exception:
+                pass  # se não conseguir ler, deixa passar
+
+            img_filename = f"image_{saved_index}.jpg"
             img_path = product_dir / img_filename
             
             with open(img_path, 'wb') as f:
-                f.write(response.content)
+                f.write(content)
             
-            size_kb = len(response.content) / 1024
             downloaded.append(img_filename)
-            print(f"   ✅ {i}/{len(image_urls)} - {size_kb:.1f}KB")
+            print(f"   ✅ {i}/{len(image_urls)} → image_{saved_index}.jpg ({size_kb:.1f}KB)")
+            saved_index += 1
         except Exception as e:
             print(f"   ⚠️  Erro imagem {i}: {e}")
+
+    if skipped:
+        print(f"   🗑️  {skipped} imagem(s) descartada(s) por serem muito pequenas")
     
     return str(product_dir.relative_to(Path(base_path).parent)), downloaded
 

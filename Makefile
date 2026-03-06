@@ -741,6 +741,118 @@ api-prepare-product: ## Prepara produto via API oficial (uso: make api-prepare-p
 	@echo ""
 	@docker exec -it site python3 scripts/api_prepare_ml.py "$(URL)"
 
+prepare-full: ## Prepara produto com Scraping HTML + Screenshot + OCR (uso: make prepare-full URL=https://...)
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make prepare-full URL=https://mercadolivre.com/sec/ABC123"; \
+		echo "     make prepare-full URL=https://produto.mercadolivre.com.br/MLB-..."; \
+		echo ""; \
+		echo "💡 Este método combina:"; \
+		echo "   - Scraping HTML tradicional"; \
+		echo "   - Screenshot da página"; \
+		echo "   - Extração via OCR para dados mais precisos"; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@if ! docker ps | grep -q info-scrap; then \
+		echo "🛠️  Container info-scrap não encontrado. Subindo..."; \
+		$(COMPOSE) up -d info-scrap; \
+		echo "⏳ Aguardando serviço inicializar..."; \
+		sleep 5; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 PREPARAÇÃO COMPLETA COM OCR"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@echo "📋 O que será feito:"
+	@echo "   1. ✅ Resolver link de afiliado"
+	@echo "   2. 📸 Capturar screenshot da página"
+	@echo "   3. 🔍 Extrair informações via OCR"
+	@echo "   4. 🌐 Fazer scraping HTML"
+	@echo "   5. 🔄 Combinar dados HTML + OCR"
+	@echo "   6. 📥 Baixar imagens do produto"
+	@echo "   7. 🏷️  Perguntar categoria"
+	@echo "   8. 💾 Gerar JSON de staging"
+	@echo ""
+	@docker exec -it site python3 scripts/prepare_full.py "$(URL)"
+
+prepare-ml: ## Prepara Mercado Livre com API + Scraping + OCR otimizado (uso: make prepare-ml URL=https://...)
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make prepare-ml URL=https://mercadolivre.com/sec/ABC123"; \
+		echo ""; \
+		echo "💡 Método OTIMIZADO:"; \
+		echo "   1. API oficial (se OAuth disponível)"; \
+		echo "   2. Scraping HTML (fallback)"; \
+		echo "   3. OCR apenas para complementar dados faltantes"; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@if ! docker ps | grep -q info-scrap; then \
+		echo "🛠️  Container info-scrap não encontrado. Subindo..."; \
+		$(COMPOSE) up -d info-scrap; \
+		sleep 5; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 PREPARAÇÃO OTIMIZADA - MERCADO LIVRE"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@echo "📋 Estratégia:"
+	@echo "   1. 🔌 API Oficial (dados precisos)"
+	@echo "   2. 🌐 Scraping HTML (se API falhar)"
+	@echo "   3. 📸 Screenshot + OCR (apenas complementar)"
+	@echo ""
+	@docker exec -it site python3 scripts/prepare_ml_best.py "$(URL)"
+
+prepare-amazon: ## Prepara Amazon com Scraping + OCR otimizado (uso: make prepare-amazon URL=https://...)
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make prepare-amazon URL=https://amazon.com.br/dp/B08X123456"; \
+		echo "     make prepare-amazon URL=https://amzn.to/ABC123"; \
+		echo ""; \
+		echo "💡 Método OTIMIZADO:"; \
+		echo "   1. Scraping HTML com Playwright"; \
+		echo "   2. OCR apenas para complementar dados"; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@if ! docker ps | grep -q info-scrap; then \
+		echo "🛠️  Container info-scrap não encontrado. Subindo..."; \
+		$(COMPOSE) up -d info-scrap; \
+		sleep 5; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 PREPARAÇÃO OTIMIZADA - AMAZON"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@echo "📋 Estratégia:"
+	@echo "   1. 🌐 Scraping HTML detalhado"
+	@echo "   2. 📸 Screenshot + OCR (complementar)"
+	@echo "   3. 📥 Download de imagens em alta resolução"
+	@echo ""
+	@docker exec -it site python3 scripts/amazon_prepare_best.py "$(URL)"
+
 api-update-product: ## Atualiza produto existente (preço, desconto, disponibilidade, mídias) via API ML
 	@if [ -z "$(URL)" ]; then \
 		echo "❌ Erro: URL não fornecida"; \
@@ -786,6 +898,59 @@ shopee-prepare-product: ## Prepara produto da Shopee via scraping (uso: make sho
 	@echo "📥 Coletando informações do produto..."
 	@echo ""
 	@docker exec -it site python3 scripts/shopee_prepare.py "$(URL)"
+
+prepare-shopee-best: ## Prepara produto Shopee com API + Scraping + OCR (uso: make prepare-shopee-best URL=https://...)
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make prepare-shopee-best URL=https://s.shopee.com.br/ABC123"; \
+		echo "     make prepare-shopee-best URL=https://shopee.com.br/product/123/456"; \
+		echo ""; \
+		echo "💡 Este método usa:"; \
+		echo "   - API pública da Shopee"; \
+		echo "   - Scraping HTML com Playwright"; \
+		echo "   - Screenshot + OCR para dados complementares"; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@if ! docker ps | grep -q info-scrap; then \
+		echo "🛠️  Container info-scrap não encontrado. Subindo..."; \
+		$(COMPOSE) up -d info-scrap; \
+		echo "⏳ Aguardando serviço inicializar..."; \
+		sleep 5; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 PREPARAÇÃO COMPLETA - SHOPEE (API + Scraping + OCR)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@echo "📋 O que será feito:"
+	@echo "   1. ✅ Resolver link de afiliado"
+	@echo "   2. 🔌 Tentar API da Shopee"
+	@echo "   3. 🌐 Scraping HTML com Playwright"
+	@echo "   4. 📸 Screenshot (browser REAL no Ubuntu)"
+	@echo "   5. 🔍 Extrair dados via OCR (preços, descontos)"
+	@echo "   6. 🔄 Combinar todos os dados"
+	@echo "   7. 📥 Baixar imagens"
+	@echo "   8. 🏷️  Perguntar categoria"
+	@echo "   9. 💾 Gerar JSON de staging"
+	@echo ""
+	@echo "📸 Abrindo browser real para screenshot..."
+	@SCREENSHOT_HOST=$$(DISPLAY=:1 python3 services/site/scripts/take_screenshot_host.py "$(URL)" 2>/dev/tty); \
+	if [ -n "$$SCREENSHOT_HOST" ] && [ -f "$$SCREENSHOT_HOST" ]; then \
+		echo "✅ Screenshot capturado: $$SCREENSHOT_HOST"; \
+		docker cp "$$SCREENSHOT_HOST" site:/tmp/shopee_screenshot_host.png; \
+		rm -f "$$SCREENSHOT_HOST"; \
+		docker exec -it site python3 scripts/shopee_prepare_best.py "$(URL)" --screenshot /tmp/shopee_screenshot_host.png; \
+	else \
+		echo "⚠️  Screenshot no host falhou — tentando Playwright headless..."; \
+		docker exec -it site python3 scripts/shopee_prepare_best.py "$(URL)"; \
+	fi
 
 shopee-update-prices: ## Atualiza preços e disponibilidade de produto da Shopee (uso: make shopee-update-prices URL="...")
 	@if [ -z "$(URL)" ]; then \
@@ -912,7 +1077,7 @@ help: ## Mostra esta ajuda
 	@awk 'BEGIN {FS = ":.*?## "} /^(oauth-url|update-ngrok-url|test-oauth|check-tokens|test-api):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "🤖 PRODUTOS (Mercado Livre):"
-	@awk 'BEGIN {FS = ":.*?## "} /^(prepare-auto|api-prepare-product|stage|prepare-products):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*?## "} /^(prepare-ml|prepare-shopee-best|prepare-amazon|api-prepare-product|prepare-auto|stage|prepare-products):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "🗄️  BANCO DE DADOS:"
 	@awk 'BEGIN {FS = ":.*?## "} /^(migrate-tags|migrate-webhook):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -935,7 +1100,35 @@ help-products: ## Mostra ajuda para adicionar produtos
 	@echo "🤖 FLUXO AUTOMÁTICO - Adicionar Produto do Mercado Livre"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
-	@echo "🚀 MÉTODO RECOMENDADO - API Oficial (OAuth necessário):"
+	@echo "🌟 MÉTODOS OTIMIZADOS (Recomendado):"
+	@echo ""
+	@echo "   📦 MERCADO LIVRE:"
+	@echo "   make prepare-ml URL=\"https://mercadolivre.com/sec/ABC123\""
+	@echo ""
+	@echo "      ✅ API oficial (se OAuth disponível)"
+	@echo "      ✅ Scraping HTML (fallback automático)"
+	@echo "      ✅ OCR apenas para dados faltantes"
+	@echo "      ✅ Preços promocionais e descontos"
+	@echo ""
+	@echo "   🛍️  SHOPEE:"
+	@echo "   make prepare-shopee-best URL=\"https://s.shopee.com.br/ABC123\""
+	@echo ""
+	@echo "      ✅ API pública da Shopee"
+	@echo "      ✅ Scraping com Playwright"
+	@echo "      ✅ OCR para preços promocionais"
+	@echo "      ✅ Resolve links de afiliado"
+	@echo ""
+	@echo "   📦 AMAZON:"
+	@echo "   make prepare-amazon URL=\"https://amzn.to/ABC123\""
+	@echo ""
+	@echo "      ✅ Scraping HTML detalhado"
+	@echo "      ✅ OCR complementar"
+	@echo "      ✅ Detecta Amazon Prime"
+	@echo "      ✅ Imagens em alta resolução"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🔄 MÉTODO ALTERNATIVO - API Oficial (OAuth necessário):"
 	@echo "   make api-prepare-product URL=\"https://mercadolivre.com/sec/ABC123\""
 	@echo ""
 	@echo "   ✅ Dados 100% precisos da API oficial"
@@ -972,6 +1165,24 @@ help-products: ## Mostra ajuda para adicionar produtos
 
 check-stage: ## Verifica imagens no staging
 	@$(MAKE) run-py script=scripts/check_stage_images.py
+
+test-info-scrap: ## Testa o serviço de extração de imagens
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@if ! docker ps | grep -q info-scrap; then \
+		echo "🛠️  Container info-scrap não encontrado. Subindo..."; \
+		$(COMPOSE) up -d info-scrap; \
+		echo "⏳ Aguardando serviço inicializar..."; \
+		sleep 5; \
+	fi
+	@echo "🧪 Testando serviço de extração com image_example.png..."
+	@if [ ! -f services/site/image_example.png ]; then \
+		echo "📁 Copiando imagem de exemplo..."; \
+		cp image_example.png services/site/ 2>/dev/null || echo "⚠️  image_example.png não encontrado na raiz"; \
+	fi
+	@docker exec -it site python3 scripts/test_info_scrap.py /app/image_example.png
 
 # =====================
 # 📸 Instagram
