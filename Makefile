@@ -105,39 +105,91 @@ unserve-ngrok:  ## Desliga o túnel ngrok (economiza tempo do trial)
 		echo "⚠️  Ngrok não estava rodando"; \
 	fi
 
-serve-cloudflare:  ## Inicia túnel Cloudflare Quick (TEMPORÁRIO 2-4h, só para testes)
-	@echo "⚠️  ATENÇÃO: Quick Tunnel é TEMPORÁRIO (desconecta após 2-4 horas)"
-	@echo ""
-	@echo "   Para túnel PERMANENTE use: make serve-cloudflare-fixed"
-	@echo ""
-	@echo "🌐 Iniciando túnel Cloudflare Quick (apenas para testes rápidos)..."
-	@echo ""
-	@if ! command -v cloudflared &> /dev/null && [ ! -f /usr/local/bin/cloudflared ]; then \
-		echo "❌ Cloudflared não está instalado!"; \
-		echo ""; \
-		echo "Execute primeiro: make install-cloudflared"; \
-		exit 1; \
-	fi
-	@echo "🔧 Subindo containers Docker..."
-	@$(COMPOSE) up -d
-	@sleep 2
-	@echo "✅ Site rodando em https://localhost:5000"
-	@echo ""
-	@echo "🚀 Iniciando túnel Cloudflare Quick (conexão direta HTTPS)..."
+serve-cloudflare:  ## Inicia Cloudflare Tunnel em background, captura URL, configura OAuth ML automaticamente
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "🌐 IMPORTANTE: Copie a URL https://...trycloudflare.com que aparecer"
-	@echo "⚡ OTIMIZADO: Conexão direta ao HTTPS + timeouts aumentados"
+	@echo "🚀 CLOUDFLARE TUNNEL + AUTO-CONFIG OAUTH MERCADO LIVRE"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@CLOUDFLARED_BIN=$$(command -v cloudflared 2>/dev/null || echo /usr/local/bin/cloudflared); \
+	if [ ! -x "$$CLOUDFLARED_BIN" ]; then \
+		echo "❌ Cloudflared não está instalado!"; \
+		echo "   Execute: make install-cloudflared"; \
+		exit 1; \
+	fi; \
+	echo "🔧 Subindo containers Docker..."; \
+	$(COMPOSE) up -d; \
+	sleep 2; \
+	echo "✅ Site rodando em https://localhost:5000"; \
+	echo ""; \
+	echo "🚀 Iniciando túnel Cloudflare em background..."; \
+	pkill cloudflared 2>/dev/null || true; \
+	sleep 1; \
+	LOG=/tmp/cloudflare_tunnel.log; \
+	rm -f $$LOG; \
 	$$CLOUDFLARED_BIN tunnel \
 		--url https://localhost:5000 \
 		--no-tls-verify \
 		--proxy-connect-timeout 60s \
 		--proxy-keepalive-timeout 5m \
 		--proxy-keepalive-connections 200 \
-		--proxy-tcp-keepalive 60s
+		--proxy-tcp-keepalive 60s \
+		2>&1 | tee $$LOG & \
+	echo ""; \
+	echo "⏳ Aguardando URL ser gerada..."; \
+	CF_URL=""; \
+	for i in $$(seq 1 20); do \
+		CF_URL=$$(grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com' $$LOG 2>/dev/null | head -1); \
+		if [ -n "$$CF_URL" ]; then break; fi; \
+		sleep 2; \
+	done; \
+	if [ -z "$$CF_URL" ]; then \
+		echo "❌ Não foi possível capturar a URL do Cloudflare"; \
+		echo "   Verifique o log: cat /tmp/cloudflare_tunnel.log"; \
+		exit 1; \
+	fi; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "✅ TÚNEL ATIVO:"; \
+	echo "   $$CF_URL"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	echo "📝 Atualizando ML_REDIRECT_URI no .env..."; \
+	NEW_REDIRECT="$$CF_URL/auth/mercadolivre/callback"; \
+	sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=$$NEW_REDIRECT|" .env; \
+	echo "   ✅ .env atualizado: $$NEW_REDIRECT"; \
+	echo ""; \
+	echo "🔄 Reiniciando container site para recarregar nova URL..."; \
+	$(COMPOSE) stop site > /dev/null 2>&1; \
+	$(COMPOSE) rm -f site > /dev/null 2>&1; \
+	$(COMPOSE) up -d site > /dev/null 2>&1; \
+	sleep 3; \
+	echo "   ✅ Container reiniciado com nova redirect URI"; \
+	echo ""; \
+	APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2); \
+	AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NEW_REDIRECT"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "🔑 PRÓXIMOS PASSOS PARA OAUTH:"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	echo "1️⃣  Cadastre a Redirect URI no painel ML (se ainda não cadastrou):"; \
+	echo "   https://developers.mercadolivre.com.br/devcenter"; \
+	echo "   → Redirect URI: $$NEW_REDIRECT"; \
+	echo ""; \
+	echo "2️⃣  Abra esta URL no navegador para autorizar:"; \
+	echo ""; \
+	echo "   $$AUTH_URL"; \
+	echo ""; \
+	echo "3️⃣  Após autorizar, verifique os tokens:"; \
+	echo "   make check-tokens"; \
+	echo ""; \
+	echo "4️⃣  Prepare o produto:"; \
+	echo "   make prepare-ml URL=https://mercadolivre.com/sec/..."; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "💡 Túnel rodando em background. Para parar: make stop-cloudflare"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""
 
 stop-cloudflare:  ## Para o túnel Cloudflare
 	@echo "🛑 Encerrando túnel Cloudflare..."
@@ -783,16 +835,17 @@ prepare-full: ## Prepara produto com Scraping HTML + Screenshot + OCR (uso: make
 	@echo ""
 	@docker exec -it site python3 scripts/prepare_full.py "$(URL)"
 
-prepare-ml: ## Prepara Mercado Livre com API + Scraping + OCR otimizado (uso: make prepare-ml URL=https://...)
+prepare-ml: ## Prepara ML: API Oficial (+ OCR screenshot p/ preço promo) (uso: make prepare-ml URL=https://...)
 	@if [ -z "$(URL)" ]; then \
 		echo "❌ Erro: URL não fornecida"; \
 		echo ""; \
 		echo "Uso: make prepare-ml URL=https://mercadolivre.com/sec/ABC123"; \
 		echo ""; \
-		echo "💡 Método OTIMIZADO:"; \
-		echo "   1. API oficial (se OAuth disponível)"; \
-		echo "   2. Scraping HTML (fallback)"; \
-		echo "   3. OCR apenas para complementar dados faltantes"; \
+		echo "💡 Estratégia:"; \
+		echo "   1. 🔌 API Oficial → dados + imagens HQ (fonte prioritária)"; \
+		echo "   2. 🌐 Scraping HTML (fallback se sem OAuth)"; \
+		echo "   3. 📸 Screenshot + OCR → lê preço promocional dinâmico da página"; \
+		echo "   🚫 Imagens: SOMENTE da API oficial (descarta scraping/OCR)"; \
 		exit 1; \
 	fi
 	@if ! docker ps | grep -q site; then \
@@ -806,15 +859,16 @@ prepare-ml: ## Prepara Mercado Livre com API + Scraping + OCR otimizado (uso: ma
 	fi
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "🚀 PREPARAÇÃO OTIMIZADA - MERCADO LIVRE"
+	@echo "🚀 PREPARAÇÃO ML — API + OCR PREÇO PROMO"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@echo "🔗 URL: $(URL)"
 	@echo ""
 	@echo "📋 Estratégia:"
-	@echo "   1. 🔌 API Oficial (dados precisos)"
-	@echo "   2. 🌐 Scraping HTML (se API falhar)"
-	@echo "   3. 📸 Screenshot + OCR (apenas complementar)"
+	@echo "   1. 🔌 API Oficial — dados + imagens HQ"
+	@echo "   2. 🌐 Scraping HTML — fallback"
+	@echo "   3. 📸 Screenshot + 🔍 OCR — preço promocional dinâmico"
+	@echo "   🚫 Imagens: SOMENTE da API (máxima qualidade)"
 	@echo ""
 	@docker exec -it site python3 scripts/prepare_ml_best.py "$(URL)"
 

@@ -114,16 +114,29 @@ def get_sale_price_from_api(item_id, token):
 
 
 def download_images_hq(image_urls, product_slug, base_path="/app/uploads"):
-    """Baixa imagens em alta qualidade, descartando imagens pequenas (< 20KB ou < 300x300px)."""
+    """Baixa imagens em alta qualidade, descartando imagens pequenas (< 20KB ou < 300x300px).
+    SEMPRE limpa a pasta antes de baixar para evitar mistura com imagens antigas.
+    """
     from PIL import Image
     import io
+    import glob
 
     MIN_SIZE_KB = 20        # descarta < 20 KB
     MIN_DIMENSION = 300    # descarta se largura ou altura < 300px
 
     product_dir = Path(base_path) / product_slug
     product_dir.mkdir(parents=True, exist_ok=True)
-    
+
+    # ── Limpar imagens antigas antes de baixar novas ──────────────────────
+    old_images = list(product_dir.glob('image_*.jpg')) + list(product_dir.glob('image_*.png'))
+    if old_images:
+        print(f"   🧹 Removendo {len(old_images)} imagem(ns) antiga(s) da pasta...")
+        for old in old_images:
+            try:
+                old.unlink()
+            except Exception:
+                pass
+
     print(f"\n📥 Baixando {len(image_urls)} imagens HQ (filtrando imagens pequenas)...")
     
     downloaded = []
