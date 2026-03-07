@@ -27,7 +27,7 @@ def index():
     
     # Gerar schema da organização
     organization_schema = seo_service.generate_organization_schema(
-        organization_name="V&M - Lojinha",
+        organization_name="DEF - Lojinha",
         social_profiles=[
             "https://www.instagram.com/seu_perfil",
             "https://www.facebook.com/sua_pagina"

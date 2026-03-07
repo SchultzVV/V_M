@@ -9,7 +9,7 @@ Google Search: "aspirador robô"
 
 ┌─────────────────────────────────────────────────────┐
 │                                                     │
-│  V&M - Lojinha                                      │
+│  DEF - Lojinha                                      │
 │  https://seusite.com                                │
 │                                                     │
 │  Loja online com produtos diversos. Eletrônicos,   │
@@ -86,7 +86,7 @@ CTR: ~5-7% (7 em cada 100 pessoas clicam)
     "itemCondition": "https://schema.org/NewCondition",
     "seller": {
       "@type": "Organization",
-      "name": "V&M - Lojinha"
+      "name": "DEF - Lojinha"
     }
   },
   "aggregateRating": {
@@ -169,7 +169,7 @@ Publicado há 2 dias
 
 ### 5. **Organization**
 ```
-V&M - Lojinha
+DEF - Lojinha
 ⭐⭐⭐⭐⭐ 4.8 (523 avaliações)
 📍 São Paulo, SP
 📱 (11) 9999-9999
@@ -214,7 +214,7 @@ O Google vai mostrar exatamente como seu site aparecerá nos resultados!
 ### ❌ Sem Schema.org
 ```
 ┌────────────────────┐
-│ V&M - Lojinha      │
+│ DEF - Lojinha      │
 │ seusite.com        │
 │                    │
 │ Loja online com    │

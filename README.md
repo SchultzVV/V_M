@@ -1,4 +1,4 @@
-# V&M Site
+# DEF Site
 
 Este repositório contém o site Flask com integração ao Mercado Livre e sistema automatizado de produtos.
 

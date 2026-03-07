@@ -7,7 +7,7 @@ from datetime import datetime
 class SEOService:
     """Serviço para gerenciar SEO, meta tags e structured data"""
     
-    def __init__(self, site_name: str = "V&M", site_url: str = "https://seusite.com"):
+    def __init__(self, site_name: str = "DEF", site_url: str = "https://seusite.com"):
         self.site_name = site_name
         self.site_url = site_url.rstrip('/')
     
@@ -225,6 +225,6 @@ class SEOService:
 
 # Instância global do serviço
 seo_service = SEOService(
-    site_name="V&M - Lojinha",
+    site_name="DEF - Lojinha",
     site_url="https://seusite.com"  # Alterar quando tiver domínio
 )

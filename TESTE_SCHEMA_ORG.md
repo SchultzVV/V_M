@@ -71,7 +71,7 @@ Sitemap: https://seusite.com/sitemap.xml
 {
   "@context": "https://schema.org",
   "@type": "Organization",
-  "name": "V&M - Lojinha",
+  "name": "DEF - Lojinha",
   "url": "https://seusite.com",
   "logo": "https://seusite.com/static/logo.png",
   "sameAs": [
@@ -98,7 +98,7 @@ Sitemap: https://seusite.com/sitemap.xml
   "sku": "123",
   "brand": {
     "@type": "Brand",
-    "name": "V&M - Lojinha"
+    "name": "DEF - Lojinha"
   },
   "offers": {
     "@type": "Offer",
@@ -151,7 +151,7 @@ Depois que o site estiver online:
 ```
 Resultado no Google:
 ┌────────────────────────────────────┐
-│ V&M - Lojinha                      │
+│ DEF - Lojinha                      │
 │ www.seusite.com                    │
 │ Loja online com produtos...        │
 └────────────────────────────────────┘
