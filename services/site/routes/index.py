@@ -9,7 +9,7 @@ def index():
     <html>
     <head>
       <meta charset="utf-8">
-      <title>V&M - Lojinha</title>
+      <title>DEF - Lojinha</title>
       <style>
         body { margin: 0; font-family: sans-serif; text-align: center; background: #000; color: white; }
         iframe { display: none; }
@@ -17,7 +17,7 @@ def index():
     </head>
     <body>
       <iframe src="/media/ping" id="ngrok-prewarm"></iframe>
-      <h1>V&M - Lojinha</h1>
+      <h1>DEF - Lojinha</h1>
       <p>Produtos promocionais garimpados com bom gosto 😍</p>
       <p><a class="button" href="/ai">Ir para integração IA</a></p>
       <div class="grid" id="products-container"></div>

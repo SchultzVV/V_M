@@ -14,6 +14,7 @@ services:
     depends_on:
       - db
       - minio
+      - redis
     networks:
       - backend
 
@@ -47,6 +48,27 @@ services:
     networks:
       - backend
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - backend
+    restart: always
+
+  info-scrap:
+    image: ghcr.io/schultzvv/info_scrap:sha-d337627
+    container_name: info-scrap
+    ports:
+      - "8001:8000"
+    networks:
+      - backend
+    restart: always
+
 networks:
   backend:
     driver: bridge
@@ -54,3 +76,4 @@ networks:
 volumes:
   pgdata:
   minio_data:
+  redis_data:

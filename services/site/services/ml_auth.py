@@ -3,6 +3,7 @@ OAuth do Mercado Livre - Autenticação e gerenciamento de tokens
 """
 
 import os
+import sys
 import requests
 from datetime import datetime, timedelta
 from typing import Optional, Dict
@@ -60,20 +61,43 @@ class MercadoLivreAuth:
             "redirect_uri": self.redirect_uri
         }
         
-        response = requests.post(self.token_url, data=data)
-        response.raise_for_status()
+        # Debug: Log dos dados enviados
+        print(f"🔍 DEBUG - Trocando código por token:", flush=True)
+        print(f"   client_id: {self.app_id}", flush=True)
+        print(f"   redirect_uri: {repr(self.redirect_uri)}", flush=True)
+        print(f"   code: {code[:20]}...", flush=True)
+        sys.stdout.flush()
         
-        token_data = response.json()
-        
-        # Adiciona timestamp de expiração
-        token_data["expires_at"] = (
-            datetime.utcnow() + timedelta(seconds=token_data.get("expires_in", 21600))
-        ).isoformat()
-        
-        # Salva tokens no arquivo
-        self._save_tokens(token_data)
-        
-        return token_data
+        try:
+            response = requests.post(self.token_url, data=data)
+            response.raise_for_status()
+            
+            token_data = response.json()
+            
+            # Adiciona timestamp de expiração
+            token_data["expires_at"] = (
+                datetime.utcnow() + timedelta(seconds=token_data.get("expires_in", 21600))
+            ).isoformat()
+            
+            # Salva tokens no arquivo
+            self._save_tokens(token_data)
+            
+            print(f"✅ Token obtido com sucesso!", flush=True)
+            sys.stdout.flush()
+            return token_data
+            
+        except requests.exceptions.HTTPError as e:
+            error_detail = ""
+            try:
+                error_detail = response.json()
+            except:
+                error_detail = response.text
+            
+            print(f"❌ Erro ao trocar código por token:", flush=True)
+            print(f"   Status: {response.status_code}", flush=True)
+            print(f"   Resposta: {error_detail}", flush=True)
+            sys.stdout.flush()
+            raise
     
     def refresh_access_token(self, refresh_token: Optional[str] = None) -> Dict:
         """

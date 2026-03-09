@@ -19,7 +19,7 @@ else:
     exit(1)
 
 import os
-from flask import Flask
+from flask import Flask, request
 from routes.product_routes import product_bp
 from models.product import db, Product
 from models import Base
@@ -29,13 +29,21 @@ from routes.index import index_bp
 from routes.webhook_routes import webhook_bp
 from routes.auth_routes import auth_bp
 from routes.sync_routes import sync_bp
+from routes.instagram_routes import instagram_bp
 
 app = Flask(__name__)
 
-# # ✅ Middleware para remover tela do Ngrok
+# # ✅ Middleware para remover tela do Ngrok e evitar cache agressivo
 @app.after_request
 def skip_ngrok_warning(response):
     response.headers["ngrok-skip-browser-warning"] = "true"
+    # Evita cache agressivo do Cloudflare/proxies
+    if request.path.startswith('/static/'):
+        response.headers["Cache-Control"] = "public, max-age=300"  # Cache de 5 minutos para estáticos
+    else:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     return response
 # app.register_blueprint(index_bp)
 
@@ -50,6 +58,7 @@ app.register_blueprint(ai_bp)
 app.register_blueprint(webhook_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(sync_bp)
+app.register_blueprint(instagram_bp)
 
 with app.app_context():
     db.create_all()  # ✅ Cria a tabela 'products' se não existir

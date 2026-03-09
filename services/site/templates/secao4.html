@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>V&M - PetShop</title>
+  <title>DEF - PetShop</title>
   <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/search-styles.css" />
   <style>
     body {
-      background-image: url('/static/background_PET.png');
+      background-image: url('/static/bg.png');
     }
     
     .sort-buttons {
@@ -38,6 +39,39 @@
     .sort-btn.active {
       background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     }
+    
+    .subcategory-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 25px 0 15px 0;
+    }
+    
+    .subcat-btn {
+      background: rgba(255, 255, 255, 0.9);
+      color: #333;
+      border: 2px solid #667eea;
+      padding: 10px 18px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .subcat-btn:hover {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    
+    .subcat-btn.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -48,16 +82,45 @@
     <button class="nav-btn" onclick="window.location.href='/secao3'">📱 Eletrônicos</button>
     <button class="nav-btn active" onclick="window.location.href='/secao4'">🐾 PetShop</button>
   </div>
-  <p style="margin-top: 40px; font-weight: bold; font-size: 50px;">V&M - PetShop</p>
+  <p style="margin-top: 40px; font-weight: bold; font-size: 50px;">DEF - PetShop</p>
+  
+  <!-- Botões de subcategoria -->
+  <div class="subcategory-buttons">
+    <button class="subcat-btn active" onclick="filterBySubcategory('todos', this)">🐾 Todos</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('caes', this)">🐶 Cães</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('gatos', this)">🐱 Gatos</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('racao', this)">🍖 Ração</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('brinquedos', this)">🧸 Brinquedos</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('higiene', this)">🛁 Higiene</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('acessorios', this)">🦴 Acessórios</button>
+    <button class="subcat-btn" onclick="filterBySubcategory('saude', this)">💉 Saúde</button>
+  </div>
+  
   <p style="margin-top: 20px; font-weight: bold; font-size: 19px;">
     Tudo para o seu melhor amigo 🐾❤️
   </p>
   
+  <!-- Barra de Busca -->
+  <div class="search-container">
+    <div class="search-wrapper">
+      <span class="search-icon">🔍</span>
+      <input 
+        type="text" 
+        class="search-input" 
+        id="searchInput"
+        placeholder="Buscar em PetShop... (ex: ração, brinquedo, coleira)"
+        autocomplete="off"
+      />
+      <button class="clear-btn" id="clearBtn" onclick="clearSearch()">✕ Limpar</button>
+    </div>
+    <div class="search-results-count" id="resultsCount"></div>
+  </div>
+  
   <!-- Botões de ordenação -->
   <div class="sort-buttons" style="text-align: center; margin: 20px 0;">
-    <button class="sort-btn" onclick="sortProducts('price-asc')">💰 Mais Baratos!</button>
-    <button class="sort-btn" onclick="sortProducts('price-desc')">💸 Mais Caros!</button>
-    <button class="sort-btn" onclick="sortProducts('discount')">🔥 Maior Desconto!</button>
+    <button class="sort-btn" onclick="sortProducts('price-asc', this)">💰 Mais Baratos!</button>
+    <button class="sort-btn" onclick="sortProducts('price-desc', this)">💸 Mais Caros!</button>
+    <button class="sort-btn" onclick="sortProducts('discount', this)">🔥 Maior Desconto!</button>
   </div>
   
   <div class="grid" id="products-container"></div>
@@ -179,6 +242,118 @@
     }
 
     let allProducts = []; // Variável global para armazenar todos os produtos
+    let currentSubcategory = 'todos'; // Subcategoria atual
+    let currentSearchTerm = ''; // Termo de busca atual
+
+    function updateResultsCount(count, total, searchTerm = '') {
+      const resultsDiv = document.getElementById('resultsCount');
+      if (!resultsDiv) return;
+      if (searchTerm) {
+        resultsDiv.textContent = `🔍 ${count} produto${count !== 1 ? 's' : ''} encontrado${count !== 1 ? 's' : ''} para "${searchTerm}"`;
+      } else if (count !== total) {
+        resultsDiv.textContent = `Mostrando ${count} de ${total} produtos`;
+      } else {
+        resultsDiv.textContent = '';
+      }
+    }
+
+    function displayProducts(products) {
+      const container = document.getElementById('products-container');
+      if (!container) return;
+      container.innerHTML = '';
+      if (products.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #666; font-size: 18px; margin-top: 40px;">Nenhum produto encontrado 😢</p>';
+      } else {
+        products.forEach(product => {
+          const card = createProductCard(product);
+          container.appendChild(card);
+        });
+      }
+      updateResultsCount(products.length, allProducts.length, currentSearchTerm);
+    }
+
+    function searchProducts(searchTerm) {
+      currentSearchTerm = searchTerm.trim();
+      const clearBtn = document.getElementById('clearBtn');
+      if (clearBtn) clearBtn.classList.toggle('visible', !!currentSearchTerm);
+      
+      if (currentSearchTerm) {
+        fetch(`/api/products?tag=PET&search=${encodeURIComponent(currentSearchTerm)}`, {
+          headers: { "ngrok-skip-browser-warning": "true" }
+        })
+        .then(res => res.json())
+        .then(products => displayProducts(products))
+        .catch(err => console.error("Erro ao buscar produtos:", err));
+      } else {
+        displayProducts(allProducts);
+      }
+    }
+
+    function clearSearch() {
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput) searchInput.value = '';
+      currentSearchTerm = '';
+      const clearBtn = document.getElementById('clearBtn');
+      if (clearBtn) clearBtn.classList.remove('visible');
+      displayProducts(allProducts);
+      if (searchInput) searchInput.focus();
+    }
+
+    function filterBySubcategory(subcategory, clickedButton) {
+      currentSubcategory = subcategory;
+      
+      // Remove active class de todos os botões de subcategoria
+      document.querySelectorAll('.subcat-btn').forEach(btn => btn.classList.remove('active'));
+      
+      // Adiciona active class ao botão clicado
+      if (clickedButton) clickedButton.classList.add('active');
+      
+      // Filtra os produtos pela subcategoria
+      let filteredProducts = allProducts;
+      if (subcategory !== 'todos') {
+        filteredProducts = allProducts.filter(product => {
+          const title = product.title.toLowerCase();
+          
+          switch(subcategory) {
+            case 'caes':
+              return title.includes('cão') || title.includes('cachorro') || title.includes('dog') || 
+                     title.includes('canino');
+            case 'gatos':
+              return title.includes('gato') || title.includes('cat') || title.includes('felino');
+            case 'racao':
+              return title.includes('ração') || title.includes('comida') || title.includes('alimento') || 
+                     title.includes('petisco') || title.includes('sachê');
+            case 'brinquedos':
+              return title.includes('brinquedo') || title.includes('bolinha') || title.includes('mordedor') || 
+                     title.includes('arranhador');
+            case 'higiene':
+              return title.includes('shampoo') || title.includes('sabonete') || title.includes('escova') || 
+                     title.includes('pente') || title.includes('toalha') || title.includes('higiene');
+            case 'acessorios':
+              return title.includes('coleira') || title.includes('guia') || title.includes('caminha') || 
+                     title.includes('comedouro') || title.includes('bebedouro') || title.includes('casinha') || 
+                     title.includes('roupa');
+            case 'saude':
+              return title.includes('medicamento') || title.includes('vitamina') || title.includes('antipulgas') || 
+                     title.includes('vermífugo') || title.includes('saúde');
+            default:
+              return true;
+          }
+        });
+      }
+      
+      // Renderiza os produtos filtrados
+      const container = document.getElementById('products-container');
+      container.innerHTML = '';
+      if (filteredProducts.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #666; font-size: 18px; margin-top: 40px;">Nenhum produto encontrado nesta categoria 😢</p>';
+      } else {
+        filteredProducts.forEach(product => {
+          const card = createProductCard(product);
+          container.appendChild(card);
+        });
+      }
+    }
 
     function getNumericPrice(priceStr) {
       return parseFloat(priceStr.replace("R$", "").replace(",", ".").trim());
@@ -194,12 +369,12 @@
       return 0;
     }
 
-    function sortProducts(type) {
+    function sortProducts(type, clickedButton) {
       // Remove active class de todos os botões
       document.querySelectorAll('.sort-btn').forEach(btn => btn.classList.remove('active'));
       
       // Adiciona active class ao botão clicado
-      event.target.classList.add('active');
+      if (clickedButton) clickedButton.classList.add('active');
 
       let sortedProducts = [...allProducts];
       
@@ -233,13 +408,25 @@
       .then(res => res.json())
       .then(products => {
         allProducts = products; // Armazena os produtos globalmente
-        const container = document.getElementById('products-container');
-        products.forEach(product => {
-          const card = createProductCard(product);
-          container.appendChild(card);
-        });
+        displayProducts(products);
       })
       .catch(err => console.error('Erro ao carregar produtos:', err));
+    
+    // Event listeners para a busca
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+      let searchTimeout;
+      searchInput.addEventListener('input', function(e) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => searchProducts(e.target.value), 300);
+      });
+      searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          clearTimeout(searchTimeout);
+          searchProducts(e.target.value);
+        }
+      });
+    }
   </script>
 </body>
 </html>

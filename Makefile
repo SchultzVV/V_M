@@ -36,7 +36,26 @@ COMPOSE = docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml --env
 # =====================
 
 up:  ## Sobe o ambiente de desenvolvimento
-	$(COMPOSE) up --build
+	@echo "🔧 Subindo containers Docker em modo desenvolvimento..."
+	$(COMPOSE) up -d --build
+	@echo ""
+	@echo "✅ Ambiente iniciado com sucesso!"
+	@echo ""
+	@echo "🌐 Acesso local:"
+	@echo "   https://localhost:5000"
+	@echo ""
+	@echo "📋 Comandos úteis:"
+	@echo "   make logs-site           - Ver logs em tempo real"
+	@echo ""
+	@echo "🌍 Expor com HTTPS público (para OAuth/Webhooks do ML):"
+	@echo "   make serve-cloudflare        - Cloudflare rápido (URL aleatória, TEMPORÁRIO 2-4h)"
+	@echo "   make serve-cloudflare-fixed  - Cloudflare URL FIXA (PERMANENTE, recomendado!)"
+	@echo "   make serve-ngrok             - Ngrok (rápido, limitado no plano free)"
+	@echo "   make serve-localtunnel       - LocalTunnel (simples)"
+	@echo "   make serve-serveo            - Serveo SSH (sem instalar nada)"
+	@echo ""
+	@echo "   make down                - Parar containers"
+	@echo ""
 
 down:  ## Para e remove containers + volumes
 	$(COMPOSE) down -v
@@ -53,13 +72,16 @@ redo-site:  ## Rebuild completo apenas do site
 logs-site:  ## Logs em tempo real do site
 	$(COMPOSE) logs -f site
 
+shell-site:  ## Abre shell bash dentro do container site
+	@docker exec -it site /bin/bash
+
 serve-ngrok:  ## Inicia túnel ngrok para acessar localmente via web
 	@echo "🛑 Encerrando ngrok anterior, se existir..."
 	@pkill ngrok || true
 	@echo "🔧 Subindo containers Docker..."
 	@$(COMPOSE) up -d
 	@echo "🚀 Iniciando túnel com ngrok (URL aleatória - plano free)..."
-	@ngrok http --request-header-add="ngrok-skip-browser-warning:true" 5000 > /dev/null &
+	@ngrok http --request-header-add="ngrok-skip-browser-warning:true" https://localhost:5000 > /dev/null &
 	@sleep 6
 	@echo "🌐 URL pública gerada:"
 	@curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
@@ -67,6 +89,510 @@ serve-ngrok:  ## Inicia túnel ngrok para acessar localmente via web
 	@echo "⚠️  IMPORTANTE: Copie a URL acima e adicione no painel do Mercado Livre:"
 	@echo "   https://developers.mercadolivre.com.br/devcenter"
 	@echo "   Redirect URI: <URL_ACIMA>/auth/mercadolivre/callback"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "💡 LEMBRE-SE: Ngrok tem limite de horas no plano free!"
+	@echo "   Quando terminar de usar, desligue com:"
+	@echo "   make unserve-ngrok"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+unserve-ngrok:  ## Desliga o túnel ngrok (economiza tempo do trial)
+	@echo "🛑 Encerrando ngrok..."
+	@if pkill ngrok 2>/dev/null; then \
+		echo "✅ Ngrok encerrado com sucesso!"; \
+		echo "💰 Trial salvo - você pode usar make serve-ngrok quando precisar"; \
+	else \
+		echo "⚠️  Ngrok não estava rodando"; \
+	fi
+
+serve-cloudflare:  ## Inicia Cloudflare Tunnel em background, captura URL, configura OAuth ML automaticamente
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 CLOUDFLARE TUNNEL + AUTO-CONFIG OAUTH MERCADO LIVRE"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@CLOUDFLARED_BIN=$$(command -v cloudflared 2>/dev/null || echo /usr/local/bin/cloudflared); \
+	if [ ! -x "$$CLOUDFLARED_BIN" ]; then \
+		echo "❌ Cloudflared não está instalado!"; \
+		echo "   Execute: make install-cloudflared"; \
+		exit 1; \
+	fi; \
+	echo "🔧 Subindo containers Docker..."; \
+	$(COMPOSE) up -d; \
+	sleep 2; \
+	echo "✅ Site rodando em https://localhost:5000"; \
+	echo ""; \
+	echo "🚀 Iniciando túnel Cloudflare em background..."; \
+	pkill cloudflared 2>/dev/null || true; \
+	sleep 1; \
+	LOG=/tmp/cloudflare_tunnel.log; \
+	rm -f $$LOG; \
+	$$CLOUDFLARED_BIN tunnel \
+		--url https://localhost:5000 \
+		--no-tls-verify \
+		--proxy-connect-timeout 60s \
+		--proxy-keepalive-timeout 5m \
+		--proxy-keepalive-connections 200 \
+		--proxy-tcp-keepalive 60s \
+		2>&1 | tee $$LOG & \
+	echo ""; \
+	echo "⏳ Aguardando URL ser gerada..."; \
+	CF_URL=""; \
+	for i in $$(seq 1 20); do \
+		CF_URL=$$(grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com' $$LOG 2>/dev/null | head -1); \
+		if [ -n "$$CF_URL" ]; then break; fi; \
+		sleep 2; \
+	done; \
+	if [ -z "$$CF_URL" ]; then \
+		echo "❌ Não foi possível capturar a URL do Cloudflare"; \
+		echo "   Verifique o log: cat /tmp/cloudflare_tunnel.log"; \
+		exit 1; \
+	fi; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "✅ TÚNEL ATIVO:"; \
+	echo "   $$CF_URL"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	echo "📝 Atualizando ML_REDIRECT_URI no .env..."; \
+	NEW_REDIRECT="$$CF_URL/auth/mercadolivre/callback"; \
+	sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=$$NEW_REDIRECT|" .env; \
+	echo "   ✅ .env atualizado: $$NEW_REDIRECT"; \
+	echo ""; \
+	echo "🔄 Reiniciando container site para recarregar nova URL..."; \
+	$(COMPOSE) stop site > /dev/null 2>&1; \
+	$(COMPOSE) rm -f site > /dev/null 2>&1; \
+	$(COMPOSE) up -d site > /dev/null 2>&1; \
+	sleep 3; \
+	echo "   ✅ Container reiniciado com nova redirect URI"; \
+	echo ""; \
+	APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2); \
+	AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NEW_REDIRECT"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "🔑 PRÓXIMOS PASSOS PARA OAUTH:"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	echo "1️⃣  Cadastre a Redirect URI no painel ML (se ainda não cadastrou):"; \
+	echo "   https://developers.mercadolivre.com.br/devcenter"; \
+	echo "   → Redirect URI: $$NEW_REDIRECT"; \
+	echo ""; \
+	echo "2️⃣  Abra esta URL no navegador para autorizar:"; \
+	echo ""; \
+	echo "   $$AUTH_URL"; \
+	echo ""; \
+	echo "3️⃣  Após autorizar, verifique os tokens:"; \
+	echo "   make check-tokens"; \
+	echo ""; \
+	echo "4️⃣  Prepare o produto:"; \
+	echo "   make prepare-ml URL=https://mercadolivre.com/sec/..."; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "💡 Túnel rodando em background. Para parar: make stop-cloudflare"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""
+
+stop-cloudflare:  ## Para o túnel Cloudflare
+	@echo "🛑 Encerrando túnel Cloudflare..."
+	@pkill cloudflared || true
+	@echo "✅ Túnel encerrado!"
+
+serve-cloudflare-fixed:  ## Cloudflare com URL FIXA (requer setup inicial)
+	@echo "🌐 Iniciando túnel Cloudflare com URL FIXA..."
+	@echo ""
+	@CLOUDFLARED_BIN=$$(command -v cloudflared 2>/dev/null || echo /usr/local/bin/cloudflared); \
+	if [ ! -x "$$CLOUDFLARED_BIN" ]; then \
+		echo "❌ Cloudflared não está instalado!"; \
+		echo ""; \
+		echo "Execute primeiro: make install-cloudflared"; \
+		exit 1; \
+	fi; \
+	if [ ! -f ~/.cloudflared/config.yml ]; then \
+		echo "❌ Túnel não configurado!"; \
+		echo ""; \
+		echo "Execute primeiro: make setup-cloudflare-fixed"; \
+		echo ""; \
+		echo "Isso vai criar um túnel permanente com URL fixa."; \
+		exit 1; \
+	fi; \
+	echo "🔧 Subindo containers Docker..."; \
+	$(COMPOSE) up -d; \
+	sleep 2; \
+	echo "✅ Site rodando em https://localhost:5000"; \
+	echo ""; \
+	echo "🚀 Iniciando túnel com URL PERMANENTE..."; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "🌐 A URL será a mesma sempre que você reiniciar"; \
+	echo "⚡ OTIMIZADO: Conexão direta ao HTTPS + timeouts aumentados"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	$$CLOUDFLARED_BIN tunnel run
+
+setup-cloudflare-fixed:  ## Configurar túnel Cloudflare com URL FIXA (executar 1x)
+	@echo "🔧 Configurando túnel Cloudflare com URL permanente..."
+	@echo ""
+	@CLOUDFLARED_BIN=$$(command -v cloudflared 2>/dev/null || echo /usr/local/bin/cloudflared); \
+	if [ ! -x "$$CLOUDFLARED_BIN" ]; then \
+		echo "❌ Cloudflared não está instalado!"; \
+		echo ""; \
+		echo "Execute primeiro: make install-cloudflared"; \
+		exit 1; \
+	fi; \
+	if [ -f ~/.cloudflared/config.yml ]; then \
+		echo "✅ Túnel já está configurado!"; \
+		echo ""; \
+		echo "Para reconfigurar, remova: rm -rf ~/.cloudflared"; \
+		echo "Depois execute novamente: make setup-cloudflare-fixed"; \
+		exit 0; \
+	fi; \
+	echo "🔑 Passo 1: Login no Cloudflare"; \
+	echo "(Uma página do navegador vai abrir)"; \
+	echo ""; \
+	$$CLOUDFLARED_BIN tunnel login; \
+	echo ""; \
+	echo "✅ Login realizado!"; \
+	echo ""; \
+	echo "🌐 Passo 2: Criando túnel..."; \
+	TUNNEL_NAME="vm-site-$$(date +%s)"; \
+	if $$CLOUDFLARED_BIN tunnel list 2>/dev/null | grep -q "vm-site"; then \
+		echo "⚠️  Túnel vm-site já existe, usando ele..."; \
+		TUNNEL_NAME="vm-site"; \
+	else \
+		$$CLOUDFLARED_BIN tunnel create vm-site; \
+		TUNNEL_NAME="vm-site"; \
+	fi; \
+	TUNNEL_ID=$$($$CLOUDFLARED_BIN tunnel list | grep "$$TUNNEL_NAME" | awk '{print $$1}' | head -1); \
+	echo "✅ Túnel criado: $$TUNNEL_ID"; \
+	echo ""; \
+	echo "📄 Passo 3: Criando configuração..."; \
+	mkdir -p ~/.cloudflared; \
+	CRED_FILE=$$(ls ~/.cloudflared/*.json 2>/dev/null | grep "$$TUNNEL_ID" | head -1); \
+	cat > ~/.cloudflared/config.yml << EOF$$'\n'\
+tunnel: $$TUNNEL_ID$$'\n'\
+credentials-file: $$CRED_FILE$$'\n'\
+$$'\n'\
+ingress:$$'\n'\
+  - service: https://localhost:5000$$'\n'\
+    originRequest:$$'\n'\
+      noTLSVerify: true$$'\n'\
+      connectTimeout: 60s$$'\n'\
+      keepaliveTimeout: 5m$$'\n'\
+      keepaliveConnections: 200$$'\n'\
+      tcpKeepAlive: 60s$$'\n'\
+  - service: http_status:404$$'\n'\
+EOF$$'\n'\
+	; \
+	echo "✅ Configuração criada em ~/.cloudflared/config.yml"; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "✅ Setup concluído!"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	echo "🚀 Agora execute:"; \
+	echo "   make serve-cloudflare-fixed"; \
+	echo ""; \
+	echo "🌐 A URL do túnel aparecerá ao iniciar e será SEMPRE A MESMA!"; \
+	echo ""
+
+setup-cloudflare:  ## [ANTIGO] Configuração inicial do Cloudflare Tunnel
+	@echo "⚠️  Este comando está obsoleto. Use:"
+	@echo "   make setup-cloudflare-fixed  - Para túnel com URL fixa"
+	@echo ""
+	@chmod +x setup_cloudflare.sh
+	@./setup_cloudflare.sh
+
+install-cloudflared:  ## Instala cloudflared (necessário para Cloudflare Tunnel)
+	@echo "📦 Instalando Cloudflared..."
+	@echo ""
+	@if command -v cloudflared &> /dev/null; then \
+		echo "✅ Cloudflared já está instalado!"; \
+		cloudflared --version; \
+		exit 0; \
+	fi
+	@echo "🔽 Baixando cloudflared..."
+	@wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -O /tmp/cloudflared.deb
+	@echo "📦 Instalando..."
+	@sudo dpkg -i /tmp/cloudflared.deb
+	@rm /tmp/cloudflared.deb
+	@echo ""
+	@echo "✅ Cloudflared instalado com sucesso!"
+	@cloudflared --version
+	@echo ""
+	@echo "🚀 Agora você pode usar:"
+	@echo "   make serve-cloudflare        - Túnel otimizado (RECOMENDADO!)"
+	@echo "   make serve-cloudflare-proxy  - Com proxy HTTP (fallback)"
+	@echo "   make setup-cloudflare        - Configurar túnel permanente"
+
+serve-cloudflare-proxy:  ## Cloudflare com proxy HTTP (usar se serve-cloudflare falhar)
+	@if ! command -v cloudflared &> /dev/null; then \
+		echo "❌ Cloudflared não está instalado!"; \
+		echo ""; \
+		echo "Execute primeiro: make install-cloudflared"; \
+		exit 1; \
+	fi
+	@echo "🔧 Subindo containers Docker..."
+	@$(COMPOSE) up -d
+	@echo ""
+	@echo "🔎 Iniciando proxy HTTP (porta 8000)..."
+	@pkill -f "proxy_http.py" 2>/dev/null || true
+	@python3 proxy_http.py > /dev/null 2>&1 &
+	@sleep 2
+	@echo "✅ Proxy HTTP rodando (8000 → 5000 HTTPS)"
+	@echo ""
+	@echo "🚀 Iniciando Cloudflare com proxy HTTP..."
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🌐 IMPORTANTE: Copie a URL https://...trycloudflare.com que aparecer"
+	@echo "⚠️  Usa proxy HTTP (pode ser mais lento que serve-cloudflare)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@cloudflared tunnel --url http://localhost:8000
+
+stop-cloudflare-proxy:  ## Para o túnel Cloudflare com proxy
+	@echo "🛑 Encerrando túnel Cloudflare..."
+	@pkill cloudflared || true
+	@pkill -f "proxy_http.py" || true
+	@echo "✅ Túnel e proxy encerrados!"
+
+serve-localtunnel:  ## Inicia túnel LocalTunnel (GRATUITO, super simples!)
+	@echo "🌐 Iniciando túnel LocalTunnel..."
+	@echo ""
+	@if ! command -v lt &> /dev/null; then \
+		echo "❌ LocalTunnel não está instalado!"; \
+		echo ""; \
+		echo "Execute primeiro: make setup-localtunnel"; \
+		exit 1; \
+	fi
+	@echo "🔧 Subindo containers Docker..."
+	@$(COMPOSE) up -d
+	@echo ""
+	@echo "🔄 Iniciando proxy HTTP→HTTPS..."
+	@python3 proxy_http.py > /dev/null 2>&1 &
+	@sleep 2
+	@echo "✅ Proxy rodando (porta 8000 → 5000)"
+	@echo ""
+	@echo "🚀 Iniciando LocalTunnel..."
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🌐 Sua URL pública: https://vm-site.loca.lt"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "📋 Configure no Mercado Livre:"
+	@echo "   Redirect URI: https://vm-site.loca.lt/auth/mercadolivre/callback"
+	@echo ""
+	@echo "⚠️  Na primeira vez, pode aparecer uma página pedindo para clicar"
+	@echo "    em 'Click to Continue' - é só clicar uma vez"
+	@echo ""
+	@lt --port 8000 --subdomain vm-site
+
+stop-localtunnel:  ## Para o túnel LocalTunnel
+	@echo "🛑 Encerrando túnel LocalTunnel..."
+	@pkill -f "lt --port" || true
+	@pkill -f "proxy_http.py" || true
+	@echo "✅ Túnel e proxy encerrados!"
+
+setup-localtunnel:  ## Configuração inicial do LocalTunnel
+	@chmod +x setup_localtunnel.sh
+	@./setup_localtunnel.sh
+
+serve-serveo:  ## Inicia túnel Serveo via SSH (GRATUITO, sem instalar nada!)
+	@echo "🌐 Iniciando túnel Serveo (SSH)..."
+	@echo ""
+	@echo "🔧 Subindo containers Docker..."
+	@$(COMPOSE) up -d
+	@echo ""
+	@echo "🚀 Iniciando túnel via SSH..."
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🌐 Sua URL pública será: https://vmsite.serveo.net"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=60 -R vmsite:80:localhost:5000 serveo.net
+
+stop-serveo:  ## Para o túnel Serveo
+	@echo "🛑 Encerrando túnel Serveo..."
+	@pkill -f "ssh.*serveo.net" || true
+	@echo "✅ Túnel encerrado!"
+
+help-tuneis:  ## Exibe guia completo das alternativas gratuitas ao ngrok
+	@./guia_tuneis.sh
+
+test-oauth:  ## Testa o fluxo OAuth - Abre navegador para autorizar
+	@echo "🔑 Testando OAuth do Mercado Livre..."
+	@echo ""
+	@echo "📋 Configuração atual:"
+	@grep "ML_APP_ID" .env | head -1
+	@grep "ML_REDIRECT_URI" .env
+	@echo ""
+	@echo "🌐 Método 1 - Via nosso site (redirect automático):"
+	@curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url' | xargs -I {} echo "{}/auth/mercadolivre/login"
+	@echo ""
+	@echo "🌐 Método 2 - URL Direta do Mercado Livre:"
+	@./test_oauth_direct.sh | grep "https://auth.mercadolivre" | head -1
+	@echo ""
+	@echo "💡 Recomendado: Use o Método 2 (URL direta) para evitar bloqueios"
+	@echo "✅ Após autorizar, verifique os tokens com: make check-tokens"
+
+oauth-url:  ## Gera URL de autenticação OAuth com ngrok atual
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔑 URL DE AUTENTICAÇÃO OAUTH - MERCADO LIVRE"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@NGROK_URL=$$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | jq -r '.tunnels[0].public_url' 2>/dev/null); \
+	if [ -z "$$NGROK_URL" ] || [ "$$NGROK_URL" = "null" ]; then \
+		echo "❌ Ngrok não está rodando!"; \
+		echo ""; \
+		echo "Execute primeiro: make serve-ngrok"; \
+		exit 1; \
+	fi; \
+	APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2); \
+	AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NGROK_URL/auth/mercadolivre/callback"; \
+	echo "🌐 URL do ngrok atual:"; \
+	echo "   $$NGROK_URL"; \
+	echo ""; \
+	echo "🔗 Cole esta URL no navegador para autorizar:"; \
+	echo ""; \
+	echo "$$AUTH_URL"; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "⚠️  IMPORTANTE: Cadastre no painel do Mercado Livre:"
+	@echo "   https://developers.mercadolivre.com.br/devcenter"
+	@echo ""
+	@NGROK_URL=$$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | jq -r '.tunnels[0].public_url' 2>/dev/null); \
+	echo "   Redirect URI: $$NGROK_URL/auth/mercadolivre/callback"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+
+update-ngrok-url:  ## Atualiza .env e reinicia containers com nova URL do ngrok
+	@echo ""
+	@echo "🔄 Atualizando configuração do ngrok..."
+	@echo ""
+	@NGROK_URL=$$(curl -s http://127.0.0.1:4040/api/tunnels 2>/dev/null | jq -r '.tunnels[0].public_url' 2>/dev/null); \
+	if [ -z "$$NGROK_URL" ] || [ "$$NGROK_URL" = "null" ]; then \
+		echo "❌ Ngrok não está rodando!"; \
+		echo "Execute primeiro: make serve-ngrok"; \
+		exit 1; \
+	fi; \
+	OLD_URL=$$(grep "^ML_REDIRECT_URI=" .env | cut -d'=' -f2); \
+	NEW_URL="$$NGROK_URL/auth/mercadolivre/callback"; \
+	echo "🔗 URL antiga: $$OLD_URL"; \
+	echo "🔗 URL nova:   $$NEW_URL"; \
+	echo ""; \
+	if [ "$$OLD_URL" = "$$NEW_URL" ]; then \
+		echo "✅ URL já está atualizada!"; \
+		exit 0; \
+	fi; \
+	echo "📝 Atualizando .env..."; \
+	sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=$$NEW_URL|" .env; \
+	echo "✅ .env atualizado"; \
+	echo ""; \
+	echo "🔄 Reiniciando containers para carregar nova URL..."; \
+	docker-compose down > /dev/null 2>&1; \
+	docker-compose up -d > /dev/null 2>&1; \
+	sleep 3; \
+	echo "✅ Containers reiniciados"; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "⚠️  PRÓXIMOS PASSOS:"; \
+	echo ""; \
+	echo "1. Cadastre no painel ML: https://developers.mercadolivre.com.br/devcenter"; \
+	echo "   Redirect URI: $$NEW_URL"; \
+	echo ""; \
+	echo "2. Autorize novamente: make oauth-url"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+
+update-cloudflare-url:  ## Atualiza .env com URL do Cloudflare Tunnel e reinicia container
+	@echo ""
+	@echo "🔄 Atualizando configuração do Cloudflare Tunnel..."
+	@echo ""
+	@CLOUDFLARE_URL=$$(grep "https://" /tmp/cloudflare_tunnel.log 2>/dev/null | grep "trycloudflare.com" | grep -oP 'https://[^\s|]+' | head -1); \
+	if [ -z "$$CLOUDFLARE_URL" ]; then \
+		echo "❌ Cloudflare Tunnel não está rodando!"; \
+		echo ""; \
+		echo "Execute primeiro: make serve-cloudflare-quick"; \
+		exit 1; \
+	fi; \
+	OLD_URL=$$(grep "^ML_REDIRECT_URI=" .env | cut -d'=' -f2); \
+	NEW_URL="$$CLOUDFLARE_URL/auth/mercadolivre/callback"; \
+	echo "🔗 URL antiga: $$OLD_URL"; \
+	echo "🔗 URL nova:   $$NEW_URL"; \
+	echo ""; \
+	if [ "$$OLD_URL" = "$$NEW_URL" ]; then \
+		echo "✅ URL já está atualizada!"; \
+		exit 0; \
+	fi; \
+	echo "📝 Atualizando .env..."; \
+	sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=$$NEW_URL|" .env; \
+	echo "✅ .env atualizado"; \
+	echo ""; \
+	echo "🔄 Reiniciando container site para carregar nova URL..."; \
+	$(COMPOSE) stop site > /dev/null 2>&1; \
+	$(COMPOSE) rm -f site > /dev/null 2>&1; \
+	$(COMPOSE) up -d site > /dev/null 2>&1; \
+	sleep 3; \
+	echo "✅ Container reiniciado"; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "⚠️  PRÓXIMOS PASSOS:"; \
+	echo ""; \
+	echo "1. Cadastre no painel ML: https://developers.mercadolivre.com.br/devcenter"; \
+	echo "   Redirect URI: $$NEW_URL"; \
+	echo ""; \
+	echo "2. Autorize com: make oauth-cloudflare"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+
+oauth-cloudflare:  ## Gera URL OAuth usando Cloudflare Tunnel
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔑 URL DE AUTENTICAÇÃO OAUTH - MERCADO LIVRE (Cloudflare)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@CLOUDFLARE_URL=$$(grep "https://" /tmp/cloudflare_tunnel.log 2>/dev/null | grep "trycloudflare.com" | grep -oP 'https://[^\s|]+' | head -1); \
+	if [ -z "$$CLOUDFLARE_URL" ]; then \
+		echo "❌ Cloudflare Tunnel não está rodando!"; \
+		echo ""; \
+		echo "Execute primeiro: make serve-cloudflare-quick"; \
+		exit 1; \
+	fi; \
+	APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2); \
+	AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$CLOUDFLARE_URL/auth/mercadolivre/callback"; \
+	echo "🌐 URL do Cloudflare Tunnel:"; \
+	echo "   $$CLOUDFLARE_URL"; \
+	echo ""; \
+	echo "🔗 Cole esta URL no navegador para autorizar:"; \
+	echo ""; \
+	echo "$$AUTH_URL"; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "⚠️  IMPORTANTE: Cadastre no painel do Mercado Livre:"
+	@echo "   https://developers.mercadolivre.com.br/devcenter"
+	@echo ""
+	@echo "   Redirect URI: $$CLOUDFLARE_URL/auth/mercadolivre/callback"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "✅ Após autorizar no navegador, verifique com: make check-tokens"
+	@echo ""
+
+check-tokens:  ## Verifica se os tokens OAuth foram salvos
+	@echo "🔍 Verificando tokens salvos..."
+	@echo ""
+	@docker exec site cat /app/config/ml_tokens.json 2>/dev/null | jq -r '"✅ User ID: " + (.user_id | tostring), "✅ Token expira em: " + (.expires_in | tostring) + " segundos", "✅ Access Token: " + .access_token[:30] + "...", "✅ Refresh Token: " + .refresh_token[:30] + "..."' || echo "❌ Arquivo de tokens não encontrado"
+	@echo ""
+	@echo "💡 Para testar o token, use: make test-api"
+
+test-api:  ## Testa chamada à API do Mercado Livre com token OAuth
+	@echo "🧪 Testando API do Mercado Livre..."
+	@echo ""
+	@TOKEN=$$(docker exec site cat /app/config/ml_tokens.json 2>/dev/null | jq -r '.access_token'); \
+	if [ -z "$$TOKEN" ]; then \
+		echo "❌ Token não encontrado. Execute: make test-oauth"; \
+		exit 1; \
+	fi; \
+	echo "📡 Buscando dados do usuário..."; \
+	curl -s -H "Authorization: Bearer $$TOKEN" https://api.mercadolibre.com/users/me | jq '{id, nickname, email, pontos: .points, reputacao: .seller_reputation.level_id}'
 
 serve-render:  ## Deploy no Render.com (produção gratuita)
 	@echo "📦 Verificando configuração do Git..."
@@ -201,49 +727,600 @@ mc-alias:  ## Cria alias do cliente MinIO (MC)
 	alias set localminio http://minio:9000 minio minio123
 
 
-run-py: ## Roda um script Python dentro do container site-dev
-	@if ! docker ps | grep -q site-dev; then \
-		echo "🛠️  Container site-dev não encontrado. Subindo com docker-compose..."; \
+run-py: ## Roda um script Python dentro do container site
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
 		$(COMPOSE) up -d --build site; \
 	fi
-	@docker exec -it site-dev python3 $(script)
+	@docker exec -it site python3 $(script)
 
-stage: ## Executa o stage_products.py dentro do site-dev
-	@if ! docker ps | grep -q site-dev; then \
-		echo "🛠️  Container site-dev não encontrado. Subindo com docker-compose..."; \
+stage: ## Executa o stage_products.py dentro do site
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
 		$(COMPOSE) up -d --build site; \
 	fi
-	@docker exec -it site-dev python3 scripts/stage_products.py
+	@docker exec -it site python3 scripts/stage_products.py
 
-prepare-products: ## Executa generate_staging_json.py dentro do site-dev
+prepare-publish: ## Gera imagens prontas para publicação no Instagram a partir do staging
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🎨 PREPARANDO IMAGENS PARA PUBLICAÇÃO NO INSTAGRAM"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@docker exec -it site python3 scripts/prepare_publish_images.py --all
+	@echo ""
+	@echo "✅ Imagens prontas! Acesse: services/site/publish_ready/"
+	@echo ""
+
+prepare-products: ## Executa generate_staging_json.py dentro do site
 	$(MAKE) run-py script=scripts/generate_staging_json.py
 
-migrate-tags: ## Executa a migração para adicionar coluna tags
-	@if ! docker ps | grep -q site-dev; then \
-		echo "🛠️  Container site-dev não encontrado. Subindo com docker-compose..."; \
+prepare-auto: ## Prepara produto via scraping HTML (uso: make prepare-auto URL=https://...)
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make prepare-auto URL=https://mercadolivre.com/sec/ABC123"; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
 		$(COMPOSE) up -d --build site; \
 	fi
-	@docker exec -it site-dev python3 scripts/migrate_add_tags.py
+	@echo "🤖 Preparando produto via scraping..."
+	@docker exec -it site python3 scripts/auto_prepare_ml.py "$(URL)"
+
+api-prepare-product: ## Prepara produto via API oficial (uso: make api-prepare-product URL=https://...)
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make api-prepare-product URL=https://mercadolivre.com/sec/ABC123"; \
+		echo "     make api-prepare-product URL=https://produto.mercadolivre.com.br/MLB-..."; \
+		echo ""; \
+		echo "💡 O script irá resolver o link, obter dados da API e perguntar a categoria"; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo ""
+	@echo "🚀 Preparando produto via API oficial (link de afiliado preservado)..."
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@docker exec -it site python3 scripts/api_prepare_ml.py "$(URL)"
+
+prepare-full: ## Prepara produto com Scraping HTML + Screenshot + OCR (uso: make prepare-full URL=https://...)
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make prepare-full URL=https://mercadolivre.com/sec/ABC123"; \
+		echo "     make prepare-full URL=https://produto.mercadolivre.com.br/MLB-..."; \
+		echo ""; \
+		echo "💡 Este método combina:"; \
+		echo "   - Scraping HTML tradicional"; \
+		echo "   - Screenshot da página"; \
+		echo "   - Extração via OCR para dados mais precisos"; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@if ! docker ps | grep -q info-scrap; then \
+		echo "🛠️  Container info-scrap não encontrado. Subindo..."; \
+		$(COMPOSE) up -d info-scrap; \
+		echo "⏳ Aguardando serviço inicializar..."; \
+		sleep 5; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 PREPARAÇÃO COMPLETA COM OCR"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@echo "📋 O que será feito:"
+	@echo "   1. ✅ Resolver link de afiliado"
+	@echo "   2. 📸 Capturar screenshot da página"
+	@echo "   3. 🔍 Extrair informações via OCR"
+	@echo "   4. 🌐 Fazer scraping HTML"
+	@echo "   5. 🔄 Combinar dados HTML + OCR"
+	@echo "   6. 📥 Baixar imagens do produto"
+	@echo "   7. 🏷️  Perguntar categoria"
+	@echo "   8. 💾 Gerar JSON de staging"
+	@echo ""
+	@docker exec -it site python3 scripts/prepare_full.py "$(URL)"
+
+prepare-ml: ## Prepara ML: API Oficial (+ OCR screenshot p/ preço promo) (uso: make prepare-ml URL=https://...)
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make prepare-ml URL=https://mercadolivre.com/sec/ABC123"; \
+		echo ""; \
+		echo "💡 Estratégia:"; \
+		echo "   1. 🔌 API Oficial → dados + imagens HQ (fonte prioritária)"; \
+		echo "   2. 🌐 Scraping HTML (fallback se sem OAuth)"; \
+		echo "   3. 📸 Screenshot + OCR → lê preço promocional dinâmico da página"; \
+		echo "   🚫 Imagens: SOMENTE da API oficial (descarta scraping/OCR)"; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@if ! docker ps | grep -q info-scrap; then \
+		echo "🛠️  Container info-scrap não encontrado. Subindo..."; \
+		$(COMPOSE) up -d info-scrap; \
+		sleep 5; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 PREPARAÇÃO ML — API + OCR PREÇO PROMO"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@echo "📋 Estratégia:"
+	@echo "   1. 🔌 API Oficial — dados + imagens HQ"
+	@echo "   2. 🌐 Scraping HTML — fallback"
+	@echo "   3. 📸 Screenshot + 🔍 OCR — preço promocional dinâmico"
+	@echo "   🚫 Imagens: SOMENTE da API (máxima qualidade)"
+	@echo ""
+	@docker exec -it site python3 scripts/prepare_ml_best.py "$(URL)"
+
+prepare-amazon: ## Prepara Amazon com Scraping + OCR otimizado (uso: make prepare-amazon URL=https://...)
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make prepare-amazon URL=https://amazon.com.br/dp/B08X123456"; \
+		echo "     make prepare-amazon URL=https://amzn.to/ABC123"; \
+		echo ""; \
+		echo "💡 Método OTIMIZADO:"; \
+		echo "   1. Scraping HTML com Playwright"; \
+		echo "   2. OCR apenas para complementar dados"; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@if ! docker ps | grep -q info-scrap; then \
+		echo "🛠️  Container info-scrap não encontrado. Subindo..."; \
+		$(COMPOSE) up -d info-scrap; \
+		sleep 5; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 PREPARAÇÃO OTIMIZADA - AMAZON"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@echo "📋 Estratégia:"
+	@echo "   1. 🌐 Scraping HTML detalhado"
+	@echo "   2. 📸 Screenshot + OCR (complementar)"
+	@echo "   3. 📥 Download de imagens em alta resolução"
+	@echo ""
+	@docker exec -it site python3 scripts/amazon_prepare_best.py "$(URL)"
+
+api-update-product: ## Atualiza produto existente (preço, desconto, disponibilidade, mídias) via API ML
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make api-update-product URL=https://mercadolivre.com/sec/ABC123"; \
+		echo "     make api-update-product URL=https://produto.mercadolivre.com.br/MLB-..."; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔄 ATUALIZAÇÃO DE PRODUTO EXISTENTE"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@echo "📊 Atualizando: preços, descontos, disponibilidade e imagens..."
+	@echo ""
+	@docker exec -it site python3 scripts/api_update_ml.py "$(URL)"
+
+shopee-prepare-product: ## Prepara produto da Shopee via scraping (uso: make shopee-prepare-product URL=https://...)
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make shopee-prepare-product URL=https://shopee.com.br/product/123456/7890123456"; \
+		echo "     make shopee-prepare-product URL=https://shope.ee/ABC123"; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🛍️  PREPARAÇÃO DE PRODUTO DA SHOPEE"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@echo "📥 Coletando informações do produto..."
+	@echo ""
+	@docker exec -it site python3 scripts/shopee_prepare.py "$(URL)"
+
+prepare-shopee-best: ## Prepara produto Shopee com API + Scraping + OCR (uso: make prepare-shopee-best URL=https://...)
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make prepare-shopee-best URL=https://s.shopee.com.br/ABC123"; \
+		echo "     make prepare-shopee-best URL=https://shopee.com.br/product/123/456"; \
+		echo ""; \
+		echo "💡 Este método usa:"; \
+		echo "   - API pública da Shopee"; \
+		echo "   - Scraping HTML com Playwright"; \
+		echo "   - Screenshot + OCR para dados complementares"; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@if ! docker ps | grep -q info-scrap; then \
+		echo "🛠️  Container info-scrap não encontrado. Subindo..."; \
+		$(COMPOSE) up -d info-scrap; \
+		echo "⏳ Aguardando serviço inicializar..."; \
+		sleep 5; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 PREPARAÇÃO COMPLETA - SHOPEE (API + Scraping + OCR)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@echo "📋 O que será feito:"
+	@echo "   1. ✅ Resolver link de afiliado"
+	@echo "   2. 🔌 Tentar API da Shopee"
+	@echo "   3. 🌐 Scraping HTML com Playwright"
+	@echo "   4. 📸 Screenshot (browser REAL no Ubuntu)"
+	@echo "   5. 🔍 Extrair dados via OCR (preços, descontos)"
+	@echo "   6. 🔄 Combinar todos os dados"
+	@echo "   7. 📥 Baixar imagens"
+	@echo "   8. 🏷️  Perguntar categoria"
+	@echo "   9. 💾 Gerar JSON de staging"
+	@echo ""
+	@echo "📸 Abrindo browser real para screenshot..."
+	@SCREENSHOT_HOST=$$(DISPLAY=:1 python3 services/site/scripts/take_screenshot_host.py "$(URL)" 2>/dev/tty); \
+	if [ -n "$$SCREENSHOT_HOST" ] && [ -f "$$SCREENSHOT_HOST" ]; then \
+		echo "✅ Screenshot capturado: $$SCREENSHOT_HOST"; \
+		docker cp "$$SCREENSHOT_HOST" site:/tmp/shopee_screenshot_host.png; \
+		rm -f "$$SCREENSHOT_HOST"; \
+		docker exec -it site python3 scripts/shopee_prepare_best.py "$(URL)" --screenshot /tmp/shopee_screenshot_host.png; \
+	else \
+		echo "⚠️  Screenshot no host falhou — tentando Playwright headless..."; \
+		docker exec -it site python3 scripts/shopee_prepare_best.py "$(URL)"; \
+	fi
+
+shopee-update-prices: ## Atualiza preços e disponibilidade de produto da Shopee (uso: make shopee-update-prices URL="...")
+	@if [ -z "$(URL)" ]; then \
+		echo "❌ Erro: URL não fornecida"; \
+		echo ""; \
+		echo "Uso: make shopee-update-prices URL=\"https://s.shopee.com.br/...\""; \
+		echo ""; \
+		exit 1; \
+	fi
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔄 ATUALIZAÇÃO DE PREÇOS SHOPEE"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "📊 Verificando preço e disponibilidade..."
+	@echo "🔗 URL: $(URL)"
+	@echo ""
+	@docker exec -it site python3 scripts/shopee_update_prices.py "$(URL)"
+
+prepare-all: ## Prepara TODOS os produtos da lista (list_to_prepare.json)
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 PREPARAÇÃO EM LOTE - TODOS OS PRODUTOS"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@TOTAL=$$(cat services/site/list_to_prepare_and_stage/list_to_prepare.json | jq '.links | length'); \
+	echo "📦 Total de produtos na fila: $$TOTAL"; \
+	echo ""; \
+	read -p "⚠️  Deseja continuar? Você escolherá a categoria de cada produto. (s/N): " CONFIRMA; \
+	if [ "$$CONFIRMA" != "s" ] && [ "$$CONFIRMA" != "S" ]; then \
+		echo "❌ Operação cancelada."; \
+		exit 0; \
+	fi; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "🔄 INICIANDO PROCESSAMENTO..."; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	CONTADOR=0; \
+	SUCESSO=0; \
+	ERRO=0; \
+	cat services/site/list_to_prepare_and_stage/list_to_prepare.json | jq -r '.links[].url' | while read URL; do \
+		CONTADOR=$$((CONTADOR + 1)); \
+		echo ""; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		echo "📦 Produto $$CONTADOR/$$TOTAL"; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		echo "🔗 URL: $$URL"; \
+		echo ""; \
+		echo "📂 CATEGORIAS DISPONÍVEIS:"; \
+		echo "   1. geral    - Produtos gerais (padrão)"; \
+		echo "   2. E        - Eletrônicos"; \
+		echo "   3. CD       - Casa & Decoração"; \
+		echo "   4. ME       - Moda & Estilo"; \
+		echo "   5. PET      - Pet Shop"; \
+		echo ""; \
+		read -p "🏷️  Categoria para este produto (ou Enter para 'geral'): " CATEGORIA; \
+		CATEGORIA=$${CATEGORIA:-geral}; \
+		echo ""; \
+		echo "✅ Categoria: $$CATEGORIA"; \
+		echo ""; \
+		if docker exec site python3 scripts/api_prepare_ml.py "$$URL" "$$CATEGORIA"; then \
+			echo ""; \
+			echo "✅ Produto $$CONTADOR preparado com sucesso!"; \
+			SUCESSO=$$((SUCESSO + 1)); \
+		else \
+			echo ""; \
+			echo "❌ Erro ao processar produto $$CONTADOR"; \
+			ERRO=$$((ERRO + 1)); \
+		fi; \
+		echo ""; \
+		read -p "⏸️  Pressione Enter para continuar com o próximo produto..."; \
+	done; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "✅ PROCESSAMENTO CONCLUÍDO!"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	echo "📊 Resumo:"; \
+	echo "   Total processados: $$TOTAL produtos"; \
+	echo ""; \
+	echo "💡 IMPORTANTE: Verifique os JSONs gerados em staging/"; \
+	echo ""; \
+	echo "📋 Próximo passo:"; \
+	echo "   make stage    # Publicar todos os produtos preparados"; \
+	echo ""
+
+migrate-tags: ## Executa a migração para adicionar coluna tags
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@docker exec -it site python3 scripts/migrate_add_tags.py
 
 migrate-webhook: ## Executa a migração para adicionar campos de webhook
-	@if ! docker ps | grep -q site-dev; then \
-		echo "🛠️  Container site-dev não encontrado. Subindo com docker-compose..."; \
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
 		$(COMPOSE) up -d --build site; \
 	fi
-	@docker exec -it site-dev python3 scripts/migrate_add_webhook_fields.py
+	@docker exec -it site python3 scripts/migrate_add_webhook_fields.py
 
 
 help: ## Mostra esta ajuda
-	@echo "🛠️  Comandos disponíveis:"
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9._-]+:.*##/ {printf "👉 \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🛠️  COMANDOS DISPONÍVEIS"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "📦 DESENVOLVIMENTO:"
+	@awk 'BEGIN {FS = ":.*?## "} /^(up|down|restart-site|redo-site|logs-site):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "🌐 NGROK & DEPLOY:"
+	@awk 'BEGIN {FS = ":.*?## "} /^(serve-ngrok|serve-render):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "🔑 OAUTH MERCADO LIVRE:"
+	@awk 'BEGIN {FS = ":.*?## "} /^(oauth-url|update-ngrok-url|test-oauth|check-tokens|test-api):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "🤖 PRODUTOS (Mercado Livre):"
+	@awk 'BEGIN {FS = ":.*?## "} /^(prepare-ml|prepare-shopee-best|prepare-amazon|api-prepare-product|prepare-auto|stage|prepare-products):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "🗄️  BANCO DE DADOS:"
+	@awk 'BEGIN {FS = ":.*?## "} /^(migrate-tags|migrate-webhook):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "🚀 PRODUÇÃO:"
+	@awk 'BEGIN {FS = ":.*?## "} /^(prd-up|prd-down|prd-up-ghcr):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "🧹 LIMPEZA:"
+	@awk 'BEGIN {FS = ":.*?## "} /^(prune|clean-images|clear-minio|clear-minio-force):.*##/ {printf "   \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "💡 AJUDA DETALHADA:"
+	@echo "   make help-products  - Guia completo de produtos"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
 
-check-stage:
+help-products: ## Mostra ajuda para adicionar produtos
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🤖 FLUXO AUTOMÁTICO - Adicionar Produto do Mercado Livre"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🌟 MÉTODOS OTIMIZADOS (Recomendado):"
+	@echo ""
+	@echo "   📦 MERCADO LIVRE:"
+	@echo "   make prepare-ml URL=\"https://mercadolivre.com/sec/ABC123\""
+	@echo ""
+	@echo "      ✅ API oficial (se OAuth disponível)"
+	@echo "      ✅ Scraping HTML (fallback automático)"
+	@echo "      ✅ OCR apenas para dados faltantes"
+	@echo "      ✅ Preços promocionais e descontos"
+	@echo ""
+	@echo "   🛍️  SHOPEE:"
+	@echo "   make prepare-shopee-best URL=\"https://s.shopee.com.br/ABC123\""
+	@echo ""
+	@echo "      ✅ API pública da Shopee"
+	@echo "      ✅ Scraping com Playwright"
+	@echo "      ✅ OCR para preços promocionais"
+	@echo "      ✅ Resolve links de afiliado"
+	@echo ""
+	@echo "   📦 AMAZON:"
+	@echo "   make prepare-amazon URL=\"https://amzn.to/ABC123\""
+	@echo ""
+	@echo "      ✅ Scraping HTML detalhado"
+	@echo "      ✅ OCR complementar"
+	@echo "      ✅ Detecta Amazon Prime"
+	@echo "      ✅ Imagens em alta resolução"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🔄 MÉTODO ALTERNATIVO - API Oficial (OAuth necessário):"
+	@echo "   make api-prepare-product URL=\"https://mercadolivre.com/sec/ABC123\""
+	@echo ""
+	@echo "   ✅ Dados 100% precisos da API oficial"
+	@echo "   ✅ Imagens em alta qualidade"
+	@echo "   ✅ Preços e descontos reais"
+	@echo "   ✅ Vídeos do produto (se houver)"
+	@echo "   ✅ Resolve links de afiliado automaticamente"
+	@echo ""
+	@echo "🔄 MÉTODO ALTERNATIVO - Scraping HTML (sem OAuth):"
+	@echo "   make prepare-auto URL=\"https://produto.mercadolivre.com.br/MLB-...\""
+	@echo ""
+	@echo "   ✅ Funciona sem autenticação"
+	@echo "   ⚠️  Imagens podem vir incorretas"
+	@echo "   ⚠️  Preços podem estar desatualizados"
+	@echo ""
+	@echo "📤 PUBLICAR NO SITE:"
+	@echo "   make stage"
+	@echo ""
+	@echo "   ✅ Upload de imagens para MinIO"
+	@echo "   ✅ Adiciona ao banco de dados"
+	@echo "   ✅ Produto disponível no site"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "📝 MÉTODO MANUAL (legacy):"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "   make prepare-products  # Digite dados manualmente"
+	@echo "   make stage             # Publicar"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "📚 Documentação completa: services/site/docs/AUTO_PREPARE_PRODUTOS.md"
+	@echo ""
+
+check-stage: ## Verifica imagens no staging
 	@$(MAKE) run-py script=scripts/check_stage_images.py
 
-prune:clean-images
+test-info-scrap: ## Testa o serviço de extração de imagens
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@if ! docker ps | grep -q info-scrap; then \
+		echo "🛠️  Container info-scrap não encontrado. Subindo..."; \
+		$(COMPOSE) up -d info-scrap; \
+		echo "⏳ Aguardando serviço inicializar..."; \
+		sleep 5; \
+	fi
+	@echo "🧪 Testando serviço de extração com image_example.png..."
+	@if [ ! -f services/site/image_example.png ]; then \
+		echo "📁 Copiando imagem de exemplo..."; \
+		cp image_example.png services/site/ 2>/dev/null || echo "⚠️  image_example.png não encontrado na raiz"; \
+	fi
+	@docker exec -it site python3 scripts/test_info_scrap.py /app/image_example.png
+
+# =====================
+# 📸 Instagram
+# =====================
+
+instagram-post: ## Posta produto no Instagram (modo automático)
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo "📸 Postando automaticamente no Instagram..."
+	@curl -X POST "http://localhost:5000/instagram/post/auto?simulate=false" \
+		-H "Content-Type: application/json" | jq .
+
+instagram-test: ## Testa postagem Instagram (não posta de verdade)
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo "🎭 Testando postagem Instagram (modo simulação)..."
+	@curl -X POST "http://localhost:5000/instagram/post/auto?simulate=true" \
+		-H "Content-Type: application/json" | jq .
+
+instagram-status: ## Verifica status do sistema Instagram
+	@echo "🔍 Verificando status do sistema Instagram..."
+	@curl -s "http://localhost:5000/instagram/status" | jq .
+
+instagram-history: ## Mostra histórico de posts no Instagram
+	@echo "📋 Histórico de posts no Instagram..."
+	@curl -s "http://localhost:5000/instagram/history?limit=10" | jq .
+
+instagram-workflow: ## Mostra diagrama do workflow dos agentes
+	@curl -s "http://localhost:5000/instagram/workflow" | jq -r '.workflow_diagram'
+
+instagram-test-system: ## Testa todos os componentes do sistema Instagram
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo "🧪 Testando sistema completo..."
+	@docker exec -it site python3 test_instagram_system.py
+
+stage-and-post: ## Publica no ML e posta automaticamente no Instagram
+	@echo "🚀 Executando fluxo completo: ML + Instagram"
+	@$(MAKE) stage
+	@sleep 2
+	@$(MAKE) instagram-post
+
+insta-publish: ## Publica produto no Instagram (sem LLM, direto)
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo "📸 Publicando no Instagram..."
+	@curl -k -X POST "https://localhost:5000/instagram/post/auto?simulate=false" \
+		-H "Content-Type: application/json" | jq .
+
+insta-test: ## Testa publicação Instagram (modo simulação)
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@echo "🎭 Testando publicação Instagram (simulação)..."
+	@curl -k -X POST "https://localhost:5000/instagram/post/auto?simulate=true" \
+		-H "Content-Type: application/json" | jq .
+
+clear-minio: ## Remove TODAS as imagens do MinIO (com confirmação)
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@docker exec -it site python3 scripts/clear_minio_images.py
+
+clear-minio-force: ## Remove TODAS as imagens do MinIO (SEM confirmação - cuidado!)
+	@if ! docker ps | grep -q site; then \
+		echo "🛠️  Container site não encontrado. Subindo com docker-compose..."; \
+		$(COMPOSE) up -d --build site; \
+	fi
+	@docker exec -it site python3 scripts/clear_minio_images.py --force
+
+prune: ## Remove containers, volumes e imagens não utilizadas
 	docker system prune -f --volumes
 
-clean-images:
+clean-images: ## Remove TODAS as imagens Docker (cuidado!)
 	@if [ -n "$$(docker images -q)" ]; then \
 		echo "🔴 Removendo todas as imagens Docker..."; \
 		docker stop $$(docker ps -q); \

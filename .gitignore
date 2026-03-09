@@ -3,3 +3,11 @@
 vector_db/
 __pycache__
 /services/site/__pycache__/
+
+# Arquivos gerados pelo Docker (root) — screenshots, crops OCR, uploads
+services/site/fotos/
+services/site/uploads/
+services/site/staging/
+services/site/insta_staging/
+services/site/list_to_prepare_and_stage/
+services/site/publish_ready/

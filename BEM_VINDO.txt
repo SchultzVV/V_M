@@ -1,0 +1,114 @@
+████████████████████████████████████████████████████████████████
+█                                                              █
+█   ██████╗ ███████╗███████╗██╗███╗   ██╗███████╗███╗   ███╗ █
+█   ██╔══██╗██╔════╝██╔════╝██║████╗  ██║██╔════╝████╗ ████║ █
+█   ██║  ██║█████╗  █████╗  ██║██╔██╗ ██║█████╗  ██╔████╔██║ █
+█   ██║  ██║██╔══╝  ██╔══╝  ██║██║╚██╗██║██╔══╝  ██║╚██╔╝██║ █
+█   ██████╔╝███████╗██║     ██║██║ ╚████║███████╗██║ ╚═╝ ██║ █
+█   ╚═════╝ ╚══════╝╚═╝     ╚═╝╚═╝  ╚═══╝╚══════╝╚═╝     ╚═╝ █
+█                                                              █
+█              Sistema de Documentação V_M                    █
+█                                                              █
+████████████████████████████████████████████████████████████████
+
+🎯 BEM-VINDO AO SISTEMA DEFINEME!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 O QUE É ISTO?
+
+Um sistema completo de documentação que mapeia TODAS as pastas
+do projeto V_M e documenta os comandos 'make' relacionados.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 COMECE AQUI:
+
+1. Leia o guia principal:
+   👉 cat README_DEFINEME.md
+
+2. Veja o mapa completo:
+   👉 cat MAPA_PASTAS.md
+
+3. Navegue visualmente:
+   👉 cat INDICE_VISUAL.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📖 ARQUIVOS DISPONÍVEIS:
+
+📘 Guias Principais
+   • README_DEFINEME.md         Guia completo do sistema
+   • MAPA_PASTAS.md            Tabela de navegação
+   • INDICE_VISUAL.md          Visualização em árvore
+   • CHECKLIST_PASTAS.md       Status da documentação
+   • RESUMO_FINAL.md           Resumo executivo
+
+📖 DefineMe (Documentação por Pasta)
+   • DefineMe.md                           (Raiz - comandos make)
+   • services/site/scripts/DefineMe.md     (Scripts Python)
+   • services/site/staging/DefineMe.md     (Staging produtos)
+   • services/site/agents/DefineMe.md      (Agentes LLM)
+   • services/site/list_to_prepare_and_stage/DefineMe.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⭐ DESTAQUE: make prepare-products
+
+O comando 'make prepare-products' está COMPLETAMENTE documentado
+no DefineMe.md da raiz, incluindo:
+
+   ✅ Fluxo detalhado com diagramas
+   ✅ Console output real
+   ✅ JSON de exemplo completo
+   ✅ Estrutura de arquivos gerados
+   ✅ Tabela de categorias
+   ✅ Evidências práticas
+
+Leia: DefineMe.md (seção prepare-products)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 USO RÁPIDO:
+
+# Adicionar produto
+make prepare-products
+
+# Publicar no site
+make stage
+
+# Postar no Instagram
+make instagram-post
+
+# Ver todos os comandos
+make help
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 ESTATÍSTICAS:
+
+   Documentos criados:     9
+   DefineMe.md:           5
+   Pastas documentadas:   5/22  (23%)
+   Comandos make:         20+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 DICA:
+
+Sempre que você esquecer como algo funciona, consulte o
+DefineMe.md da pasta relevante!
+
+Exemplo:
+   "Como funcionam os scripts?" → cat services/site/scripts/DefineMe.md
+   "Como usar o Instagram?"    → cat services/site/agents/DefineMe.md
+   "Como funciona o staging?"  → cat services/site/staging/DefineMe.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 SISTEMA PRONTO PARA USO!
+
+Criado em: 28 de Janeiro de 2026
+Status: ✅ Concluído
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

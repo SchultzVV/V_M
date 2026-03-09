@@ -8,6 +8,7 @@ from flask import Blueprint, request, jsonify, render_template, Response
 from werkzeug.utils import secure_filename
 from models.product import Product
 from services.product_service import save_product, get_all_products, get_products_by_tag
+from services.seo_service import seo_service
 
 product_bp = Blueprint("product_bp", __name__)
 
@@ -16,7 +17,24 @@ product_bp = Blueprint("product_bp", __name__)
 def index():
     # Exibe todos os produtos na página principal
     products = get_all_products()
-    return render_template("index.html")
+    
+    # Gerar meta tags otimizadas
+    meta_tags = seo_service.generate_meta_tags(
+        title="Promoções e Ofertas Incríveis",
+        description="Catálogo de sobrevivência pós-sistema! As melhores promoções da internet em um só lugar. Eletrônicos, Casa, Moda e muito mais!",
+        keywords=["promoções", "ofertas", "descontos", "loja online", "eletrônicos", "casa", "moda"]
+    )
+    
+    # Gerar schema da organização
+    organization_schema = seo_service.generate_organization_schema(
+        organization_name="DEF - Lojinha",
+        social_profiles=[
+            "https://www.instagram.com/seu_perfil",
+            "https://www.facebook.com/sua_pagina"
+        ]
+    )
+    
+    return render_template("index.html", meta_tags=meta_tags, organization_schema=organization_schema)
 
 @product_bp.route("/secao1")
 def secao1():
@@ -110,8 +128,14 @@ def auto_categorize_product(title):
 def api_products():
     try:
         tag = request.args.get('tag', 'all')
+        search = request.args.get('search', '').strip()
         
-        if tag == 'all':
+        if search:
+            # Busca por nome (case-insensitive)
+            products = Product.query.filter(
+                Product.title.ilike(f'%{search}%')
+            ).all()
+        elif tag == 'all':
             products = get_all_products()
         else:
             products = get_products_by_tag(tag)
@@ -162,3 +186,57 @@ def delete_product(product_id):
 
     except Exception as e:
         return jsonify({"error": f"Erro ao deletar: {str(e)}"}), 500
+
+
+@product_bp.route("/sitemap.xml")
+def sitemap():
+    """Gera sitemap.xml dinamicamente"""
+    pages = [
+        {'path': '/', 'priority': 1.0, 'changefreq': 'daily'},
+        {'path': '/secao1', 'priority': 0.8, 'changefreq': 'daily'},
+        {'path': '/secao2', 'priority': 0.8, 'changefreq': 'daily'},
+        {'path': '/secao3', 'priority': 0.8, 'changefreq': 'daily'},
+        {'path': '/secao4', 'priority': 0.8, 'changefreq': 'daily'},
+    ]
+    
+    sitemap_xml = seo_service.generate_sitemap_xml(pages)
+    return Response(sitemap_xml, mimetype='application/xml')
+
+
+@product_bp.route("/robots.txt")
+def robots():
+    """Gera robots.txt"""
+    robots_txt = seo_service.generate_robots_txt(
+        disallow_paths=['/admin', '/api'],
+        sitemap_url=f"{seo_service.site_url}/sitemap.xml"
+    )
+    return Response(robots_txt, mimetype='text/plain')
+
+
+@product_bp.route("/produto/<product_id>")
+def product_detail(product_id):
+    """Exibe página detalhada do produto com SEO completo"""
+    product = Product.query.get(product_id)
+    
+    if not product:
+        return "Produto não encontrado", 404
+    
+    # Converter product para dict
+    product_dict = product.to_dict()
+    
+    # Gerar schema.org do produto
+    product_schema = seo_service.generate_product_schema(product_dict)
+    
+    # Gerar breadcrumb schema
+    breadcrumb_schema = seo_service.generate_breadcrumb_schema([
+        {'name': 'Home', 'url': '/'},
+        {'name': 'Produtos', 'url': '/'},
+        {'name': product.title[:30], 'url': f'/produto/{product_id}'}
+    ])
+    
+    return render_template(
+        "produto.html",
+        product=product_dict,
+        product_schema=product_schema,
+        breadcrumb_schema=breadcrumb_schema
+    )

@@ -1,0 +1,133 @@
+"""
+Agente Enriquecedor de Produto
+Enriquece os dados do produto com informações adicionais e
+prepara descrição otimizada para Instagram
+"""
+from typing import Any, Dict
+from langchain_core.prompts import ChatPromptTemplate
+from agents import BaseAgent
+import os
+
+
+class ProductEnricherAgent(BaseAgent):
+    """
+    Agente responsável por enriquecer os dados do produto
+    e preparar conteúdo otimizado para Instagram
+    """
+    
+    def __init__(self, redis_client):
+        super().__init__(
+            name="product_enricher",
+            redis_client=redis_client,
+            temperature=0.7  # Temperatura moderada para criatividade
+        )
+    
+    def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Enriquece os dados do produto
+        
+        Args:
+            input_data: Dict contendo:
+                - selected_product: produto selecionado pelo agente decisor
+                - custom_context: contexto adicional opcional
+        
+        Returns:
+            Dict com produto enriquecido incluindo:
+                - caption: legenda para Instagram
+                - hashtags: lista de hashtags relevantes
+                - call_to_action: CTA personalizado
+                - visual_suggestions: sugestões para composição visual
+        """
+        product = input_data.get('selected_product')
+        
+        if not product:
+            return {
+                "success": False,
+                "error": "Produto não fornecido",
+                "enriched_product": None
+            }
+        
+        # Verifica cache primeiro
+        cache_key = f"enriched:{product.get('external_id')}"
+        cached = self._check_cache(cache_key)
+        if cached and not input_data.get('force_refresh'):
+            print(f"✅ Usando dados enriquecidos do cache")
+            return cached
+        
+        # Enriquece o produto usando LLM
+        enriched = self._enrich_with_llm(product, input_data.get('custom_context'))
+        
+        result = {
+            "success": True,
+            "enriched_product": enriched,
+            "original_product": product
+        }
+        
+        # Salva no cache por 24 horas
+        self._save_to_cache(cache_key, result, ttl=86400)
+        self._save_to_memory({"product_id": product.get('external_id'), "enriched": True})
+        
+        return result
+    
+    def _enrich_with_llm(
+        self,
+        product: Dict[str, Any],
+        custom_context: str = None
+    ) -> Dict[str, Any]:
+        """Enriquece dados (modo mock - sem LLM)"""
+        
+        print("🎭 Modo MOCK: Gerando conteúdo básico")
+        
+        title = product.get('title', '')
+        price_raw = product.get('price', 0)
+        
+        # Trata diferentes formatos de preço
+        if isinstance(price_raw, str):
+            # Remove formatação e pega primeiro valor
+            import re
+            numbers = re.findall(r'\d+[.,]\d+', price_raw.replace(',', '.'))
+            price = float(numbers[0]) if numbers else 0.0
+        else:
+            price = float(price_raw)
+        
+        platform = product.get('platform', 'mercadolivre')
+        link = product.get('link', '')
+        
+        # Gera conteúdo básico sem usar LLM
+        return {
+            "caption": f"🔥 {title}\n\n💰 Por apenas R$ {price:.2f}\n\n✨ Aproveite esta oferta!",
+            "hashtags": ["#oferta", "#promocao", "#comprasonline", "#deals", "#mercadolivre"],
+            "call_to_action": "🛒 Link na bio!",
+            "visual_suggestions": "Imagem com preço em destaque",
+            "key_features": ["Qualidade garantida", "Melhor preço", "Entrega rápida"],
+            "original_title": title,
+            "price": price,
+            "platform": platform,
+            "link": link,
+            "external_id": product.get('external_id'),
+            "images_local": product.get('images_local'),
+            "images": product.get('images', []),
+            "_file": product.get('_file')
+        }
+    
+    def generate_alternative_captions(
+        self,
+        product: Dict[str, Any],
+        num_alternatives: int = 3
+    ) -> list:
+        """Gera legendas alternativas para testes A/B"""
+        alternatives = []
+        
+        for i in range(num_alternatives):
+            custom_context = f"Versão {i+1}: "
+            if i == 0:
+                custom_context += "Tom mais promocional e urgente"
+            elif i == 1:
+                custom_context += "Tom mais informativo e educativo"
+            else:
+                custom_context += "Tom mais descontraído e divertido"
+            
+            enriched = self._enrich_with_llm(product, custom_context)
+            alternatives.append(enriched)
+        
+        return alternatives
