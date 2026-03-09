@@ -11,3 +11,16 @@ services/site/staging/
 services/site/insta_staging/
 services/site/list_to_prepare_and_stage/
 services/site/publish_ready/
+
+# Gerados em runtime — logs, temp files
+/tmp/cloudflare_tunnel.log
+*.pyc
+*.pyo
+*.pyd
+
+# Certificados locais (apenas para dev)
+services/site/cert.pem
+services/site/key.pem
+
+# Imagens avulsas de teste
+services/site/image_example.png
