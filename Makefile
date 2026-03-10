@@ -381,7 +381,7 @@ clear-minio-force:  ## Remove TODAS as imagens do MinIO SEM confirmação
 	@$(MAKE) -s _ensure-site
 	@docker exec -it site python3 scripts/clear_minio_images.py --force
 
-prune:  ## Remove containers, volumes e imagens não utilizadas
+prune:clean-images  ## Remove containers, volumes e imagens não utilizadas
 	docker system prune -f --volumes
 
 clean-images:  ## Remove TODAS as imagens Docker (cuidado!)

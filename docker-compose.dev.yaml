@@ -18,8 +18,6 @@ services:
     env_file: .env
     volumes:
       - ./services/site:/app
-      - ./cert.pem:/app/cert.pem
-      - ./key.pem:/app/key.pem
     command: ["python", "main.py"]
     depends_on:
       - db
