@@ -27,6 +27,8 @@ from datetime import datetime
 from slugify import slugify
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 from playwright_stealth import Stealth
+import sys as _sys; _sys.path.insert(0, __import__('os').path.dirname(__file__))
+from category_selector import ask_user_category, ask_user_subcategory
 
 # Importar funções do shopee_prepare
 sys.path.insert(0, os.path.dirname(__file__))
@@ -323,75 +325,9 @@ def enrich_shopee_data_with_ocr(scraping_data: dict, ocr_data: dict) -> dict:
 
 
 def ask_user_category_shopee() -> tuple:
-    """
-    Pergunta ao usuário a categoria e subcategoria do produto.
-    
-    Returns:
-        Tupla (tag, subcategory)
-    """
-    print("\n" + "="*70)
-    print("📂 CATEGORIZAÇÃO DO PRODUTO")
-    print("="*70)
-    print("\n📂 CATEGORIAS DISPONÍVEIS:")
-    print("   1. E   - Eletrônicos")
-    print("   2. CD  - Casa & Decoração")
-    print("   3. ME  - Moda & Estilo")
-    print("   4. PET - Pet Shop")
-    
-    tag_map = {
-        "1": "E",
-        "2": "CD",
-        "3": "ME",
-        "4": "PET",
-        "E": "E",
-        "CD": "CD",
-        "ME": "ME",
-        "PET": "PET"
-    }
-    
-    while True:
-        tag_input = input("\n🏷️  Digite a categoria (1/2/3/4 ou E/CD/ME/PET): ").strip().upper()
-        tag = tag_map.get(tag_input)
-        if tag:
-            break
-        print("   ❌ Categoria inválida! Use: 1, 2, 3, 4 ou E, CD, ME, PET")
-    
-    print(f"\n✅ Categoria selecionada: {tag}")
-
-    # Lista subpastas existentes no staging para a tag selecionada
-    tag_folders = {
-        "E":   "eletronicos",
-        "CD":  "casa-decoracao",
-        "ME":  "moda-estilo",
-        "PET": "petshop",
-    }
-    tag_folder = tag_folders.get(tag, "geral")
-    tag_path = Path(f"/app/staging/{tag_folder}")
-    existing_subs = sorted([d.name for d in tag_path.iterdir() if d.is_dir()]) if tag_path.exists() else []
-
-    print(f"\n📁 Subcategorias existentes em '{tag_folder}':")
-    for i, sub in enumerate(existing_subs, 1):
-        print(f"   {i:2}. {sub}")
-    print(f"\n   Digite o número de uma opção, ou o nome de uma NOVA subcategoria")
-    print(f"   (Enter para não usar subcategoria)")
-
-    sub_input = input("📁 Subcategoria: ").strip().lower()
-
-    if not sub_input:
-        subcategory = ""
-        print("⚠️  Nenhuma subcategoria definida")
-    elif sub_input.isdigit():
-        idx = int(sub_input) - 1
-        if 0 <= idx < len(existing_subs):
-            subcategory = existing_subs[idx]
-            print(f"✅ Subcategoria: {subcategory}")
-        else:
-            print("⚠️  Número inválido, sem subcategoria")
-            subcategory = ""
-    else:
-        subcategory = sub_input
-        print(f"✅ Nova subcategoria: {subcategory}")
-
+    """Delegado para category_selector (módulo compartilhado)."""
+    tag        = ask_user_category()
+    subcategory = ask_user_subcategory(tag)
     return tag, subcategory
 
 

@@ -311,35 +311,9 @@
       // Filtra os produtos pela subcategoria
       let filteredProducts = allProducts;
       if (subcategory !== 'todos') {
-        filteredProducts = allProducts.filter(product => {
-          const title = product.title.toLowerCase();
-          
-          switch(subcategory) {
-            case 'caes':
-              return title.includes('cão') || title.includes('cachorro') || title.includes('dog') || 
-                     title.includes('canino');
-            case 'gatos':
-              return title.includes('gato') || title.includes('cat') || title.includes('felino');
-            case 'racao':
-              return title.includes('ração') || title.includes('comida') || title.includes('alimento') || 
-                     title.includes('petisco') || title.includes('sachê');
-            case 'brinquedos':
-              return title.includes('brinquedo') || title.includes('bolinha') || title.includes('mordedor') || 
-                     title.includes('arranhador');
-            case 'higiene':
-              return title.includes('shampoo') || title.includes('sabonete') || title.includes('escova') || 
-                     title.includes('pente') || title.includes('toalha') || title.includes('higiene');
-            case 'acessorios':
-              return title.includes('coleira') || title.includes('guia') || title.includes('caminha') || 
-                     title.includes('comedouro') || title.includes('bebedouro') || title.includes('casinha') || 
-                     title.includes('roupa');
-            case 'saude':
-              return title.includes('medicamento') || title.includes('vitamina') || title.includes('antipulgas') || 
-                     title.includes('vermífugo') || title.includes('saúde');
-            default:
-              return true;
-          }
-        });
+        filteredProducts = allProducts.filter(product =>
+          (product.subcategory || '').toLowerCase() === subcategory.toLowerCase()
+        );
       }
       
       // Renderiza os produtos filtrados

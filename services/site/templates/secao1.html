@@ -337,45 +337,9 @@
       // Filtra os produtos pela subcategoria
       let filteredProducts = allProducts;
       if (subcategory !== 'todos') {
-        filteredProducts = allProducts.filter(product => {
-          const title = product.title.toLowerCase();
-          const subcatLower = subcategory.toLowerCase();
-          
-          // Aqui você pode adicionar lógica mais sofisticada de filtro
-          // Por enquanto, vamos buscar pela palavra-chave no título
-          switch(subcategory) {
-            case 'banheiro':
-              return title.includes('banheiro') || title.includes('toalha') || title.includes('sabonete') || 
-                     title.includes('shampoo') || title.includes('espelho') || title.includes('box');
-            case 'sala':
-              return title.includes('sala') || title.includes('sofá') || title.includes('poltrona') || 
-                     title.includes('mesa de centro') || title.includes('rack') || title.includes('tv');
-            case 'quarto':
-              return title.includes('quarto') || title.includes('cama') || title.includes('colchão') || 
-                     title.includes('guarda-roupa') || title.includes('criado') || title.includes('edredom') || 
-                     title.includes('travesseiro') || title.includes('lençol');
-            case 'cozinha':
-              return title.includes('cozinha') || title.includes('panela') || title.includes('frigideira') || 
-                     title.includes('jogo de jantar') || title.includes('talheres') || title.includes('forno') || 
-                     title.includes('micro') || title.includes('geladeira') || title.includes('fogão');
-            case 'corredor':
-              return title.includes('corredor') || title.includes('aparador') || title.includes('espelho') || 
-                     title.includes('luminária') || title.includes('quadro');
-            case 'garagem':
-              return title.includes('garagem') || title.includes('ferramenta') || title.includes('organizador') || 
-                     title.includes('prateleira') || title.includes('estante');
-            case 'sacada':
-              return title.includes('sacada') || title.includes('varanda') || title.includes('jardim') || 
-                     title.includes('planta') || title.includes('vaso') || title.includes('churrasqueira') || 
-                     title.includes('cadeira de praia');
-            case 'area-servico':
-              return title.includes('área de serviço') || title.includes('lavanderia') || title.includes('vassoura') || 
-                     title.includes('rodo') || title.includes('balde') || title.includes('lavadora') || 
-                     title.includes('secadora') || title.includes('tanque');
-            default:
-              return true;
-          }
-        });
+        filteredProducts = allProducts.filter(product =>
+          (product.subcategory || '').toLowerCase() === subcategory.toLowerCase()
+        );
       }
       
       // Renderiza os produtos filtrados

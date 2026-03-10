@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import requests
 from pathlib import Path
@@ -113,11 +114,17 @@ ensure_fallback_bucket()
 
 PROCESSED_FILE = os.path.join(STAGING_DIR, ".processed")
 
-if os.path.exists(PROCESSED_FILE):
-    with open(PROCESSED_FILE, "r") as f:
-        processed_files = set(f.read().splitlines())
-else:
+# --force → ignora .processed e reprocessa tudo (útil após correção de código)
+force_mode = "--force" in sys.argv
+if force_mode:
+    print("⚠️  Modo FORCE: todos os JSONs serão reprocessados (ignora .processed)")
     processed_files = set()
+else:
+    if os.path.exists(PROCESSED_FILE):
+        with open(PROCESSED_FILE, "r") as f:
+            processed_files = set(line.strip() for line in f if line.strip())
+    else:
+        processed_files = set()
 
 newly_processed = []
 
@@ -180,6 +187,15 @@ for json_path in json_files:
         print(f"[FALHA] {rel_path}: {str(e)}")
 
 if newly_processed:
-    with open(PROCESSED_FILE, "a") as f:
-        for name in newly_processed:
-            f.write(name + "\n")
+    # Re-lê .processed para evitar duplicatas ao usar --force
+    if os.path.exists(PROCESSED_FILE):
+        with open(PROCESSED_FILE, "r") as f:
+            already = set(line.strip() for line in f if line.strip())
+    else:
+        already = set()
+    to_write = [n for n in newly_processed if n not in already]
+    if to_write:
+        with open(PROCESSED_FILE, "a") as f:
+            for name in to_write:
+                f.write(name + "\n")
+    print(f"\n✅ {len(newly_processed)} produto(s) processado(s)")

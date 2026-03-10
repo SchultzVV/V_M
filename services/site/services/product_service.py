@@ -19,22 +19,47 @@ def get_products_by_tag(tag):
     finally:
         db.close()
 
-def save_product(title, price, old_price, image, link, id=None, tags=None):
+def save_product(title, price, old_price, image, link, id=None, tags=None,
+                 subcategory=None, external_id=None, disponivel=True, platform=None):
     db = SessionLocal()
     try:
-        product = Product(
-            id=id or str(uuid.uuid4()),  # usa o id do JSON ou gera um novo
-            title=title,
-            price=price,
-            old_price=old_price,
-            image=image,
-            link=link,
-            tags=tags or '["geral"]'  # Default para "geral" se não especificado
-        )
-        db.add(product)
-        db.flush()
-        db.refresh(product)
-        db.commit()
+        # Upsert: se external_id + platform fornecidos, atualiza produto existente
+        existing = None
+        if external_id and platform:
+            existing = db.query(Product).filter_by(
+                platform=platform, external_id=external_id
+            ).first()
+
+        if existing:
+            existing.title      = title
+            existing.price      = price
+            existing.old_price  = old_price
+            existing.image      = image
+            existing.link       = link
+            existing.tags       = tags or '["geral"]'
+            existing.subcategory = subcategory or ''
+            existing.disponivel  = disponivel
+            db.commit()
+            product = existing
+        else:
+            product = Product(
+                id=id or str(uuid.uuid4()),
+                title=title,
+                price=price,
+                old_price=old_price,
+                image=image,
+                link=link,
+                tags=tags or '["geral"]',
+                subcategory=subcategory or '',
+                external_id=external_id,
+                platform=platform,
+                disponivel=disponivel,
+            )
+            db.add(product)
+            db.flush()
+            db.refresh(product)
+            db.commit()
+
         return {
             "id": product.id,
             "title": product.title,
@@ -42,7 +67,8 @@ def save_product(title, price, old_price, image, link, id=None, tags=None):
             "old_price": product.old_price,
             "image": product.image,
             "link": product.link,
-            "tags": product.tags
+            "tags": product.tags,
+            "subcategory": product.subcategory,
         }
 
     except Exception as e:

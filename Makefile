@@ -219,6 +219,7 @@ prepare-ml:  ## ⭐ Prepara produto ML: API oficial + OCR preço promo  (URL=htt
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "🔗 $(URL)" && echo ""
 	@docker exec -it site python3 scripts/prepare_ml_best.py "$(URL)"
+	@docker exec site find /app/staging -type d -exec chmod o+rwx {} \; && docker exec site find /app/staging -name "*.json" -exec chmod o+rw {} \;
 
 prepare-shopee:  ## ⭐ Prepara produto Shopee: API + Playwright + OCR  (URL=https://...)
 	@if [ -z "$(URL)" ]; then echo "❌ Uso: make prepare-shopee URL=https://s.shopee.com.br/ABC123"; exit 1; fi
@@ -235,6 +236,7 @@ prepare-shopee:  ## ⭐ Prepara produto Shopee: API + Playwright + OCR  (URL=htt
 	else \
 		docker exec -it site python3 scripts/shopee_prepare_best.py "$(URL)"; \
 	fi
+	@docker exec site find /app/staging -type d -exec chmod o+rwx {} \; && docker exec site find /app/staging -name "*.json" -exec chmod o+rw {} \;
 
 prepare-amazon:  ## ⭐ Prepara produto Amazon: Playwright + OCR  (URL=https://...)
 	@if [ -z "$(URL)" ]; then echo "❌ Uso: make prepare-amazon URL=https://amzn.to/ABC123"; exit 1; fi
@@ -244,6 +246,7 @@ prepare-amazon:  ## ⭐ Prepara produto Amazon: Playwright + OCR  (URL=https://.
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "🔗 $(URL)" && echo ""
 	@docker exec -it site python3 scripts/amazon_prepare_best.py "$(URL)"
+	@docker exec site find /app/staging -type d -exec chmod o+rwx {} \; && docker exec site find /app/staging -name "*.json" -exec chmod o+rw {} \;
 
 prepare-all:  ## Prepara lote de produtos (list_to_prepare.json)
 	@$(MAKE) -s _ensure-site
@@ -267,6 +270,12 @@ prepare-all:  ## Prepara lote de produtos (list_to_prepare.json)
 stage:  ## ⭐ Publica produtos preparados no site (DB + MinIO)
 	@$(MAKE) -s _ensure-site
 	@docker exec -it site python3 scripts/stage_products.py
+	@./scripts/staging_dedup.sh
+
+restage:  ## Re-publica TODOS os produtos do staging (ignora .processed — útil após correção de código)
+	@$(MAKE) -s _ensure-site
+	@echo "⚠️  Reprocessando todo o staging (modo force)..."
+	@docker exec -it site python3 scripts/stage_products.py --force
 
 api-update:  ## Atualiza preço/disponibilidade de produto ML  (URL=https://...)
 	@if [ -z "$(URL)" ]; then echo "❌ Uso: make api-update URL=https://..."; exit 1; fi
@@ -323,6 +332,10 @@ migrate-webhook:  ## Migração: adiciona campos de webhook no banco
 	@$(MAKE) -s _ensure-site
 	@docker exec -it site python3 scripts/migrate_add_webhook_fields.py
 
+migrate-subcategory:  ## Migração: adiciona coluna subcategory nos produtos
+	@$(MAKE) -s _ensure-site
+	@docker exec -it site python3 scripts/migrate_add_subcategory.py
+
 
 # ============================================================
 # 🏭  PRODUÇÃO
@@ -373,6 +386,18 @@ test-info-scrap:  ## Testa serviço OCR / extração
 # 🧹  MANUTENÇÃO
 # ============================================================
 
+staging-fix-perms:  ## Corrige permissões do staging para que o usuário possa deletar os JSONs
+	@if docker ps --format '{{.Names}}' | grep -q '^site$$'; then \
+		docker exec site find /app/staging -type d -exec chmod o+rwx {} \;; \
+		docker exec site find /app/staging -name "*.json" -exec chmod o+rw {} \;; \
+		echo "✅ Permissões corrigidas via Docker"; \
+	else \
+		sudo chown -R $$USER:$$USER services/site/staging/ && echo "✅ Owner corrigido via sudo"; \
+	fi
+
+staging-dedup:  ## Remove JSONs duplicados do staging, mantendo apenas o mais novo por produto
+	@./scripts/staging_dedup.sh
+
 clear-minio:  ## Remove TODAS as imagens do MinIO (com confirmação)
 	@$(MAKE) -s _ensure-site
 	@docker exec -it site python3 scripts/clear_minio_images.py
@@ -416,13 +441,13 @@ help:  ## Mostra este menu
 	@awk 'BEGIN{FS=":.*?## "}/^(prepare-ml|prepare-shopee|prepare-amazon|prepare-all):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📤 STAGE / ATUALIZAÇÃO"
-	@awk 'BEGIN{FS=":.*?## "}/^(stage|api-update|shopee-update|check-stage):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*?## "}/^(stage|restage|api-update|shopee-update|check-stage):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📸 INSTAGRAM"
 	@awk 'BEGIN{FS=":.*?## "}/^(instagram-post|instagram-test|instagram-status|instagram-history|stage-and-post):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "🗄️  BANCO DE DADOS"
-	@awk 'BEGIN{FS=":.*?## "}/^(migrate-tags|migrate-webhook):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*?## "}/^(migrate-tags|migrate-webhook|migrate-subcategory):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "🏭 PRODUÇÃO"
 	@awk 'BEGIN{FS=":.*?## "}/^(prd-up|prd-down|prd-logs|build-prd-site|push-ghcr|prd-up-ghcr):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
@@ -431,7 +456,7 @@ help:  ## Mostra este menu
 	@awk 'BEGIN{FS=":.*?## "}/^(test|test-unit|test-integration|test-info-scrap):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "🧹 MANUTENÇÃO"
-	@awk 'BEGIN{FS=":.*?## "}/^(clear-minio|clear-minio-force|prune|clean-images):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*?## "}/^(staging-dedup|staging-fix-perms|clear-minio|clear-minio-force|prune|clean-images):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""

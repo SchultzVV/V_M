@@ -43,8 +43,11 @@ from auto_prepare_ml import (
     follow_affiliate_link,
     extract_ml_product_id,
     scrape_mercadolivre_product,
+)
+from category_selector import (
     detect_product_category,
-    ask_user_category
+    ask_user_category,
+    ask_user_subcategory,
 )
 
 
@@ -736,36 +739,8 @@ def main():
 
         suggested_category = detect_product_category(product_data['title'])
         print(f"\n📦 Produto: {product_data['title']}")
-        selected_category  = ask_user_category(suggested_category)
-
-        # Subcategoria
-        tag_folders = {
-            "E":    "eletronicos",
-            "CD":   "casa-decoracao",
-            "ME":   "moda-estilo",
-            "PET":  "petshop",
-            "geral": "geral",
-        }
-        tag_folder   = tag_folders.get(selected_category.upper(), "geral")
-        staging_base = Path("/app/staging")
-        tag_path     = staging_base / tag_folder
-        existing_subs = sorted([d.name for d in tag_path.iterdir() if d.is_dir()]) if tag_path.exists() else []
-
-        print(f"\n📁 Subcategorias em '{tag_folder}':")
-        for i, sub in enumerate(existing_subs, 1):
-            print(f"   {i:2}. {sub}")
-        print(f"\n   Número de opção, nome novo ou Enter para sem subcategoria")
-
-        sub_input = input("📁 Subcategoria: ").strip().lower()
-        if not sub_input:
-            selected_subcategory = ""
-        elif sub_input.isdigit():
-            idx = int(sub_input) - 1
-            selected_subcategory = existing_subs[idx] if 0 <= idx < len(existing_subs) else ""
-        else:
-            selected_subcategory = sub_input
-        if selected_subcategory:
-            print(f"   ✅ Subcategoria: {selected_subcategory}")
+        selected_category    = ask_user_category(suggested_category)
+        selected_subcategory = ask_user_subcategory(selected_category)
 
         # ─────────────────────────────────────────────────────────
         # ETAPA 9: Gerar JSON de staging

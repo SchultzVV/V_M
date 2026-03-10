@@ -312,38 +312,9 @@
       // Filtra os produtos pela subcategoria
       let filteredProducts = allProducts;
       if (subcategory !== 'todos') {
-        filteredProducts = allProducts.filter(product => {
-          const title = product.title.toLowerCase();
-          
-          switch(subcategory) {
-            case 'smartphones':
-              return title.includes('smartphone') || title.includes('celular') || title.includes('iphone') || 
-                     title.includes('galaxy') || title.includes('motorola') || title.includes('xiaomi');
-            case 'computadores':
-              return title.includes('notebook') || title.includes('computador') || title.includes('pc') || 
-                     title.includes('desktop') || title.includes('macbook') || title.includes('laptop');
-            case 'audio':
-              return title.includes('fone') || title.includes('headphone') || title.includes('caixa de som') || 
-                     title.includes('speaker') || title.includes('jbl') || title.includes('áudio');
-            case 'tv':
-              return title.includes('tv') || title.includes('televisão') || title.includes('smart tv') || 
-                     title.includes('monitor');
-            case 'games':
-              return title.includes('playstation') || title.includes('xbox') || title.includes('nintendo') || 
-                     title.includes('game') || title.includes('console') || title.includes('controle');
-            case 'cameras':
-              return title.includes('câmera') || title.includes('gopro') || title.includes('filmadora') || 
-                     title.includes('canon') || title.includes('nikon');
-            case 'smartwatch':
-              return title.includes('smartwatch') || title.includes('relógio inteligente') || title.includes('apple watch') || 
-                     title.includes('galaxy watch');
-            case 'acessorios':
-              return title.includes('cabo') || title.includes('carregador') || title.includes('capa') || 
-                     title.includes('película') || title.includes('adaptador') || title.includes('suporte');
-            default:
-              return true;
-          }
-        });
+        filteredProducts = allProducts.filter(product =>
+          (product.subcategory || '').toLowerCase() === subcategory.toLowerCase()
+        );
       }
       
       // Renderiza os produtos filtrados

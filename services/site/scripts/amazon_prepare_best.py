@@ -25,6 +25,8 @@ from pathlib import Path
 from datetime import datetime
 from slugify import slugify
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+import sys as _sys; _sys.path.insert(0, __import__('os').path.dirname(__file__))
+from category_selector import ask_user_category, ask_user_subcategory
 
 
 def resolve_amazon_link(url: str) -> str:
@@ -446,29 +448,9 @@ def download_amazon_images(image_urls: list, product_slug: str) -> tuple:
 
 
 def ask_user_category_amazon() -> tuple:
-    """Pergunta categoria ao usuário."""
-    print("\n" + "="*70)
-    print("📂 CATEGORIZAÇÃO DO PRODUTO")
-    print("="*70)
-    print("\n📂 CATEGORIAS:")
-    print("   1. E   - Eletrônicos")
-    print("   2. CD  - Casa & Decoração")
-    print("   3. ME  - Moda & Estilo")
-    print("   4. PET - Pet Shop")
-    
-    tag_map = {"1": "E", "2": "CD", "3": "ME", "4": "PET", "E": "E", "CD": "CD", "ME": "ME", "PET": "PET"}
-    
-    while True:
-        tag_input = input("\n🏷️  Categoria (1/2/3/4 ou E/CD/ME/PET): ").strip().upper()
-        tag = tag_map.get(tag_input)
-        if tag:
-            break
-        print("   ❌ Inválido!")
-    
-    print(f"\n✅ Categoria: {tag}")
-    
-    subcategory = input("\n📁 Subcategoria (ou Enter): ").strip().lower()
-    
+    """Delegado para category_selector (módulo compartilhado)."""
+    tag        = ask_user_category()
+    subcategory = ask_user_subcategory(tag)
     return tag, subcategory
 
 
@@ -478,7 +460,7 @@ def create_amazon_json(product_data: dict, product_dir: str, original_url: str, 
     product_slug = slugify(product_data['title'])
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    tag_folders = {"E": "eletronicos", "CD": "casa-decoracao", "ME": "moda-estilo", "PET": "pet", "geral": "geral"}
+    tag_folders = {"E": "eletronicos", "CD": "casa-decoracao", "ME": "moda-estilo", "PET": "petshop", "geral": "geral"}
     tag_folder = tag_folders.get(tag.upper(), "geral")
     
     if subcategory:

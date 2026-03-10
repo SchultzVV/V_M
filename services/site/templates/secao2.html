@@ -311,35 +311,9 @@
       // Filtra os produtos pela subcategoria
       let filteredProducts = allProducts;
       if (subcategory !== 'todos') {
-        filteredProducts = allProducts.filter(product => {
-          const title = product.title.toLowerCase();
-          
-          switch(subcategory) {
-            case 'feminino':
-              return title.includes('feminino') || title.includes('mulher') || title.includes('blusa') || 
-                     title.includes('vestido') || title.includes('saia') || title.includes('calça feminina');
-            case 'masculino':
-              return title.includes('masculino') || title.includes('homem') || title.includes('camisa') || 
-                     title.includes('bermuda') || title.includes('calça masculina') || title.includes('camiseta');
-            case 'infantil':
-              return title.includes('infantil') || title.includes('criança') || title.includes('bebê') || 
-                     title.includes('kids') || title.includes('menino') || title.includes('menina');
-            case 'calcados':
-              return title.includes('sapato') || title.includes('tênis') || title.includes('sandália') || 
-                     title.includes('chinelo') || title.includes('bota') || title.includes('calçado');
-            case 'acessorios':
-              return title.includes('acessório') || title.includes('colar') || title.includes('pulseira') || 
-                     title.includes('brinco') || title.includes('anel') || title.includes('chapéu') || 
-                     title.includes('lenço') || title.includes('cinto');
-            case 'bolsas':
-              return title.includes('bolsa') || title.includes('mochila') || title.includes('carteira') || 
-                     title.includes('necessaire');
-            case 'relogios':
-              return title.includes('relógio') || title.includes('smartwatch') || title.includes('watch');
-            default:
-              return true;
-          }
-        });
+        filteredProducts = allProducts.filter(product =>
+          (product.subcategory || '').toLowerCase() === subcategory.toLowerCase()
+        );
       }
       
       // Renderiza os produtos filtrados

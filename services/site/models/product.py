@@ -30,7 +30,8 @@ class Product(db.Model):
     descricao = db.Column(db.Text, nullable=True)
     imagens = db.Column(db.Text, nullable=True)  # Alias para image
     disponivel = db.Column(db.Boolean, default=True)  # Disponibilidade do produto
-    
+    subcategory = db.Column(db.String(100), nullable=True, default='')  # Subcategoria (gatos, saude, etc.)
+
     # Índice único para evitar duplicatas
     __table_args__ = (
         db.UniqueConstraint('platform', 'external_id', name='unique_platform_external_id'),
@@ -87,5 +88,9 @@ class Product(db.Model):
             "link": self.link,
             "images": safe_images,
             "bucketName": bucket_name or "desconhecido",
-            "tags": json.loads(self.tags) if hasattr(self, 'tags') and self.tags else ["geral"]
+            "tags": json.loads(self.tags) if hasattr(self, 'tags') and self.tags else ["geral"],
+            "subcategory": self.subcategory or "",
+            "disponivel": self.disponivel if self.disponivel is not None else True,
+            "external_id": self.external_id or "",
+            "platform": self.platform or "",
         }

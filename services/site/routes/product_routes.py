@@ -86,7 +86,11 @@ def add_product():
             old_price=data["oldPrice"],
             image=json.dumps(image_paths),
             link=data["link"],
-            tags=json.dumps(tags)
+            tags=json.dumps(tags),
+            subcategory=data.get("subcategory", ""),
+            external_id=data.get("external_id", ""),
+            disponivel=data.get("disponivel", True),
+            platform=data.get("platform", ""),
         )
         return jsonify({"message": "Produto salvo com sucesso!", "product": product}), 201
 
