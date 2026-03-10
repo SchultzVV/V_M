@@ -314,6 +314,31 @@ instagram-status:  ## Status do sistema Instagram (tokens, permissões)
 instagram-history:  ## Histórico de posts no Instagram (últimos 10)
 	@curl -s "http://localhost:5000/instagram/history?limit=10" | jq .
 
+prepare-post-image:  ## ⭐ Gera imagem 1080x1080 para post (FILE=caminho.json ou --all)
+	@$(MAKE) -s _ensure-site
+	@echo "" && echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🎨 PREPARE POST IMAGE — gerador de imagens para Instagram"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@if [ -n "$(FILE)" ]; then \
+		echo "📄 Arquivo: $(FILE)" && echo ""; \
+		docker exec -it site python3 scripts/prepare_publish_images.py \
+			--file "$(FILE)" \
+			--staging-dir staging \
+			--output publish_ready \
+			--uploads-dir uploads || true; \
+	else \
+		echo "📦 Modo: todos os produtos do staging" && echo ""; \
+		docker exec -it site python3 scripts/prepare_publish_images.py \
+			--all \
+			--staging-dir staging \
+			--output publish_ready \
+			--uploads-dir uploads || true; \
+	fi
+	@echo ""
+	@echo "📁 Imagens disponíveis em: services/site/publish_ready/"
+	@docker exec site find /app/publish_ready -name "*.jpg" 2>/dev/null | sort | \
+		while read f; do echo "  🖼️  $$(basename $$f)"; done
+
 stage-and-post:  ## Publica no site E posta no Instagram em sequência
 	@$(MAKE) stage
 	@sleep 2
@@ -444,7 +469,7 @@ help:  ## Mostra este menu
 	@awk 'BEGIN{FS=":.*?## "}/^(stage|restage|api-update|shopee-update|check-stage):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📸 INSTAGRAM"
-	@awk 'BEGIN{FS=":.*?## "}/^(instagram-post|instagram-test|instagram-status|instagram-history|stage-and-post):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*?## "}/^(prepare-post-image|instagram-post|instagram-test|instagram-status|instagram-history|stage-and-post):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "🗄️  BANCO DE DADOS"
 	@awk 'BEGIN{FS=":.*?## "}/^(migrate-tags|migrate-webhook|migrate-subcategory):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)

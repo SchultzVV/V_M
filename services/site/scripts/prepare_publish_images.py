@@ -77,7 +77,7 @@ class InstagramImageGenerator:
         Returns:
             Lista com os caminhos das imagens geradas
         """
-        json_files = list(self.staging_dir.glob("*.json"))
+        json_files = [f for f in self.staging_dir.rglob("*.json") if f.name != ".gitkeep"]
         
         if not json_files:
             print(f"⚠️  Nenhum arquivo JSON encontrado em {self.staging_dir}")
