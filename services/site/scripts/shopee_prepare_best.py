@@ -331,6 +331,127 @@ def ask_user_category_shopee() -> tuple:
     return tag, subcategory
 
 
+def take_and_ocr_affiliate_full(affiliate_url: str) -> dict:
+    """
+    ETAPA 5B — Segundo scraping mandatório para confirmação de preço.
+
+    Tira screenshot COMPLETO do link curto de afiliado, envia ao OCR e extrai
+    preço atual + preço antigo de forma autoritativa (sem recorte de ROI).
+
+    - Screenshot salvo em /app/fotos/affiliate_full_YYYYMMDD_HHMMSS.png
+    - Toda a saída OCR é impressa para debug
+    """
+    result = {'price': 0.0, 'old_price': 0.0, 'raw_prices': [], 'raw_text': '', 'source': 'none'}
+
+    print(f"\n📸 [ETAPA 5B] Screenshot completo do link de afiliado...")
+    print(f"   🔗 {affiliate_url}")
+
+    tmp_path = None
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                viewport={'width': 1440, 'height': 900},
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            )
+            page = context.new_page()
+            page.goto(affiliate_url, wait_until='networkidle', timeout=30000)
+            page.wait_for_timeout(3000)
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix='_affiliate_full.png')
+            tmp.close()
+            page.screenshot(path=tmp.name, full_page=False)
+            tmp_path = tmp.name
+            print(f"   ✅ Screenshot capturado")
+            browser.close()
+    except Exception as e:
+        print(f"   ⚠️  Erro ao capturar screenshot do afiliado: {e}")
+        return result
+
+    # Salvar cópia permanente para debug
+    try:
+        import shutil as _shutil
+        debug_dir = Path('/app/fotos')
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        dest = debug_dir / f'affiliate_full_{ts}.png'
+        _shutil.copy2(tmp_path, dest)
+        os.chmod(dest, 0o644)
+        print(f"   💾 Screenshot salvo: {dest}")
+    except Exception as e:
+        print(f"   ⚠️  Não foi possível salvar screenshot: {e}")
+
+    # OCR no screenshot completo
+    try:
+        with open(tmp_path, 'rb') as f:
+            files = {'file': (os.path.basename(tmp_path), f, 'image/png')}
+            response = requests.post('http://info-scrap:8000/extract', files=files, timeout=60)
+
+        if response.status_code != 200:
+            print(f"   ⚠️  OCR retornou status {response.status_code}")
+            return result
+
+        ocr = response.json()
+        raw_text = ocr.get('text', '')
+        result['raw_text'] = raw_text
+        lines = [ln for ln in raw_text.strip().splitlines() if ln.strip()]
+
+        print(f"\n   ┌─── [DEBUG OCR AFILIADO — {len(lines)} linhas] ───────────────────")
+        for ln in lines:
+            print(f"   │ {ln}")
+        print(f"   └───────────────────────────────────────────────────────────")
+
+        # Parser de preços BR
+        raw_matches = re.findall(
+            r'R\$?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?)',
+            raw_text, re.IGNORECASE
+        )
+        prices = []
+        for m in raw_matches:
+            s = m.strip()
+            if ',' in s and '.' in s:
+                s = s.replace('.', '').replace(',', '.')
+            elif ',' in s:
+                s = s.replace(',', '.')
+            elif re.match(r'^\d{1,3}\.\d{3}$', s):
+                s = s.replace('.', '')
+            try:
+                v = round(float(s), 2)
+                if 50.0 <= v <= 100_000.0:
+                    prices.append(v)
+            except ValueError:
+                pass
+        prices = sorted(set(prices))
+        result['raw_prices'] = prices
+        print(f"\n   💰 Preços detectados: {prices}")
+
+        if len(prices) >= 2:
+            result['price']     = min(prices)
+            result['old_price'] = max(prices)
+            result['source']    = 'affiliate_ocr'
+            disc = round((result['old_price'] - result['price']) / result['old_price'] * 100)
+            print(f"   ✅ Preço atual  : R$ {result['price']:.2f}")
+            print(f"   ✅ Preço antigo : R$ {result['old_price']:.2f}  ({disc}% OFF)")
+        elif len(prices) == 1:
+            result['price']  = prices[0]
+            result['source'] = 'affiliate_ocr'
+            print(f"   ✅ Preço detectado: R$ {prices[0]:.2f}")
+        else:
+            print(f"   ℹ️  Nenhum preço encontrado no screenshot do afiliado")
+
+    except requests.exceptions.ConnectionError:
+        print(f"   ⚠️  Serviço info-scrap não disponível (OCR do afiliado ignorado)")
+    except Exception as e:
+        print(f"   ⚠️  Erro no OCR do afiliado: {e}")
+    finally:
+        try:
+            if tmp_path:
+                os.remove(tmp_path)
+        except Exception:
+            pass
+
+    return result
+
+
 def main():
     if len(sys.argv) < 2:
         print("❌ Uso: python shopee_prepare_best.py <URL_SHOPEE> [--screenshot PATH]")
@@ -433,6 +554,25 @@ def main():
             ocr_data = extract_info_from_screenshot(screenshot_path)
         else:
             print("\n⚠️  Screenshot não disponível, continuando sem OCR...")
+
+        # ========================================
+        # ETAPA 5B: Screenshot completo do link de afiliado — preço mandatório
+        # ========================================
+        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("ETAPA 5B: OCR mandatório — screenshot completo do link de afiliado")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        affiliate_ocr = take_and_ocr_affiliate_full(original_url)
+        if affiliate_ocr['source'] == 'affiliate_ocr' and affiliate_ocr['price'] > 0:
+            print(f"\n   🔒 Preços do afiliado sobrescrevem dados anteriores (mandatório):")
+            product_data['price'] = affiliate_ocr['price']
+            if affiliate_ocr['old_price'] > affiliate_ocr['price']:
+                product_data['original_price'] = affiliate_ocr['old_price']
+                print(f"      price         : R$ {affiliate_ocr['price']:.2f}")
+                print(f"      original_price: R$ {affiliate_ocr['old_price']:.2f}")
+            else:
+                print(f"      price         : R$ {affiliate_ocr['price']:.2f}")
+        else:
+            print(f"   ⚠️  OCR do afiliado sem preços — mantendo dados anteriores")
 
         # ========================================
         # ETAPA 6: Enriquecer dados com OCR
