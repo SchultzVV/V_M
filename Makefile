@@ -291,6 +291,21 @@ check-stage:  ## Verifica imagens no staging antes de publicar
 	@$(MAKE) -s _ensure-site
 	@docker exec -it site python3 scripts/check_stage_images.py
 
+verify-product-cheaper:  ## ⭐ Verifica se os links são o menor preço do catálogo ML  (FILE= ou URL=)
+	@$(MAKE) -s _ensure-site
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔍 VERIFICADOR DE PREÇO — Mercado Livre"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@if [ -n "$(URL)" ]; then \
+		docker exec -it site python3 scripts/price_validator/main.py --url "$(URL)"; \
+	elif [ -n "$(FILE)" ]; then \
+		docker exec -it site python3 scripts/price_validator/main.py --file "$(FILE)"; \
+	else \
+		docker exec -it site python3 scripts/price_validator/main.py; \
+	fi
+
 
 # ============================================================
 # 📸  INSTAGRAM
@@ -466,7 +481,7 @@ help:  ## Mostra este menu
 	@awk 'BEGIN{FS=":.*?## "}/^(prepare-ml|prepare-shopee|prepare-amazon|prepare-all):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📤 STAGE / ATUALIZAÇÃO"
-	@awk 'BEGIN{FS=":.*?## "}/^(stage|restage|api-update|shopee-update|check-stage):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*?## "}/^(stage|api-update|shopee-update|check-stage|verify-product-cheaper):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📸 INSTAGRAM"
 	@awk 'BEGIN{FS=":.*?## "}/^(prepare-post-image|instagram-post|instagram-test|instagram-status|instagram-history|stage-and-post):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)

@@ -30,6 +30,7 @@ from routes.webhook_routes import webhook_bp
 from routes.auth_routes import auth_bp
 from routes.sync_routes import sync_bp
 from routes.instagram_routes import instagram_bp
+from routes.price_validator_routes import price_validator_bp
 
 app = Flask(__name__)
 
@@ -59,6 +60,7 @@ app.register_blueprint(webhook_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(sync_bp)
 app.register_blueprint(instagram_bp)
+app.register_blueprint(price_validator_bp)
 
 with app.app_context():
     db.create_all()  # ✅ Cria a tabela 'products' se não existir
