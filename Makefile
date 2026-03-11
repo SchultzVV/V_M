@@ -61,7 +61,7 @@ psql:  ## Terminal psql no container postgres
 # 🌐  EXPOSE — Túneis HTTPS públicos
 # ============================================================
 
-serve-cloudflare:  ## ⭐ Túnel Cloudflare: sobe tudo, captura URL, configura OAuth ML, exibe link
+serve-cloudflare:  ## ⭐ Túnel Cloudflare: sobe tudo, captura URL e configura OAuth ML
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "🚀 CLOUDFLARE TUNNEL  +  AUTO-CONFIG OAUTH MERCADO LIVRE"
@@ -246,7 +246,7 @@ _ensure-info-scrap: _ensure-site
 		sleep 4; \
 	fi
 
-prepare-ml:  ## ⭐ Prepara produto ML: API oficial + OCR preço promo  (URL=https://...)
+prepare-ml:  ## ⭐ Prepara produto ML: API + OCR de preço promo  (URL=https://...)
 	@if [ -z "$(URL)" ]; then echo "❌ Uso: make prepare-ml URL=https://mercadolivre.com/sec/ABC123"; exit 1; fi
 	@$(MAKE) -s _ensure-info-scrap
 	@echo "" && echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -307,7 +307,7 @@ stage:  ## ⭐ Publica produtos preparados no site (DB + MinIO)
 	@docker exec -it site python3 scripts/stage_products.py
 	@./scripts/staging_dedup.sh
 
-restage:  ## Re-publica TODOS os produtos do staging (ignora .processed — útil após correção de código)
+restage:  ## Re-publica TODOS os JSONs do staging no banco (ignora .processed, útil após fix de código)
 	@$(MAKE) -s _ensure-site
 	@echo "⚠️  Reprocessando todo o staging (modo force)..."
 	@docker exec -it site python3 scripts/stage_products.py --force
@@ -326,7 +326,7 @@ check-stage:  ## Verifica imagens no staging antes de publicar
 	@$(MAKE) -s _ensure-site
 	@docker exec -it site python3 scripts/check_stage_images.py
 
-verify-product-cheaper:  ## ⭐ Verifica se os links são o menor preço do catálogo ML  (FILE= ou URL=)
+verify-product-cheaper:  ## ⭐ Verifica se o link ML é o menor preço do catálogo  (FILE= ou URL=)
 	@$(MAKE) -s _ensure-site
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -341,7 +341,7 @@ verify-product-cheaper:  ## ⭐ Verifica se os links são o menor preço do cat�
 		docker exec -it site python3 scripts/price_validator/main.py; \
 	fi
 
-update-ml-prices:  ## ⭐ Atualiza preços ML para o vendedor mais barato (todos os produtos do banco)
+update-ml-prices:  ## ⭐ ML: busca o vendedor mais barato p/ cada produto (DRY=1 simula, ID=MLB... filtra)
 	@$(MAKE) -s _ensure-site
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -358,7 +358,7 @@ update-ml-prices:  ## ⭐ Atualiza preços ML para o vendedor mais barato (todos
 		docker exec -it site python3 scripts/update_ml_prices.py; \
 	fi
 
-reprepare-ml:  ## ⭐ Re-prepara todos os produtos ML (API+OCR+imgs) mantendo tags, depois faz stage
+reprepare-ml:  ## ⭐ ML: refaz prepare (API+OCR+imgs) de todos os produtos, mantém tags, faz stage
 	@$(MAKE) -s _ensure-site
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -566,7 +566,7 @@ help:  ## Mostra este menu
 	@awk 'BEGIN{FS=":.*?## "}/^(prepare-ml|prepare-shopee|prepare-amazon|prepare-all):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📤 STAGE / ATUALIZAÇÃO"
-	@awk 'BEGIN{FS=":.*?## "}/^(stage|api-update|shopee-update|check-stage|verify-product-cheaper|update-ml-prices|reprepare-ml):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*?## "}/^(stage|restage|api-update|shopee-update|check-stage|verify-product-cheaper|update-ml-prices|reprepare-ml):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📸 INSTAGRAM"
 	@awk 'BEGIN{FS=":.*?## "}/^(prepare-post-image|instagram-post|instagram-test|instagram-status|instagram-history|stage-and-post):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
