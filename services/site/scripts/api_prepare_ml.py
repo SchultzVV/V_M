@@ -61,11 +61,61 @@ def get_product_from_api(item_id, token):
         # Fallback: tenta catálogo
         url_cat = f"https://api.mercadolibre.com/products/{clean_id}"
         response = requests.get(url_cat, headers=headers, timeout=15)
-        
+
         if response.status_code == 200:
-            print(f"   ✅ Catálogo encontrado (sem preços)")
-            return response.json()
-        
+            catalog = response.json()
+            print(f"   ✅ Catálogo encontrado — buscando preço via buy_box_winner...")
+
+            # Tenta pegar preço do buy_box_winner (item mais barato/destaque)
+            bbw_id = (catalog.get('buy_box_winner') or {}).get('item_id')
+
+            # Fallback: /products/{id}/items retorna todos os vendedores ordenados por preço
+            # (search?catalog_product_id= retorna 403 para apps sem Partner agreement)
+            cheapest_item_data = None
+            if not bbw_id:
+                items_url = f"https://api.mercadolibre.com/products/{clean_id}/items"
+                ir2 = requests.get(items_url, headers=headers, timeout=15)
+                if ir2.status_code == 200:
+                    results = ir2.json().get('results', [])
+                    if results:
+                        # já vem ordenado por preço ascendente — pega o mais barato
+                        cheapest_item_data = results[0]
+                        bbw_id = cheapest_item_data.get('item_id')
+
+            if bbw_id:
+                # Tenta enriquecer com /items/{bbw_id} (tem original_price, shipping etc.)
+                # Se retornar 403 (PolicyAgent), usa os dados já disponíveis em cheapest_item_data
+                item = None
+                item_url = f"https://api.mercadolibre.com/items/{bbw_id}"
+                ir = requests.get(item_url, headers=headers, timeout=15)
+                if ir.status_code == 200:
+                    item = ir.json()
+                elif cheapest_item_data:
+                    # 403/404 — usa dados do /products/{id}/items diretamente
+                    item = cheapest_item_data
+                    item['id'] = bbw_id
+
+                if item:
+                    price     = float(item.get('price', 0) or 0)
+                    old_price = float(item.get('original_price', 0) or 0)
+                    catalog['price']              = price
+                    catalog['original_price']     = old_price if old_price > price else 0
+                    catalog['available_quantity'] = item.get('available_quantity', 50)
+                    catalog['sold_quantity']       = item.get('sold_quantity', 0)
+                    catalog['shipping']            = item.get('shipping', {})
+                    catalog['_cheapest_item_id']   = bbw_id  # usado por get_sale_price_from_api
+                    # Usa imagens do item se catálogo não tiver
+                    if not catalog.get('pictures') and item.get('pictures'):
+                        catalog['pictures'] = item['pictures']
+                    print(f"   💰 Preço via {bbw_id}: R$ {price:.2f}" +
+                          (f"  (de R$ {old_price:.2f})" if old_price > price else ""))
+                else:
+                    print(f"   ⚠️  Item {bbw_id} retornou {ir.status_code} — sem preço")
+            else:
+                print(f"   ⚠️  buy_box_winner não encontrado — sem preço")
+
+            return catalog
+
         print(f"   ❌ Não encontrado")
         return None
     except Exception as e:

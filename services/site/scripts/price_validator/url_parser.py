@@ -31,16 +31,12 @@ def extract_item_id(url: str) -> Optional[str]:
     if item_id:
         return item_id
 
-    try:
-        response = requests.head(url, allow_redirects=True, timeout=10,
-                                 headers={"User-Agent": "Mozilla/5.0"})
-        final_url = response.url
+    final_url = _resolve_redirect(url)
+    if final_url != url:
         item_id = _extract_from_string(final_url)
         if item_id:
             logger.debug(f"ID extraído após redirect: {url} → {final_url}")
             return item_id
-    except requests.RequestException as e:
-        logger.warning(f"Falha ao resolver redirect para {url}: {e}")
 
     logger.warning(f"Não foi possível extrair MLB ID de: {url}")
     return None
@@ -68,13 +64,10 @@ def detect_url_type(url: str) -> Tuple[str, Optional[str]]:
     if t != "unknown":
         return t, id_
 
-    # Resolve redirect
-    try:
-        response = requests.head(url, allow_redirects=True, timeout=10,
-                                 headers={"User-Agent": "Mozilla/5.0"})
-        return _classify_string(response.url)
-    except requests.RequestException:
-        pass
+    # Resolve redirect (HEAD → GET fallback)
+    final_url = _resolve_redirect(url)
+    if final_url != url:
+        return _classify_string(final_url)
 
     return "unknown", None
 
@@ -90,6 +83,36 @@ def _classify_string(url: str) -> Tuple[str, Optional[str]]:
         return "item", item_id
 
     return "unknown", None
+
+
+def _resolve_redirect(url: str) -> str:
+    """
+    Resolve redirects tentando HEAD primeiro.
+    Se o servidor retornar 405 (Method Not Allowed) — como meli.la —
+    faz fallback automático para GET com stream=True (sem baixar body).
+
+    Returns:
+        URL final após seguir todos os redirects, ou a URL original em caso de erro.
+    """
+    headers = {"User-Agent": "Mozilla/5.0"}
+    try:
+        r = requests.head(url, allow_redirects=True, timeout=10, headers=headers)
+        # meli.la e alguns encurtadores rejeitam HEAD com 405
+        if r.status_code != 405:
+            return r.url
+    except requests.RequestException:
+        pass
+
+    # Fallback: GET com stream — não baixa o body, só segue os redirects
+    try:
+        r = requests.get(url, allow_redirects=True, timeout=10,
+                         headers=headers, stream=True)
+        r.close()
+        logger.debug(f"Redirect resolvido via GET fallback: {url} → {r.url}")
+        return r.url
+    except requests.RequestException as e:
+        logger.warning(f"Falha ao resolver redirect para {url}: {e}")
+        return url
 
 
 def _extract_from_string(text: str) -> Optional[str]:

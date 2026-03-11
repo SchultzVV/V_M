@@ -108,7 +108,11 @@ serve-cloudflare:  ## ⭐ Túnel Cloudflare: sobe tudo, captura URL, configura O
 	echo ""; \
 	NEW_REDIRECT="$$CF_URL/auth/mercadolivre/callback"; \
 	echo "📝 Atualizando ML_REDIRECT_URI no .env..."; \
-	sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=$$NEW_REDIRECT|" .env; \
+	if grep -q '^ML_REDIRECT_URI=' .env; then \
+		sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=$$NEW_REDIRECT|" .env; \
+	else \
+		echo "ML_REDIRECT_URI=$$NEW_REDIRECT" >> .env; \
+	fi; \
 	echo "🔄 Reiniciando site com nova URI..."; \
 	$(COMPOSE) stop site > /dev/null 2>&1; \
 	$(COMPOSE) rm -f site > /dev/null 2>&1; \
@@ -116,20 +120,32 @@ serve-cloudflare:  ## ⭐ Túnel Cloudflare: sobe tudo, captura URL, configura O
 	sleep 3; \
 	echo "✅ Container reiniciado"; \
 	echo ""; \
-	APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2); \
-	AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NEW_REDIRECT"; \
+	APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2 | tr -d '[:space:]'); \
+	TOKEN=$$(docker exec site cat /app/config/ml_tokens.json 2>/dev/null | jq -r '.access_token // empty' 2>/dev/null); \
+	TOKEN_OK=0; \
+	if [ -n "$$TOKEN" ]; then \
+		STATUS=$$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $$TOKEN" https://api.mercadolibre.com/users/me); \
+		[ "$$STATUS" = "200" ] && TOKEN_OK=1; \
+	fi; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-	echo "🔑 AUTORIZAÇÂO OAUTH:"; \
-	echo ""; \
-	echo "1️⃣  Cadastre no painel ML (se ainda não fez):"; \
-	echo "   https://developers.mercadolivre.com.br/devcenter"; \
-	echo "   → Redirect URI: $$NEW_REDIRECT"; \
-	echo ""; \
-	echo "2️⃣  Abra no navegador para autorizar:"; \
-	echo ""; \
-	echo "   $$AUTH_URL"; \
-	echo ""; \
-	echo "3️⃣  Após autorizar:  make check-tokens"; \
+	if [ "$$TOKEN_OK" = "1" ]; then \
+		echo "🔑 TOKEN ML: ✅ válido — não precisa reautorizar"; \
+		echo ""; \
+		echo "   Pode usar a API direto: make test-api"; \
+	else \
+		echo "🔑 TOKEN ML: ❌ expirado ou ausente — autorização necessária"; \
+		echo ""; \
+		AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NEW_REDIRECT"; \
+		echo "1️⃣  Atualize o Redirect URI no DevCenter ML:"; \
+		echo "   https://developers.mercadolivre.com.br/devcenter"; \
+		echo "   → URL de redirecionamento: $$NEW_REDIRECT"; \
+		echo ""; \
+		echo "2️⃣  Abra no navegador para autorizar:"; \
+		echo ""; \
+		echo "   $$AUTH_URL"; \
+		echo ""; \
+		echo "3️⃣  Após autorizar: make check-tokens"; \
+	fi; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 	echo "💡 Para parar o túnel: make stop-cloudflare"; \
 	echo ""
@@ -172,9 +188,28 @@ serve-cloudflare-fixed:  ## Túnel Cloudflare com URL PERMANENTE (requer setup-c
 	echo "🔧 Subindo containers..."; \
 	$(COMPOSE) up -d; \
 	sleep 2; \
+	TUNNEL_ID=$$(grep '^tunnel:' ~/.cloudflared/config.yml | awk '{print $$2}'); \
+	FIXED_URL="https://$$TUNNEL_ID.cfargotunnel.com"; \
+	APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2 | tr -d '[:space:]'); \
+	NEW_REDIRECT="$$FIXED_URL/auth/mercadolivre/callback"; \
+	echo ""; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-	echo "🌐 Túnel PERMANENTE (URL sempre a mesma)"; \
+	echo "🌐 CLOUDFLARE TUNNEL — URL PERMANENTE"; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "🌍 URL fixa: $$FIXED_URL"; \
+	echo "🔁 Callback: $$NEW_REDIRECT"; \
+	echo ""; \
+	if [ -n "$$APP_ID" ]; then \
+		AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NEW_REDIRECT"; \
+		echo "🔑 Link para autorizar (cole no browser se tokens expiraram):"; \
+		echo "   $$AUTH_URL"; \
+	else \
+		echo "⚠️  ML_APP_ID não preenchido no .env — OAuth não disponível"; \
+	fi; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "🚀 Iniciando túnel (Ctrl+C para parar)..."; \
+	echo ""; \
+	pkill cloudflared 2>/dev/null || true; sleep 1; \
 	$$CLOUDFLARED_BIN tunnel run
 
 
@@ -306,6 +341,40 @@ verify-product-cheaper:  ## ⭐ Verifica se os links são o menor preço do cat�
 		docker exec -it site python3 scripts/price_validator/main.py; \
 	fi
 
+update-ml-prices:  ## ⭐ Atualiza preços ML para o vendedor mais barato (todos os produtos do banco)
+	@$(MAKE) -s _ensure-site
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔄 UPDATE ML PRICES — varredura de vendedor mais barato"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@if [ "$(DRY)" = "1" ] || [ "$(DRY_RUN)" = "1" ]; then \
+		echo "   Modo: DRY-RUN (sem alterações no banco)"; echo ""; \
+		docker exec -it site python3 scripts/update_ml_prices.py --dry-run; \
+	elif [ -n "$(ID)" ]; then \
+		echo "   Modo: produto único ($(ID))"; echo ""; \
+		docker exec -it site python3 scripts/update_ml_prices.py --id "$(ID)"; \
+	else \
+		echo "   Modo: TODOS os produtos ML ativos"; echo ""; \
+		docker exec -it site python3 scripts/update_ml_prices.py; \
+	fi
+
+reprepare-ml:  ## ⭐ Re-prepara todos os produtos ML (API+OCR+imgs) mantendo tags, depois faz stage
+	@$(MAKE) -s _ensure-site
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔄 REPREPARE ML — Re-preparação completa (preço + imagens)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@if [ "$(DRY)" = "1" ] || [ "$(DRY_RUN)" = "1" ]; then \
+		echo "   Modo: DRY-RUN (só lista)"; echo ""; \
+		docker exec -it site python3 scripts/reprepare_all_ml.py --dry-run; \
+	elif [ -n "$(ID)" ]; then \
+		echo "   Modo: produto único ($(ID))"; echo ""; \
+		docker exec -it site python3 scripts/reprepare_all_ml.py --id "$(ID)"; \
+	else \
+		echo "   Modo: TODOS os produtos ML ativos"; echo ""; \
+		docker exec -it site python3 scripts/reprepare_all_ml.py; \
+	fi
+
 
 # ============================================================
 # 📸  INSTAGRAM
@@ -421,6 +490,22 @@ test-info-scrap:  ## Testa serviço OCR / extração
 	@$(MAKE) -s _ensure-info-scrap
 	@docker exec -it site python3 scripts/test_info_scrap.py /app/image_example.png
 
+test-affiliate:  ## Testes unitários do gerador de links de afiliado ML
+	@$(MAKE) -s _ensure-site
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🧪 AFFILIATE LINK GENERATOR — testes unitários"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@docker exec site python3 -m pytest tests/unit/test_affiliate_link_generator.py -v --tb=short
+
+test-price-validator:  ## Testa todo o módulo price_validator (affiliate + validator + parser)
+	@$(MAKE) -s _ensure-site
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🧪 PRICE VALIDATOR — suite completa"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@docker exec site python3 -m pytest tests/unit/ -v --tb=short
+
 
 # ============================================================
 # 🧹  MANUTENÇÃO
@@ -481,7 +566,7 @@ help:  ## Mostra este menu
 	@awk 'BEGIN{FS=":.*?## "}/^(prepare-ml|prepare-shopee|prepare-amazon|prepare-all):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📤 STAGE / ATUALIZAÇÃO"
-	@awk 'BEGIN{FS=":.*?## "}/^(stage|api-update|shopee-update|check-stage|verify-product-cheaper):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*?## "}/^(stage|api-update|shopee-update|check-stage|verify-product-cheaper|update-ml-prices|reprepare-ml):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📸 INSTAGRAM"
 	@awk 'BEGIN{FS=":.*?## "}/^(prepare-post-image|instagram-post|instagram-test|instagram-status|instagram-history|stage-and-post):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
@@ -493,7 +578,7 @@ help:  ## Mostra este menu
 	@awk 'BEGIN{FS=":.*?## "}/^(prd-up|prd-down|prd-logs|build-prd-site|push-ghcr|prd-up-ghcr):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "🧪 TESTES"
-	@awk 'BEGIN{FS=":.*?## "}/^(test|test-unit|test-integration|test-info-scrap):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*?## "}/^(test|test-unit|test-integration|test-info-scrap|test-affiliate|test-price-validator):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "🧹 MANUTENÇÃO"
 	@awk 'BEGIN{FS=":.*?## "}/^(staging-dedup|staging-fix-perms|clear-minio|clear-minio-force|prune|clean-images):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)

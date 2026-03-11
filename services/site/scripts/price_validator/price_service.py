@@ -22,7 +22,7 @@ class Listing:
     item_id: str
     price: float
     free_shipping: bool
-    permalink: str
+    permalink: str = ""           # pode ser vazio — buscado sob demanda se necessário
     seller_id: Optional[int] = None
     status: str = "active"
 
@@ -46,14 +46,19 @@ class Listing:
 def listing_from_api(data: Dict[str, Any]) -> Optional[Listing]:
     """
     Constrói um Listing a partir do JSON da API do ML.
-    Retorna None se os dados essenciais (price, permalink) estiverem ausentes.
+    Suporta dois formatos:
+      - /items/{id}                    → usa campo "id"
+      - /products/{catalog}/items     → usa campo "item_id" (normalizado para "id" em ml_api.py)
+    Retorna None se os dados essenciais (price, id) estiverem ausentes.
+    O permalink pode ser vazio — será buscado sob demanda pelo caller se necessário.
     """
     try:
         price = data.get("price") or data.get("sale_price")
-        permalink = data.get("permalink") or data.get("catalog_url")
-        item_id = data.get("id", "")
+        # Aceita "id" (search/items API) ou "item_id" (products/items API)
+        item_id = data.get("id") or data.get("item_id", "")
+        permalink = data.get("permalink") or data.get("catalog_url") or ""
 
-        if price is None or not permalink or not item_id:
+        if price is None or not item_id:
             return None
 
         shipping = data.get("shipping") or {}
@@ -70,7 +75,7 @@ def listing_from_api(data: Dict[str, Any]) -> Optional[Listing]:
             status=status,
         )
     except (TypeError, ValueError) as e:
-        logger.debug(f"Erro ao construir Listing de {data.get('id', '?')}: {e}")
+        logger.debug(f"Erro ao construir Listing de {data.get('id', data.get('item_id', '?'))}: {e}")
         return None
 
 

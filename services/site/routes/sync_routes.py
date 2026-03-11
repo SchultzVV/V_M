@@ -3,11 +3,13 @@ Rotas para sincronização manual de produtos do Mercado Livre
 Atualiza preços, disponibilidade e imagens via API
 """
 
+import subprocess
+import sys
 from flask import Blueprint, jsonify, request
 from services.ml_auth import ml_auth
 from services.marketplace_service import process_mercadolivre_item
 from models.product import Product
-from database import db
+from database import db, SessionLocal
 
 sync_bp = Blueprint("sync", __name__, url_prefix="/sync")
 
@@ -161,6 +163,130 @@ def sync_status():
             "sync_all": "/sync/mercadolivre/all"
         }
     })
+
+
+@sync_bp.route("/mercadolivre/cheapest-all", methods=["POST"])
+def sync_ml_cheapest_all():
+    """
+    Percorre todos os produtos ML no banco e atualiza para o vendedor mais barato.
+    Usa external_id diretamente (ignora link salvo, que pode ser meli.la/...).
+
+    Query param opcional:
+        ?dry_run=true   → simula sem salvar
+
+    Exemplo:
+        POST /sync/mercadolivre/cheapest-all
+        POST /sync/mercadolivre/cheapest-all?dry_run=true
+    """
+    dry_run = request.args.get("dry_run", "false").lower() == "true"
+    try:
+        from scripts.price_validator.ml_api import get_item, get_catalog_listings
+        from scripts.price_validator.price_service import parse_catalog_listings, find_cheapest
+        from scripts.price_validator.affiliate import generate_affiliate_link
+        from datetime import datetime
+
+        def _parse_price(val):
+            if val is None:
+                return 0.0
+            if isinstance(val, (int, float)):
+                return float(val)
+            s = str(val).replace("R$", "").replace("\xa0", "").strip()
+            if "," in s and "." in s:
+                s = s.replace(".", "").replace(",", ".")
+            elif "," in s:
+                s = s.replace(",", ".")
+            try:
+                return float(s)
+            except ValueError:
+                return 0.0
+
+        def _fmt(price):
+            s = f"{price:,.2f}"
+            return "R$ " + s.replace(",", "X").replace(".", ",").replace("X", ".")
+
+        session = SessionLocal()
+        products = session.query(Product).filter(
+            Product.platform == "mercadolivre",
+            Product.external_id.isnot(None),
+            Product.external_id != "",
+            Product.disponivel == True,
+        ).all()
+
+        results = {"total": len(products), "updated": 0, "cheapest": 0, "errors": 0, "details": []}
+
+        for product in products:
+            current_price = _parse_price(product.price)
+            try:
+                # Usa external_id diretamente — não parseia link
+                catalog_id = None
+                item_data  = get_item(product.external_id)
+                if item_data:
+                    catalog_id = item_data.get("catalog_product_id")
+                if not catalog_id:
+                    catalog_id = product.external_id
+
+                raw      = get_catalog_listings(catalog_id)
+                listings = parse_catalog_listings(raw)
+                cheapest = find_cheapest(listings) if listings else None
+
+                if not cheapest:
+                    results["details"].append({"id": product.external_id, "status": "no_data"})
+                    continue
+
+                # Resolve permalink (endpoint /products/{id}/items não retorna permalink)
+                if not cheapest.permalink:
+                    pd = get_item(cheapest.item_id)
+                    if pd:
+                        cheapest.permalink = pd.get("permalink", "") or ""
+                if not cheapest.permalink:
+                    cheapest.permalink = f"https://www.mercadolivre.com.br/p/{catalog_id}"
+
+                affiliate = generate_affiliate_link(cheapest.permalink) if cheapest.permalink else ""
+
+                if current_price > 0 and cheapest.real_price >= current_price * 0.99:
+                    results["cheapest"] += 1
+                    results["details"].append({
+                        "id": product.external_id, "status": "cheapest",
+                        "price": _fmt(current_price)
+                    })
+                    continue
+
+                if not dry_run:
+                    product.old_price  = product.price
+                    product.price      = _fmt(cheapest.real_price)
+                    product.link       = affiliate or cheapest.permalink
+                    product.updated_at = datetime.utcnow()
+                    session.commit()
+
+                results["updated"] += 1
+                results["details"].append({
+                    "id":        product.external_id,
+                    "title":     product.title[:60],
+                    "status":    "updated" + ("_dry" if dry_run else ""),
+                    "old_price": _fmt(current_price),
+                    "new_price": _fmt(cheapest.real_price),
+                    "new_link":  affiliate or cheapest.permalink,
+                })
+
+            except Exception as e:
+                results["errors"] += 1
+                results["details"].append({"id": product.external_id, "status": "error", "error": str(e)})
+
+        session.close()
+        return jsonify({
+            "status":  "ok",
+            "dry_run": dry_run,
+            "summary": {
+                "total":    results["total"],
+                "updated":  results["updated"],
+                "cheapest": results["cheapest"],
+                "errors":   results["errors"],
+            },
+            "details": results["details"],
+        })
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @sync_bp.route("/shopee/product/<external_id>", methods=["POST"])

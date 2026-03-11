@@ -11,9 +11,27 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .url_parser import detect_url_type
 from .ml_api import get_item, get_catalog_listings
-from .price_service import listing_from_api, parse_catalog_listings, find_cheapest
+from .price_service import listing_from_api, parse_catalog_listings, find_cheapest, Listing
+from .affiliate import generate_affiliate_link
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_permalink(listing: "Listing", catalog_id: str = "") -> str:
+    """
+    Retorna o permalink do listing.
+    Se estiver vazio (caso do endpoint /products/{id}/items que não retorna permalink),
+    faz GET /items/{item_id} para obter o permalink real.
+    Fallback final: URL da página de catálogo se catalog_id for fornecido.
+    """
+    if listing.permalink:
+        return listing.permalink
+    item_data = get_item(listing.item_id)
+    if item_data:
+        listing.permalink = item_data.get("permalink", "") or ""
+    if not listing.permalink and catalog_id:
+        listing.permalink = f"https://www.mercadolivre.com.br/p/{catalog_id}"
+    return listing.permalink
 
 
 @dataclass
@@ -25,6 +43,7 @@ class ValidationResult:
     current_price: Optional[float] = None
     cheapest_price: Optional[float] = None
     cheapest_link: Optional[str] = None
+    affiliate_link: Optional[str] = None       # cheapest_link com parâmetro matt_tool
     price_difference: Optional[float] = None   # current - cheapest (positivo = mais caro)
     free_shipping: Optional[bool] = None
     cheapest_free_shipping: Optional[bool] = None
@@ -85,10 +104,12 @@ def validate_single(url: str) -> ValidationResult:
             result.is_cheapest = None   # N/A — sem item de referência
             result.cheapest_price = cheapest.real_price
             result.cheapest_free_shipping = cheapest.free_shipping
-            result.cheapest_link = cheapest.permalink
+            permalink = _resolve_permalink(cheapest, catalog_product_id)
+            result.cheapest_link = permalink
+            result.affiliate_link = generate_affiliate_link(permalink) if permalink else None
             logger.info(
                 f"[{catalog_product_id}] Mais barato no catálogo: R$ {cheapest.real_price:.2f} "
-                f"→ {cheapest.permalink}"
+                f"→ {permalink}"
             )
         return result
 
@@ -146,12 +167,14 @@ def validate_single(url: str) -> ValidationResult:
     result.is_cheapest = is_cheapest
 
     if not is_cheapest:
-        result.cheapest_link = cheapest.permalink
+        permalink = _resolve_permalink(cheapest, catalog_product_id or "")
+        result.cheapest_link = permalink
+        result.affiliate_link = generate_affiliate_link(permalink) if permalink else None
         result.price_difference = round(original_listing.real_price - cheapest.real_price, 2)
         logger.info(
             f"[{item_id}] Existe opção mais barata: R$ {cheapest.real_price:.2f} "
             f"vs R$ {original_listing.real_price:.2f} (diff: R$ {result.price_difference:.2f}) "
-            f"→ {cheapest.permalink}"
+            f"→ {permalink}"
         )
     else:
         logger.info(f"[{item_id}] Já é o mais barato: R$ {original_listing.real_price:.2f}")

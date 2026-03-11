@@ -68,10 +68,12 @@ def _print_result(r: ValidationResult, idx: int, total: int) -> None:
     if r.is_cheapest is None:
         cheap_str     = f"R$ {r.cheapest_price:.2f}" if r.cheapest_price else "?"
         cheap_freight = "🚚 grátis" if r.cheapest_free_shipping else "frete pago"
+        aff_line = f"\n          🔗 Afiliado: {r.affiliate_link}" if r.affiliate_link else ""
         print(
             f"{prefix} 🔍  {r.item_id}  [catálogo — {r.total_listings} ofertas]\n"
             f"          Mais barato: {cheap_str} ({cheap_freight})\n"
             f"          → {r.cheapest_link}"
+            f"{aff_line}"
         )
     elif r.is_cheapest:
         print(f"{prefix} ✅  {r.item_id}  {price_str} ({freight})  — já é o mais barato")
@@ -79,10 +81,12 @@ def _print_result(r: ValidationResult, idx: int, total: int) -> None:
         diff = f"R$ {r.price_difference:.2f} mais caro"
         cheap_str = f"R$ {r.cheapest_price:.2f}" if r.cheapest_price else "?"
         cheap_freight = "🚚 grátis" if r.cheapest_free_shipping else "frete pago"
+        aff_line = f"\n          🔗 Afiliado: {r.affiliate_link}" if r.affiliate_link else ""
         print(
             f"{prefix} 💸  {r.item_id}  {price_str} ({freight})\n"
             f"          Mais barato: {cheap_str} ({cheap_freight})  [{diff}]\n"
             f"          → {r.cheapest_link}"
+            f"{aff_line}"
         )
 
 

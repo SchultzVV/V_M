@@ -363,7 +363,7 @@ def merge_api_with_ocr_price(api_data: dict, ocr_result: dict) -> dict:
     """
     merged = api_data.copy()
 
-    if ocr_result.get('source') != 'ocr' or not ocr_result.get('price', 0):
+    if ocr_result.get('source') not in ('ocr', 'affiliate_ocr') or not ocr_result.get('price', 0):
         print("   ℹ️  OCR não encontrou preço — mantendo dados da API")
         return merged
 
@@ -704,8 +704,10 @@ def main():
                 api_old   = float(api_data.get('original_price', 0) or 0)
 
                 # Tentar endpoint /sale_price (mais preciso para promoções)
-                if token and product_id:
-                    sale = get_sale_price_from_api(product_id, token)
+                # Para catalog IDs, usa o item mais barato encontrado em /products/{id}/items
+                sale_id = api_data.get('_cheapest_item_id') or product_id
+                if token and sale_id:
+                    sale = get_sale_price_from_api(sale_id, token)
                     if sale:
                         api_price = sale.get('price', api_price)
                         api_old   = sale.get('oldPrice', api_old) or api_old
@@ -863,8 +865,17 @@ def main():
 
         suggested_category = detect_product_category(product_data['title'])
         print(f"\n📦 Produto: {product_data['title']}")
-        selected_category    = ask_user_category(suggested_category)
-        selected_subcategory = ask_user_subcategory(selected_category)
+
+        # Permite bypass não-interativo via env vars (usado por reprepare_all_ml.py)
+        force_cat  = os.environ.get("FORCE_CATEGORY", "").strip()
+        force_sub  = os.environ.get("FORCE_SUBCATEGORY", "").strip()
+        if force_cat:
+            selected_category    = force_cat.upper()
+            selected_subcategory = force_sub
+            print(f"  📦 Categoria (auto): {selected_category}" + (f" / {selected_subcategory}" if selected_subcategory else ""))
+        else:
+            selected_category    = ask_user_category(suggested_category)
+            selected_subcategory = ask_user_subcategory(selected_category)
 
         # ─────────────────────────────────────────────────────────
         # ETAPA 9: Gerar JSON de staging

@@ -4,7 +4,7 @@ Cliente para a API pública do Mercado Livre com cache Redis.
 
 Endpoints usados:
   GET /items/{item_id}                                         → dados do item
-  GET /sites/MLB/search?catalog_product_id={id}&limit=50      → todos os vendedores
+  GET /products/{catalog_id}/items                            → todos os vendedores do catálogo
 """
 
 import os
@@ -95,25 +95,46 @@ def get_item(item_id: str) -> Optional[Dict[str, Any]]:
 
     url = f"{_API_BASE}/items/{item_id}"
     try:
-        resp = requests.get(url, headers=_get_auth_headers(), timeout=_REQUEST_TIMEOUT)
+        resp = _get_with_fallback(url)
         resp.raise_for_status()
         data = resp.json()
         _cache_set(cache_key, data)
         return data
     except requests.HTTPError as e:
-        logger.error(f"HTTPError ao buscar item {item_id}: {e.response.status_code} {e.response.text[:200]}")
+        status = e.response.status_code
+        # 404 = catalog ID passado como item ID (fallback esperado)
+        # 403 = PolicyAgent bloqueia item de terceiro (fallback esperado)
+        lvl = logger.debug if status in (404, 403) else logger.error
+        lvl(f"[item {item_id}] HTTP {status} — {e.response.text[:120]}")
         return None
     except requests.RequestException as e:
         logger.error(f"Erro de rede ao buscar item {item_id}: {e}")
         return None
 
 
+def _get_with_fallback(url: str) -> Optional[requests.Response]:
+    """
+    Faz GET com auth; se retornar 403 (token expirado/inválido),
+    tenta novamente sem Authorization header (endpoint público).
+    """
+    resp = requests.get(url, headers=_get_auth_headers(), timeout=_REQUEST_TIMEOUT)
+    if resp.status_code == 403:
+        logger.debug(f"403 com auth em {url} — retentando sem token (endpoint público)")
+        resp = requests.get(url, headers=_HEADERS, timeout=_REQUEST_TIMEOUT)
+    return resp
+
+
 def get_catalog_listings(catalog_product_id: str) -> List[Dict[str, Any]]:
     """
     Retorna todos os vendedores ativos do mesmo produto no catálogo ML.
 
-    Usa /sites/MLB/search?catalog_product_id=... com paginação (max 50 p/ request).
-    Concatena até 3 páginas (150 itens — suficiente para encontrar o mais barato).
+    Usa GET /products/{catalog_product_id}/items — endpoint público que lista
+    todos os itens do catálogo, ordenados por preço ascendente.
+    (O endpoint /sites/MLB/search?catalog_product_id= requer nível Partner — 403)
+
+    Normaliza cada resultado para compatibilidade com listing_from_api():
+      - Adiciona "id"        = item["item_id"]
+      - Adiciona "permalink" = "" (será buscado sob demanda pelo caller se necessário)
     """
     cache_key = f"pv:catalog:{catalog_product_id}"
     cached = _cache_get(cache_key)
@@ -121,28 +142,28 @@ def get_catalog_listings(catalog_product_id: str) -> List[Dict[str, Any]]:
         logger.debug(f"Cache HIT para catálogo {catalog_product_id}")
         return cached
 
-    results: List[Dict] = []
-    limit = 50
-    max_pages = 3
+    url = f"{_API_BASE}/products/{catalog_product_id}/items"
+    try:
+        resp = _get_with_fallback(url)
+        resp.raise_for_status()
+        data = resp.json()
+        raw_results = data.get("results", [])
 
-    for page in range(max_pages):
-        offset = page * limit
-        url = (
-            f"{_API_BASE}/sites/MLB/search"
-            f"?catalog_product_id={catalog_product_id}"
-            f"&limit={limit}&offset={offset}"
-        )
-        try:
-            resp = requests.get(url, headers=_get_auth_headers(), timeout=_REQUEST_TIMEOUT)
-            resp.raise_for_status()
-            data = resp.json()
-            page_results = data.get("results", [])
-            results.extend(page_results)
-            if len(page_results) < limit:
-                break  # última página
-        except requests.RequestException as e:
-            logger.error(f"Erro ao buscar catálogo {catalog_product_id} offset={offset}: {e}")
-            break
+        # Normaliza campos para compatibilidade com listing_from_api
+        results = []
+        for item in raw_results:
+            normalized = dict(item)
+            normalized["id"] = item.get("item_id", "")
+            if "permalink" not in normalized:
+                normalized["permalink"] = ""   # será buscado sob demanda
+            results.append(normalized)
+
+    except requests.HTTPError as e:
+        logger.error(f"HTTPError ao buscar catálogo {catalog_product_id}: {e.response.status_code} {e.response.text[:200]}")
+        results = []
+    except requests.RequestException as e:
+        logger.error(f"Erro de rede ao buscar catálogo {catalog_product_id}: {e}")
+        results = []
 
     if results:
         _cache_set(cache_key, results)
