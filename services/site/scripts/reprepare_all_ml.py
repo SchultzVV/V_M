@@ -5,7 +5,7 @@ Re-prepara TODOS os produtos ML do banco usando o pipeline completo
 (prepare_ml_best.py: API + OCR de preço + download de imagens).
 
 Mantém as mesmas tags e subcategorias já cadastradas — sem perguntas interativas.
-Após preparar todos, executa stage_products.py --force para atualizar o banco.
+Após preparar todos, imprime lembrete para rodar `make stage` manualmente.
 
 Uso:
     python scripts/reprepare_all_ml.py              # todos os produtos ML ativos
@@ -53,7 +53,9 @@ def _prepare_one(product: Product, dry_run: bool) -> dict:
     """
     tag        = _parse_tag(product.tags)
     subcategory = product.subcategory or ""
-    url        = _ml_url(product.external_id)
+    # Usa o link original salvo no banco (meli.la/...) — garante que
+    # a Etapa 5B screenshot bata no link de afiliado curto, não na URL longa do ML.
+    url        = (product.link or "").strip() or _ml_url(product.external_id)
 
     report = {
         "external_id": product.external_id,
@@ -170,10 +172,10 @@ def main():
     if not dry and ok > 0:
         print()
         print("━" * 66)
-        print("📤 Executando stage --force para publicar no banco...")
+        print("✅ JSONs de staging gerados em /app/staging/")
+        print("   Revise os arquivos e rode:")
+        print("   make stage")
         print("━" * 66)
-        stage_script = str(Path(__file__).parent / "stage_products.py")
-        subprocess.run([sys.executable, stage_script, "--force"])
 
     if dry:
         print("\nℹ️  Nada foi alterado (--dry-run). Rode sem a flag para aplicar.")

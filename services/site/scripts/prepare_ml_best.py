@@ -49,6 +49,10 @@ from category_selector import (
     ask_user_category,
     ask_user_subcategory,
 )
+try:
+    from price_validator.affiliate import generate_affiliate_link as _make_affiliate_link
+except ImportError:
+    _make_affiliate_link = None
 
 
 # ROI da área de preço na página do Mercado Livre (viewport 1440x900)
@@ -408,31 +412,39 @@ def merge_api_with_ocr_price(api_data: dict, ocr_result: dict) -> dict:
     print(f"      OCR:  R$ {ocr_price:.2f}" + (f"  (era R$ {ocr_old:.2f})" if ocr_old else ""))
     print(f"      raw_prices: {raw_prices}")
 
-    # ── CASO 1: API sem preço (catálogo) → OCR é a única fonte ──────────
+    # ── CASO 1: API sem preço (catálogo sem buy_box_winner) → OCR é a única fonte ──
     if api_price == 0 and ocr_price > 0:
         merged['price']         = f"R$ {ocr_price:.2f}"
         merged['old_price']     = f"R$ {ocr_old:.2f}" if ocr_old > ocr_price else f"R$ {ocr_price:.2f}"
         merged['_price_source'] = 'ocr'
         print(f"   📸 API sem preço — usando preço do OCR: R$ {ocr_price:.2f}")
 
-    # ── CASO 2: OCR menor que API (promoção) ────────────────────────
-    elif ocr_price > 0 and ocr_price < api_price * 0.98:
-        merged['price']         = f"R$ {ocr_price:.2f}"
-        merged['old_price']     = f"R$ {api_price:.2f}"
-        merged['_price_source'] = 'ocr_promo'
-        discount_pct = round((api_price - ocr_price) / api_price * 100)
-        print(f"   🔥 Promoção detectada via OCR: {discount_pct}% OFF!")
-        print(f"      De: R$ {api_price:.2f} → Por: R$ {ocr_price:.2f}")
+    # ── CASO 2: API JÁ TEM PREÇO OFICIAL → OCR só confirma promoção real ────
+    # Condição obrigatória: OCR deve ter visto o preço DA API como old_price
+    # (ou seja, OCR está na mesma página e confirmou que o preço riscado = preço API).
+    # Isso evita que OCR aleatório (parcela, erro de leitura) substitua preço oficial.
+    elif api_price > 0 and ocr_price > 0 and ocr_price < api_price * 0.98:
+        ocr_confirms_promo = ocr_old >= api_price * 0.95  # OCR viu api_price como riscado
+        if ocr_confirms_promo:
+            merged['price']         = f"R$ {ocr_price:.2f}"
+            merged['old_price']     = f"R$ {api_price:.2f}"
+            merged['_price_source'] = 'ocr_promo'
+            discount_pct = round((api_price - ocr_price) / api_price * 100)
+            print(f"   🔥 Promoção CONFIRMADA via OCR: {discount_pct}% OFF!")
+            print(f"      De: R$ {api_price:.2f} → Por: R$ {ocr_price:.2f}")
+        else:
+            print(f"   ✅ Preço oficial da API mantido: R$ {api_price:.2f}")
+            print(f"      (OCR leu R$ {ocr_price:.2f} mas não confirmou preço riscado — ignorado)")
 
-    # ── CASO 3: OCR viu dois preços e o old_price é maior ────────────
-    elif ocr_price > 0 and ocr_old > 0 and ocr_old > ocr_price:
+    # ── CASO 3: OCR viu dois preços e o old_price é maior (sem preço API) ─
+    elif ocr_price > 0 and ocr_old > 0 and ocr_old > ocr_price and api_price == 0:
         current_old = to_float(merged.get('old_price', 0))
         if ocr_old > current_old:
             merged['old_price'] = f"R$ {ocr_old:.2f}"
             print(f"   📝 old_price atualizado pelo OCR: R$ {ocr_old:.2f}")
 
     else:
-        print(f"   ✅ Preço da API mantido (OCR não detectou promoção mais baixa)")
+        print(f"   ✅ Preço oficial da API mantido: R$ {api_price:.2f}")
 
     # ── Frete grátis do OCR ────────────────────────────────────────────
     if ocr_result.get('free_shipping') and not merged.get('free_shipping'):
@@ -500,49 +512,84 @@ def take_and_ocr_affiliate_full(affiliate_url: str) -> dict:
     except Exception as e:
         print(f"   ⚠️  Não foi possível salvar screenshot: {e}")
 
-    # OCR no screenshot completo (sem ROI)
+    # Análise estruturada via /analyze (retorna current_price, old_price, installment, discount)
     try:
         with open(tmp_path, 'rb') as f:
             files = {'file': (os.path.basename(tmp_path), f, 'image/png')}
-            response = requests.post('http://info-scrap:8000/extract', files=files, timeout=60)
+            response = requests.post('http://info-scrap:8000/analyze', files=files, timeout=60)
 
         if response.status_code != 200:
-            print(f"   ⚠️  OCR retornou status {response.status_code}")
+            print(f"   ⚠️  info-scrap /analyze retornou status {response.status_code}")
             return result
 
-        ocr = response.json()
-        raw_text = ocr.get('text', '')
-        result['raw_text'] = raw_text
-        lines = [ln for ln in raw_text.strip().splitlines() if ln.strip()]
+        data = response.json()
 
-        print(f"\n   ┌─── [DEBUG OCR AFILIADO — {len(lines)} linhas] ───────────────────")
-        for ln in lines:
-            print(f"   │ {ln}")
-        print(f"   └───────────────────────────────────────────────────────────")
+        if not data.get('success'):
+            print(f"   ⚠️  /analyze retornou success=false")
+            return result
 
-        # Parser de preços BR (igual ao _parse_ml_prices)
-        prices = _parse_ml_prices(raw_text)
-        result['raw_prices'] = prices
-        print(f"\n   💰 Preços detectados: {prices}")
+        product = data.get('product', {})
 
-        if len(prices) >= 2:
-            result['price']     = min(prices)
-            result['old_price'] = max(prices)
-            result['source']    = 'affiliate_ocr'
-            disc = round((result['old_price'] - result['price']) / result['old_price'] * 100)
-            print(f"   ✅ Preço atual  : R$ {result['price']:.2f}")
-            print(f"   ✅ Preço antigo : R$ {result['old_price']:.2f}  ({disc}% OFF)")
-        elif len(prices) == 1:
-            result['price']  = prices[0]
+        current = product.get('current_price') or {}
+        old     = product.get('old_price') or {}
+        install = product.get('installment') or {}
+        disc    = product.get('discount') or {}
+
+        current_val  = float(current.get('value', 0) or 0)
+        old_val      = float(old.get('value', 0) or 0)
+        old_is_orphan = bool(old.get('orphan', False))  # detectado sem contexto claro
+
+        # shipping agora é string direta (ex: "Frete grátis por ser sua primeira compra")
+        shipping_str = product.get('shipping') or ''
+        if isinstance(shipping_str, str) and 'grátis' in shipping_str.lower():
+            result['free_shipping'] = True
+
+        print(f"\n   ┌─── [DEBUG /analyze] ────────────────────────────────────────")
+        if product.get('title'):
+            print(f"   │ título     : {product['title'][:70]}")
+        print(f"   │ preço atual: {current.get('formatted', '?')}")
+        if old_val:
+            orphan_flag = '  ⚠️ orphan' if old_is_orphan else ''
+            print(f"   │ preço de   : {old.get('formatted', '?')}{orphan_flag}")
+        if disc.get('percentage'):
+            print(f"   │ desconto   : {disc['percentage']}% OFF")
+        if install and install.get('installments'):
+            print(f"   │ parcelas   : {install.get('raw_text', '?')}  →  total {install.get('formatted_total', '?')}")
+        if shipping_str:
+            print(f"   │ frete      : {shipping_str[:60]}")
+        print(f"   └────────────────────────────────────────────────────────────")
+
+        if current_val > 0:
+            result['price']  = current_val
             result['source'] = 'affiliate_ocr'
-            print(f"   ✅ Preço detectado: R$ {prices[0]:.2f}")
+
+            # Só aceita old_price se for consistente com o desconto anunciado
+            if old_val > current_val and not old_is_orphan:
+                result['old_price'] = old_val
+            elif old_val > current_val and old_is_orphan and disc.get('percentage'):
+                # Orphan mas temos o % de desconto — valida pela matemática
+                expected_old = round(current_val / (1 - disc['percentage'] / 100), 2)
+                if abs(old_val - expected_old) / expected_old < 0.15:   # margem 15%
+                    result['old_price'] = old_val
+                else:
+                    result['old_price'] = 0.0
+                    print(f"   ⚠️  old_price orphan (R$ {old_val:.2f}) inconsistente com {disc['percentage']}% OFF — descartado")
+            else:
+                result['old_price'] = 0.0
+
+            result['raw_prices'] = [v for v in [current_val, result['old_price']] if v > 0]
+
+            print(f"\n   ✅ Preço atual  : R$ {current_val:.2f}")
+            if result['old_price']:
+                pct = round((result['old_price'] - current_val) / result['old_price'] * 100)
+                print(f"   ✅ Preço antigo : R$ {result['old_price']:.2f}  ({pct}% OFF)")
         else:
-            print(f"   ℹ️  Nenhum preço encontrado no screenshot do afiliado")
+            print(f"   ℹ️  /analyze não encontrou preço no screenshot do afiliado")
 
     except requests.exceptions.ConnectionError:
         print(f"   ⚠️  Serviço info-scrap não disponível (OCR do afiliado ignorado)")
     except Exception as e:
-        print(f"   ⚠️  Erro no OCR do afiliado: {e}")
+        print(f"   ⚠️  Erro no /analyze do afiliado: {e}")
     finally:
         try:
             if tmp_path:
@@ -699,18 +746,9 @@ def main():
             if api_data:
                 print(f"   ✅ Dados obtidos via API!")
 
-                # ── Preços ────────────────────────────────────────
+                # ── Preços da API (fonte oficial — não serão sobrescritos) ──
                 api_price = float(api_data.get('price', 0) or 0)
                 api_old   = float(api_data.get('original_price', 0) or 0)
-
-                # Tentar endpoint /sale_price (mais preciso para promoções)
-                # Para catalog IDs, usa o item mais barato encontrado em /products/{id}/items
-                sale_id = api_data.get('_cheapest_item_id') or product_id
-                if token and sale_id:
-                    sale = get_sale_price_from_api(sale_id, token)
-                    if sale:
-                        api_price = sale.get('price', api_price)
-                        api_old   = sale.get('oldPrice', api_old) or api_old
 
                 # ── Imagens da API (URLs de alta qualidade -O.) ───
                 for pic in api_data.get('pictures', []):
@@ -785,6 +823,8 @@ def main():
         print("\n" + "━" * 70)
         print("ETAPA 5B: OCR mandatório — screenshot completo do link de afiliado")
         print("━" * 70)
+        # Usa o URL original (meli.la ou link do banco) — é a página que
+        # mostra o preço real do afiliado, diferente da página do produto resolvida.
         affiliate_ocr = take_and_ocr_affiliate_full(url)
         if affiliate_ocr['source'] == 'affiliate_ocr' and affiliate_ocr['price'] > 0:
             print(f"\n   🔒 Preços do afiliado substituem OCR de ROI (mandatório):")
@@ -884,10 +924,18 @@ def main():
         print("ETAPA 9: Gerando JSON de staging")
         print("━" * 70)
 
+        # O link salvo no JSON deve ser o link de afiliado (com matt_tool)
+        # gerado a partir da URL resolvida do produto (product_url),
+        # não da URL curta de input (meli.la) que pode não aceitar query params.
+        if _make_affiliate_link:
+            staging_link = _make_affiliate_link(product_url)
+        else:
+            staging_link = product_url
+
         json_file, json_data = generate_staging_json(
             product_data,
             images_dir,
-            url,
+            staging_link,
             selected_category,
             selected_subcategory
         )

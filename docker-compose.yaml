@@ -61,7 +61,7 @@ services:
     restart: always
 
   info-scrap:
-    image: ghcr.io/schultzvv/info_scrap:sha-d337627
+    image: ghcr.io/schultzvv/info_scrap:latest
     container_name: info-scrap
     ports:
       - "8001:8000"
