@@ -153,10 +153,17 @@ serve-cloudflare:  ## ⭐ Túnel Cloudflare: sobe tudo, captura URL e configura 
 stop-cloudflare:  ## Para o túnel Cloudflare em background
 	@pkill cloudflared 2>/dev/null && echo "✅ Túnel encerrado" || echo "⚠️  Túnel não estava rodando"
 
-serve-ngrok:  ## Túnel ngrok (plano free, URL aleatória)
+serve-ngrok:  ## Túnel ngrok com domínio estático (NGROK_SUBDOMAIN no .env)
 	@pkill ngrok 2>/dev/null || true
 	$(COMPOSE) up -d
-	@ngrok http --request-header-add="ngrok-skip-browser-warning:true" https://localhost:5000 > /dev/null &
+	@SUBDOMAIN=$$(grep '^NGROK_SUBDOMAIN=' .env | cut -d'=' -f2 | tr -d '[:space:]'); \
+	if [ -n "$$SUBDOMAIN" ]; then \
+		echo "🌐 Usando domínio estático: https://$$SUBDOMAIN.ngrok-free.app"; \
+		ngrok http --domain=$$SUBDOMAIN.ngrok-free.app --request-header-add="ngrok-skip-browser-warning:true" https://localhost:5000 > /dev/null 2>&1 & \
+	else \
+		echo "🌐 Usando URL aleatória (defina NGROK_SUBDOMAIN no .env para URL fixa)"; \
+		ngrok http --request-header-add="ngrok-skip-browser-warning:true" https://localhost:5000 > /dev/null 2>&1 & \
+	fi
 	@sleep 6
 	@echo "🌐 URL ngrok:" && curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
 
@@ -174,40 +181,101 @@ setup-cloudflare-fixed:  ## Cria túnel Cloudflare com URL permanente (executar 
 	if [ ! -x "$$CLOUDFLARED_BIN" ]; then echo "❌ Execute: make install-cloudflared"; exit 1; fi; \
 	echo "🔑 Login Cloudflare (abrirá o browser)..."; \
 	$$CLOUDFLARED_BIN login; \
-	echo "🔧 Criando túnel permanente 'vm-site'..."; \
-	$$CLOUDFLARED_BIN tunnel create vm-site 2>/dev/null || echo "Túnel já existe"; \
-	TUNNEL_ID=$$($$CLOUDFLARED_BIN tunnel list | grep vm-site | awk '{print $$1}'); \
+	echo "🔧 Criando túnel 'def'..."; \
+	$$CLOUDFLARED_BIN tunnel create def 2>/dev/null || echo "Túnel já existe"; \
+	TUNNEL_ID=$$($$CLOUDFLARED_BIN tunnel list | grep ' def ' | awk '{print $$1}'); \
 	echo "📝 Gerando ~/.cloudflared/config.yml..."; \
 	printf "tunnel: %s\ncredentials-file: /home/%s/.cloudflared/%s.json\n\ningress:\n  - service: https://localhost:5000\n    originRequest:\n      noTLSVerify: true\n      connectTimeout: 30s\n      tlsTimeout: 30s\n      tcpKeepAlive: 30s\n      keepAliveConnections: 10\n      keepAliveTimeout: 90s\n" "$$TUNNEL_ID" "$$USER" "$$TUNNEL_ID" > ~/.cloudflared/config.yml; \
+	CF_HOST=$$(grep '^CF_HOSTNAME=' .env | cut -d'=' -f2 | tr -d '[:space:]'); \
+	if [ -n "$$CF_HOST" ]; then \
+		echo "🌐 Criando rota DNS: $$CF_HOST → túnel def..."; \
+		$$CLOUDFLARED_BIN tunnel route dns def $$CF_HOST && echo "✅ CNAME criado!"; \
+	fi; \
 	echo "✅ Configurado! Use: make serve-cloudflare-fixed"
 
-serve-cloudflare-fixed:  ## Túnel Cloudflare com URL PERMANENTE (requer setup-cloudflare-fixed)
+serve-cloudflare-fixed:  ## ⭐ Túnel Cloudflare URL FIXA: requer CF_HOSTNAME no .env (ex: def.seudominio.com)
 	@CLOUDFLARED_BIN=$$(command -v cloudflared 2>/dev/null || echo /usr/local/bin/cloudflared); \
 	if [ ! -x "$$CLOUDFLARED_BIN" ]; then echo "❌ Execute: make install-cloudflared"; exit 1; fi; \
 	if [ ! -s ~/.cloudflared/config.yml ]; then echo "❌ Execute: make setup-cloudflare-fixed"; exit 1; fi; \
+	CF_HOST=$$(grep '^CF_HOSTNAME=' .env | cut -d'=' -f2 | tr -d '[:space:]'); \
+	if [ -z "$$CF_HOST" ]; then \
+		echo ""; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		echo "⚠️  URL FIXA não configurada"; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		echo ""; \
+		echo "Para ter URL fixa permanente no Cloudflare você precisa de"; \
+		echo "um domínio próprio gerenciado pelo Cloudflare. Depois:"; \
+		echo ""; \
+		echo "  1. Adicione no .env:  CF_HOSTNAME=def.seudominio.com"; \
+		echo "  2. Execute:           make setup-cloudflare-fixed"; \
+		echo "     (cria o CNAME automaticamente)"; \
+		echo "  3. Execute:           make serve-cloudflare-fixed"; \
+		echo ""; \
+		echo "Enquanto não tem domínio, use: make serve-cloudflare"; \
+		echo "(URL muda mas tudo mais funciona igual)"; \
+		echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+		exit 1; \
+	fi; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "🔒 CLOUDFLARE TUNNEL — URL PERMANENTE  +  AUTO-CONFIG OAUTH ML"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
 	echo "🔧 Subindo containers..."; \
 	$(COMPOSE) up -d; \
 	sleep 2; \
-	TUNNEL_ID=$$(grep '^tunnel:' ~/.cloudflared/config.yml | awk '{print $$2}'); \
-	FIXED_URL="https://$$TUNNEL_ID.cfargotunnel.com"; \
+	echo "✅ Site em https://localhost:5000"; \
+	echo ""; \
+	FIXED_URL="https://$$CF_HOST"; \
 	APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2 | tr -d '[:space:]'); \
 	NEW_REDIRECT="$$FIXED_URL/auth/mercadolivre/callback"; \
-	echo ""; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-	echo "🌐 CLOUDFLARE TUNNEL — URL PERMANENTE"; \
+	echo "🌍 URL FIXA : $$FIXED_URL"; \
+	echo "🔁 Callback : $$NEW_REDIRECT"; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-	echo "🌍 URL fixa: $$FIXED_URL"; \
-	echo "🔁 Callback: $$NEW_REDIRECT"; \
 	echo ""; \
-	if [ -n "$$APP_ID" ]; then \
-		AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NEW_REDIRECT"; \
-		echo "🔑 Link para autorizar (cole no browser se tokens expiraram):"; \
-		echo "   $$AUTH_URL"; \
+	echo "📝 Atualizando ML_REDIRECT_URI no .env..."; \
+	if grep -q '^ML_REDIRECT_URI=' .env; then \
+		sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=$$NEW_REDIRECT|" .env; \
 	else \
-		echo "⚠️  ML_APP_ID não preenchido no .env — OAuth não disponível"; \
+		echo "ML_REDIRECT_URI=$$NEW_REDIRECT" >> .env; \
+	fi; \
+	echo "🔄 Reiniciando site com nova URI..."; \
+	$(COMPOSE) stop site > /dev/null 2>&1; \
+	$(COMPOSE) rm -f site > /dev/null 2>&1; \
+	$(COMPOSE) up -d site > /dev/null 2>&1; \
+	sleep 3; \
+	echo "✅ Container reiniciado"; \
+	echo ""; \
+	TOKEN=$$(docker exec site cat /app/config/ml_tokens.json 2>/dev/null | jq -r '.access_token // empty' 2>/dev/null); \
+	TOKEN_OK=0; \
+	if [ -n "$$TOKEN" ]; then \
+		STATUS=$$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $$TOKEN" https://api.mercadolibre.com/users/me); \
+		[ "$$STATUS" = "200" ] && TOKEN_OK=1; \
+	fi; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	if [ "$$TOKEN_OK" = "1" ]; then \
+		echo "🔑 TOKEN ML: ✅ válido — não precisa reautorizar"; \
+		echo ""; \
+		echo "   Pode usar a API direto: make test-api"; \
+	else \
+		echo "🔑 TOKEN ML: ❌ expirado ou ausente — autorização necessária"; \
+		echo ""; \
+		AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NEW_REDIRECT"; \
+		echo "1️⃣  Configure o Redirect URI no DevCenter ML (UMA VEZ só):"; \
+		echo "   https://developers.mercadolivre.com.br/devcenter"; \
+		echo "   → URL de redirecionamento: $$NEW_REDIRECT"; \
+		echo ""; \
+		echo "2️⃣  Abra no navegador para autorizar:"; \
+		echo ""; \
+		echo "   $$AUTH_URL"; \
+		echo ""; \
+		echo "3️⃣  Após autorizar: make check-tokens"; \
 	fi; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 	echo "🚀 Iniciando túnel (Ctrl+C para parar)..."; \
+	echo "💡 Para parar: make stop-cloudflare"; \
 	echo ""; \
 	pkill cloudflared 2>/dev/null || true; sleep 1; \
 	$$CLOUDFLARED_BIN tunnel run
