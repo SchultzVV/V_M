@@ -37,6 +37,68 @@ def load_ml_token():
         return None
 
 
+def get_affiliate_link(product_id: str, seller_id: str = None, token: str = None) -> str:
+    """
+    Obtém link de afiliado via API oficial do Mercado Livre.
+    
+    Usa o endpoint de affiliate links que retorna meli.la/... short URL
+    com affiliate_id embutido.
+    
+    Args:
+        product_id: MLB123456789
+        seller_id: ID do vendedor/afiliado. Se None, lê ML_SELLER_ID do .env
+        token: OAuth token. Se None, lê do arquivo de tokens
+    
+    Returns:
+        URL de afiliado (meli.la/...) ou produto URL como fallback
+    """
+    clean_id = product_id.replace('-', '')
+    
+    if not seller_id:
+        seller_id = os.environ.get('ML_SELLER_ID', '').strip()
+    
+    if not seller_id:
+        print(f"   ⚠️  ML_SELLER_ID não configurado, retornando URL direta")
+        return f"https://www.mercadolivre.com.br/p/{clean_id}"
+    
+    if not token:
+        token = load_ml_token()
+    
+    if not token:
+        print(f"   ⚠️  Token ML não disponível, retornando URL direta")
+        return f"https://www.mercadolivre.com.br/p/{clean_id}"
+    
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'User-Agent': 'Mozilla/5.0'
+    }
+    
+    # Endpoint oficial de affiliate links
+    # GET /categories/{category_id}/attributes: não é isso
+    # Usar o endpoint direto de geração de short URL com affiliate tracking
+    # POST /teams/{seller_id}/affiliate_link?item_id={item_id}
+    
+    url = f"https://api.mercadolibre.com/teams/{seller_id}/affiliate_link?item_id={clean_id}"
+    
+    try:
+        print(f"   🔗 Gerando affiliate link para {clean_id}...")
+        response = requests.get(url, headers=headers, timeout=15)
+        
+        if response.status_code == 200:
+            data = response.json()
+            affiliate_url = data.get('short_url') or data.get('url')
+            if affiliate_url:
+                print(f"   ✅ Affiliate link: {affiliate_url}")
+                return affiliate_url
+        else:
+            print(f"   ⚠️  /affiliate_link retornou {response.status_code}")
+            return f"https://www.mercadolivre.com.br/p/{clean_id}"
+    
+    except Exception as e:
+        print(f"   ⚠️  Erro ao gerar affiliate link: {e}")
+        return f"https://www.mercadolivre.com.br/p/{clean_id}"
+
+
 def get_product_from_api(item_id, token):
     """Busca produto na API oficial. Prioriza /items (tem preços)."""
     clean_id = item_id.replace('-', '')

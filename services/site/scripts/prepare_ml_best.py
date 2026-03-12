@@ -464,18 +464,20 @@ def merge_api_with_ocr_price(api_data: dict, ocr_result: dict) -> dict:
 
 def take_and_ocr_affiliate_full(affiliate_url: str) -> dict:
     """
-    ETAPA 5B — Segundo scraping mandatório para confirmação de preço.
+    ETAPA 5B (MANDATÓRIA) — Endpoint /product do info-scrap.
 
     Tira screenshot COMPLETO (sem recorte de ROI) do link curto de afiliado,
-    envia ao OCR e extrai preço atual + preço antigo de forma autoritativa.
+    envia ao novo endpoint /product e extrai preço + metadados de forma autoritativa.
+
+    O endpoint /product retorna:
+        {title, price (R$ str), oldPrice (R$ str), disponivel (bool), stock}
 
     - Screenshot salvo em /app/fotos/affiliate_full_YYYYMMDD_HHMMSS.png
-    - Toda a saída OCR é impressa para debug
     - Resultado é mandatório: sobrescreve preços anteriores se encontrar valores
     """
-    result = {'price': 0.0, 'old_price': 0.0, 'raw_prices': [], 'raw_text': '', 'source': 'none'}
+    result = {'price': 0.0, 'old_price': 0.0, 'raw_prices': [], 'source': 'none'}
 
-    print(f"\n📸 [ETAPA 5B] Screenshot completo do link de afiliado...")
+    print(f"\n📸 [ETAPA 5B] Screenshot + /product endpoint...")
     print(f"   🔗 {affiliate_url}")
 
     tmp_path = None
@@ -496,7 +498,7 @@ def take_and_ocr_affiliate_full(affiliate_url: str) -> dict:
             print(f"   ✅ Screenshot capturado")
             browser.close()
     except Exception as e:
-        print(f"   ⚠️  Erro ao capturar screenshot do afiliado: {e}")
+        print(f"   ⚠️  Erro ao capturar screenshot: {e}")
         return result
 
     # Salvar cópia permanente para debug
@@ -512,84 +514,66 @@ def take_and_ocr_affiliate_full(affiliate_url: str) -> dict:
     except Exception as e:
         print(f"   ⚠️  Não foi possível salvar screenshot: {e}")
 
-    # Análise estruturada via /analyze (retorna current_price, old_price, installment, discount)
+    # Chamar novo endpoint /product
     try:
         with open(tmp_path, 'rb') as f:
             files = {'file': (os.path.basename(tmp_path), f, 'image/png')}
-            response = requests.post('http://info-scrap:8000/analyze', files=files, timeout=60)
+            response = requests.post('http://info-scrap:8000/product', files=files, timeout=120)
 
         if response.status_code != 200:
-            print(f"   ⚠️  info-scrap /analyze retornou status {response.status_code}")
+            print(f"   ⚠️  /product retornou status {response.status_code}")
             return result
 
         data = response.json()
+        print(f"\n   📊 /product retornou:")
+        print(f"      title      : {data.get('title', '?')[:70]}")
+        print(f"      price      : {data.get('price', '?')}")
+        if data.get('oldPrice'):
+            print(f"      oldPrice   : {data.get('oldPrice', '?')}")
+        print(f"      disponivel : {data.get('disponivel', '?')}")
+        if data.get('stock'):
+            print(f"      stock      : {data.get('stock', '?')}")
 
-        if not data.get('success'):
-            print(f"   ⚠️  /analyze retornou success=false")
-            return result
+        # Converter preços de string "R$ XXX,XX" para float
+        def parse_price_str(s: str) -> float:
+            """Converte 'R$ 1.234,56' → 1234.56"""
+            if not s:
+                return 0.0
+            s = str(s).replace('R$', '').strip()
+            # formato BR: 1.234,56 → 1234.56
+            if ',' in s and '.' in s:
+                s = s.replace('.', '').replace(',', '.')
+            elif ',' in s:
+                s = s.replace(',', '.')
+            try:
+                return float(s)
+            except:
+                return 0.0
 
-        product = data.get('product', {})
+        price_val = parse_price_str(data.get('price', ''))
+        old_price_val = parse_price_str(data.get('oldPrice', ''))
 
-        current = product.get('current_price') or {}
-        old     = product.get('old_price') or {}
-        install = product.get('installment') or {}
-        disc    = product.get('discount') or {}
-
-        current_val  = float(current.get('value', 0) or 0)
-        old_val      = float(old.get('value', 0) or 0)
-        old_is_orphan = bool(old.get('orphan', False))  # detectado sem contexto claro
-
-        # shipping agora é string direta (ex: "Frete grátis por ser sua primeira compra")
-        shipping_str = product.get('shipping') or ''
-        if isinstance(shipping_str, str) and 'grátis' in shipping_str.lower():
-            result['free_shipping'] = True
-
-        print(f"\n   ┌─── [DEBUG /analyze] ────────────────────────────────────────")
-        if product.get('title'):
-            print(f"   │ título     : {product['title'][:70]}")
-        print(f"   │ preço atual: {current.get('formatted', '?')}")
-        if old_val:
-            orphan_flag = '  ⚠️ orphan' if old_is_orphan else ''
-            print(f"   │ preço de   : {old.get('formatted', '?')}{orphan_flag}")
-        if disc.get('percentage'):
-            print(f"   │ desconto   : {disc['percentage']}% OFF")
-        if install and install.get('installments'):
-            print(f"   │ parcelas   : {install.get('raw_text', '?')}  →  total {install.get('formatted_total', '?')}")
-        if shipping_str:
-            print(f"   │ frete      : {shipping_str[:60]}")
-        print(f"   └────────────────────────────────────────────────────────────")
-
-        if current_val > 0:
-            result['price']  = current_val
+        if price_val > 0:
+            result['price'] = price_val
             result['source'] = 'affiliate_ocr'
+            result['raw_prices'] = [price_val]
 
-            # Só aceita old_price se for consistente com o desconto anunciado
-            if old_val > current_val and not old_is_orphan:
-                result['old_price'] = old_val
-            elif old_val > current_val and old_is_orphan and disc.get('percentage'):
-                # Orphan mas temos o % de desconto — valida pela matemática
-                expected_old = round(current_val / (1 - disc['percentage'] / 100), 2)
-                if abs(old_val - expected_old) / expected_old < 0.15:   # margem 15%
-                    result['old_price'] = old_val
-                else:
-                    result['old_price'] = 0.0
-                    print(f"   ⚠️  old_price orphan (R$ {old_val:.2f}) inconsistente com {disc['percentage']}% OFF — descartado")
+            # Validar old_price
+            if old_price_val > price_val:
+                result['old_price'] = old_price_val
+                result['raw_prices'].append(old_price_val)
+                pct = round((old_price_val - price_val) / old_price_val * 100)
+                print(f"\n   ✅ Preço      : R$ {price_val:.2f}")
+                print(f"   ✅ De         : R$ {old_price_val:.2f}  ({pct}% OFF)")
             else:
-                result['old_price'] = 0.0
-
-            result['raw_prices'] = [v for v in [current_val, result['old_price']] if v > 0]
-
-            print(f"\n   ✅ Preço atual  : R$ {current_val:.2f}")
-            if result['old_price']:
-                pct = round((result['old_price'] - current_val) / result['old_price'] * 100)
-                print(f"   ✅ Preço antigo : R$ {result['old_price']:.2f}  ({pct}% OFF)")
+                print(f"\n   ✅ Preço      : R$ {price_val:.2f}")
         else:
-            print(f"   ℹ️  /analyze não encontrou preço no screenshot do afiliado")
+            print(f"\n   ℹ️  /product sem preço no screenshot do afiliado")
 
     except requests.exceptions.ConnectionError:
-        print(f"   ⚠️  Serviço info-scrap não disponível (OCR do afiliado ignorado)")
+        print(f"   ⚠️  info-scrap não disponível")
     except Exception as e:
-        print(f"   ⚠️  Erro no /analyze do afiliado: {e}")
+        print(f"   ⚠️  Erro no /product: {e}")
     finally:
         try:
             if tmp_path:
@@ -823,9 +807,11 @@ def main():
         print("\n" + "━" * 70)
         print("ETAPA 5B: OCR mandatório — screenshot completo do link de afiliado")
         print("━" * 70)
-        # Usa o URL original (meli.la ou link do banco) — é a página que
-        # mostra o preço real do afiliado, diferente da página do produto resolvida.
-        affiliate_ocr = take_and_ocr_affiliate_full(url)
+        # Usa AFFILIATE_URL se fornecido (reprepare-associate-ml), senao URL original
+        affiliate_url = os.environ.get('AFFILIATE_URL', '').strip() or url
+        if affiliate_url != url:
+            print(f"   Link de afiliado (AFFILIATE_URL): {affiliate_url}")
+        affiliate_ocr = take_and_ocr_affiliate_full(affiliate_url)
         if affiliate_ocr['source'] == 'affiliate_ocr' and affiliate_ocr['price'] > 0:
             print(f"\n   🔒 Preços do afiliado substituem OCR de ROI (mandatório):")
             ocr_result['price']      = affiliate_ocr['price']

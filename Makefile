@@ -47,6 +47,20 @@ rebuild-site:  ## Rebuild completo apenas do site
 	$(COMPOSE) build site
 	$(COMPOSE) up -d site
 
+rebuild-info-scrap:  ## Rebuild completo info-scrap (pull + down + rm + up)
+	@echo "🔄 Fazendo rebuild completo do info-scrap..."
+	@echo "  1. Pull da imagem..."
+	@docker pull ghcr.io/schultzvv/info_scrap:latest
+	@echo "  2. Parando container..."
+	@$(COMPOSE) stop info-scrap 2>/dev/null || true
+	@echo "  3. Removendo container..."
+	@$(COMPOSE) rm -f info-scrap
+	@echo "  4. Subindo com imagem atualizada..."
+	@$(COMPOSE) up -d info-scrap
+	@sleep 2
+	@echo "✅ info-scrap rebuild completo!"
+	@echo "   Status:" && docker ps --filter name=info-scrap --format "{{.Names}}: {{.Status}}"
+
 logs:  ## Logs em tempo real do site
 	$(COMPOSE) logs -f site
 
@@ -441,6 +455,28 @@ reprepare-ml:  ## ⭐ ML: refaz prepare (API+OCR+imgs) de todos os produtos, man
 	else \
 		echo "   Modo: TODOS os produtos ML ativos"; echo ""; \
 		docker exec -it site python3 scripts/reprepare_all_ml.py; \
+	fi
+
+reprepare-associate-ml:  ## ⭐ ML: reprepare COM link de afiliado (preço mais preciso via OCR)
+	@$(MAKE) -s _ensure-site
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔗 REPREPARE ASSOCIATE ML — Refaz prepare COM affiliate_link"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@ML_SELLER_ID=$$(grep "^ML_SELLER_ID=" .env | cut -d'=' -f2 | tr -d '[:space:]'); \
+	if [ -z "$$ML_SELLER_ID" ]; then \
+		echo "❌ ML_SELLER_ID não preenchido no .env"; \
+		exit 1; \
+	fi; \
+	if [ "$(DRY)" = "1" ] || [ "$(DRY_RUN)" = "1" ]; then \
+		echo "   Modo: DRY-RUN (só lista)"; echo ""; \
+		docker exec -it site python3 scripts/reprepare_associate_ml.py --dry-run; \
+	elif [ -n "$(ID)" ]; then \
+		echo "   Modo: produto único ($(ID))"; echo ""; \
+		docker exec -it site python3 scripts/reprepare_associate_ml.py --id "$(ID)"; \
+	else \
+		echo "   Modo: TODOS os produtos ML ativos"; echo ""; \
+		docker exec -it site python3 scripts/reprepare_associate_ml.py; \
 	fi
 
 
