@@ -682,6 +682,64 @@ def generate_staging_json(product_data: dict, images_dir: str, original_url: str
     return filename, data
 
 
+def append_short_link_entry(initial_url: str, final_url: str, product_url: str = "") -> bool:
+    """
+    Salva short links em /app/staging/short_link/links.json sem duplicar.
+
+    Retorna True quando adiciona novo registro, False quando já existia.
+    """
+    initial_url = (initial_url or "").strip()
+    final_url = (final_url or "").strip()
+    product_url = (product_url or "").strip()
+
+    if not initial_url or not final_url:
+        return False
+
+    short_dir = Path("/app/staging/short_link")
+    short_dir.mkdir(parents=True, exist_ok=True)
+    short_file = short_dir / "links.json"
+
+    links = []
+    if short_file.exists():
+        try:
+            with open(short_file, "r", encoding="utf-8") as f:
+                payload = json.load(f)
+            if isinstance(payload, list):
+                links = payload
+            elif isinstance(payload, dict) and isinstance(payload.get("links"), list):
+                links = payload.get("links", [])
+        except Exception:
+            links = []
+
+    already_exists = any(
+        isinstance(item, dict)
+        and item.get("url_inicial", "").strip() == initial_url
+        and item.get("url_final", "").strip() == final_url
+        for item in links
+    )
+    if already_exists:
+        return False
+
+    entry = {
+        "url_inicial": initial_url,
+        "url_final": final_url,
+        "url_produto": product_url,
+        "product_id": extract_ml_product_id(product_url) if product_url else "",
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    links.append(entry)
+
+    payload = {
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "total": len(links),
+        "links": links,
+    }
+    with open(short_file, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+
+    return True
+
+
 def main():
     if len(sys.argv) < 2:
         print("❌ Uso: python prepare_ml_best.py <URL_MERCADO_LIVRE>")
@@ -704,7 +762,21 @@ def main():
         print("━" * 70)
         print("ETAPA 1: Resolvendo link de afiliado")
         print("━" * 70)
-        product_url = follow_affiliate_link(url)
+        resolved = follow_affiliate_link(url, return_details=True)
+        if isinstance(resolved, dict):
+            redirect_final_url = resolved.get('final_url', '')
+            product_url = resolved.get('product_url')
+        else:
+            redirect_final_url = ''
+            product_url = resolved
+
+        if redirect_final_url:
+            added = append_short_link_entry(url, redirect_final_url, product_url or "")
+            if added:
+                print("   📝 short_link salvo em /app/staging/short_link/links.json")
+            else:
+                print("   ℹ️  short_link já existia em /app/staging/short_link/links.json")
+
         if not product_url:
             print("❌ Falha ao resolver link")
             sys.exit(1)

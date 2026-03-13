@@ -46,13 +46,97 @@ def extract_ml_product_id(url):
     
     return None
 
-def follow_affiliate_link(url):
+
+def _clean_ml_product_url(url):
+    """Normaliza uma URL de produto do Mercado Livre removendo fragment e querystring."""
+    if not url:
+        return None
+
+    url = url.strip()
+    if url.startswith('//'):
+        url = f"https:{url}"
+    elif url.startswith('/'):
+        url = f"https://www.mercadolivre.com.br{url}"
+
+    if '#' in url:
+        url = url.split('#', 1)[0]
+    if '?' in url:
+        url = url.split('?', 1)[0]
+
+    return url
+
+
+def _extract_product_url_from_html(html):
+    """Extrai a primeira URL de produto válida do HTML de uma landing social/perfil."""
+    soup = BeautifulSoup(html, 'html.parser')
+
+    candidate_selectors = [
+        ('meta', {'property': 'og:url'}),
+        ('meta', {'name': 'twitter:url'}),
+        ('link', {'rel': 'canonical'}),
+    ]
+    for tag_name, attrs in candidate_selectors:
+        element = soup.find(tag_name, attrs=attrs)
+        if not element:
+            continue
+        candidate = element.get('content') or element.get('href')
+        candidate = _clean_ml_product_url(candidate)
+        if candidate and extract_ml_product_id(candidate):
+            return candidate
+
+    href_patterns = [
+        re.compile(r'/p/ML[A-Z]\d+', re.IGNORECASE),
+        re.compile(r'produto\.mercadolivre\.com\.br/.+?(ML[A-Z]-?\d+)', re.IGNORECASE),
+        re.compile(r'mercadolivre\.com\.br/p/ML[A-Z]\d+', re.IGNORECASE),
+    ]
+
+    for link in soup.find_all('a', href=True):
+        href = link.get('href', '').strip()
+        if not href:
+            continue
+
+        cleaned_href = _clean_ml_product_url(href)
+        if cleaned_href and extract_ml_product_id(cleaned_href):
+            return cleaned_href
+
+        if any(pattern.search(href) for pattern in href_patterns):
+            cleaned_href = _clean_ml_product_url(href)
+            if cleaned_href and extract_ml_product_id(cleaned_href):
+                return cleaned_href
+
+    regex_patterns = [
+        r'https://produto\.mercadolivre\.com\.br/[^"\'\s>]+',
+        r'https://www\.mercadolivre\.com\.br/p/ML[A-Z]\d+[^"\'\s>]*',
+        r'/p/ML[A-Z]\d+[^"\'\s>]*',
+    ]
+    for pattern in regex_patterns:
+        match = re.search(pattern, html, re.IGNORECASE)
+        if not match:
+            continue
+        cleaned_href = _clean_ml_product_url(match.group(0))
+        if cleaned_href and extract_ml_product_id(cleaned_href):
+            return cleaned_href
+
+    return None
+
+def follow_affiliate_link(url, return_details=False):
     """
     Segue o link de afiliado até chegar na página final do produto.
     Retorna a URL final do produto.
+
+    Se return_details=True, retorna dict com:
+      - initial_url
+      - final_url (URL após redirects)
+      - product_url (URL de produto resolvida)
     """
     print(f"🔗 Seguindo link de afiliado...")
     print(f"   URL inicial: {url}")
+
+    details = {
+        'initial_url': url,
+        'final_url': '',
+        'product_url': None,
+    }
     
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -62,51 +146,39 @@ def follow_affiliate_link(url):
         # Seguir todos os redirects
         response = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
         final_url = response.url
+        details['final_url'] = final_url
         
         print(f"   URL final: {final_url}")
         
         # Verificar se é uma página de perfil (não produto direto)
         if '/social/' in final_url or '/perfil/' in final_url:
             print(f"\n🔄 Detectada página de perfil. Procurando link do produto...")
-            
-            # Tentar extrair o link do produto do botão "ir para produto"
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # Procurar por links que contenham /p/ (permalink de produto)
-            product_links = soup.find_all('a', href=re.compile(r'/p/MLB\d+'))
-            
-            if product_links:
-                product_url = product_links[0].get('href')
-                
-                # Se for URL relativa, completar com domínio
-                if product_url.startswith('/'):
-                    product_url = f"https://www.mercadolivre.com.br{product_url}"
-                
+
+            product_url = _extract_product_url_from_html(response.text)
+
+            if product_url:
                 print(f"   ✅ Link do produto encontrado: {product_url}")
-                
-                # Extrair apenas a parte antes dos parâmetros
-                if '#' in product_url:
-                    product_url = product_url.split('#')[0]
-                if '?' in product_url:
-                    product_url = product_url.split('?')[0]
-                
-                return product_url
+                details['product_url'] = product_url
+                return details if return_details else product_url
             else:
                 print(f"\n❌ ERRO: Não foi possível encontrar o link do produto na página de perfil.")
                 print(f"   Por favor, use um link direto do produto.")
                 print(f"   Exemplo: https://produto.mercadolivre.com.br/MLB-123456789-...")
-                return None
+                return details if return_details else None
         
         # Verificar se chegamos em uma página de produto
         if 'mercadolivre.com' in final_url or 'mercadolibre.com' in final_url:
-            return final_url
+            details['product_url'] = final_url
+            return details if return_details else final_url
         else:
             print(f"⚠️  URL não parece ser do Mercado Livre: {final_url}")
-            return url
+            details['product_url'] = url
+            return details if return_details else url
             
     except Exception as e:
         print(f"⚠️  Erro ao seguir redirect: {e}")
-        return url
+        details['product_url'] = url
+        return details if return_details else url
 
 def scrape_mercadolivre_product(url):
     """
