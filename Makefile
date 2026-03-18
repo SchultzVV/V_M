@@ -167,6 +167,33 @@ serve-cloudflare:  ## ⭐ Túnel Cloudflare: sobe tudo, captura URL e configura 
 stop-cloudflare:  ## Para o túnel Cloudflare em background
 	@pkill cloudflared 2>/dev/null && echo "✅ Túnel encerrado" || echo "⚠️  Túnel não estava rodando"
 
+tunnel-info:  ## 🔗 Mostra URL do túnel Cloudflare ativo AGORA (sem alterar nada ML)
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔗 TÚNEL CLOUDFLARE ATIVO"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@LOG=/tmp/cloudflare_tunnel.log; \
+	if [ -f "$$LOG" ]; then \
+		TUNNEL_URL=$$(grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com' $$LOG | head -1); \
+		if [ -n "$$TUNNEL_URL" ]; then \
+			echo "✅ TÚNEL ATIVO:"; \
+			echo "   🌐 URL: $$TUNNEL_URL"; \
+			echo "   🔗 Callback ML: $$TUNNEL_URL/auth/mercadolivre/callback"; \
+			echo ""; \
+			echo "⚠️  Copie o Callback acima se precisar atualizar o DevCenter ML"; \
+			echo "   (mas NÃO mude se o link antigo ainda está funcionando)"; \
+		else \
+			echo "❌ Tunnel log encontrado mas sem URL. Execute: make serve-cloudflare"; \
+		fi; \
+	else \
+		echo "❌ Nenhum túnel ativo encontrado."; \
+		echo "   Execute: make serve-cloudflare"; \
+	fi
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+
 serve-ngrok:  ## Túnel ngrok com domínio estático (NGROK_SUBDOMAIN no .env)
 	@pkill ngrok 2>/dev/null || true
 	$(COMPOSE) up -d
@@ -304,6 +331,53 @@ check-tokens:  ## Verifica tokens OAuth salvos no container
 		| jq -r '"✅ User ID: " + (.user_id|tostring), "✅ Expira em: " + (.expires_in|tostring) + "s", "✅ Access: " + .access_token[:30] + "...", "✅ Refresh: " + .refresh_token[:30] + "..."' \
 		|| echo "❌ Tokens não encontrados. Autorize via: make serve-cloudflare"
 
+links:  ## 🔗 Expõe todos os links importantes: Cloudflare, ML, Instagram, site
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔗 LINKS IMPORTANTES DO PROJETO"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🌐 SITE & TÚNEIS:"
+	@echo "  📍 Local: https://localhost:5000"
+	@echo "  🔧 MinIO: http://localhost:9000"
+	@echo "  🗄️  PostgreSQL: postgresql://user:password@localhost:5432/produtos_db"
+	@CF_HOST=$$(grep '^CF_HOSTNAME=' .env | cut -d'=' -f2 | cut -d'#' -f1 | xargs); \
+	if [ -n "$$CF_HOST" ]; then \
+		echo "  ☁️  Cloudflare: https://$$CF_HOST"; \
+	else \
+		echo "  ☁️  Cloudflare: (execute: make serve-cloudflare)"; \
+	fi
+	@echo ""
+	@echo "💰 MERCADO LIVRE:"
+	@grep '^MERCADO_LIVRE_AFFILIATE_ID=' .env | awk -F'=' '{print "  🆔 Affiliate ID: " $$2}' | cut -d'#' -f1; \
+	grep '^ML_APP_ID=' .env | awk -F'=' '{print "  🔐 App ID: " $$2}' | cut -d'#' -f1; \
+	echo "  🔗 API: https://api.mercadolibre.com"; \
+	echo "  🧪 DevCenter: https://developers.mercadolivre.com.br/devcenter"; \
+	echo "  💼 Afiliados: https://www.mercadolivre.com.br/afiliados"; \
+	echo "  📊 Seller Center: https://vendas.mercadolivre.com.br"
+	@echo ""
+	@echo "📸 INSTAGRAM:"
+	@echo "  🔐 API v19: https://graph.instagram.com/v19.0"
+	@echo "  📚 Docs: https://developers.facebook.com/docs/instagram-api"
+	@echo "  ⚙️  Graph Explorer: https://developers.facebook.com/tools/explorer"
+	@echo ""
+	@echo "🛠️  DASHBOARDS:"
+	@echo "  📊 Redis: redis://localhost:6379"
+	@echo "  🗄️  pgAdmin: http://localhost:5050"
+	@echo "     (email: admin@example.com)"
+	@echo "  📦 MinIO Console: http://localhost:9001"
+	@echo "     (user: minio / pass: minio123)"
+	@echo ""
+	@echo "📚 DOCUMENTAÇÃO:"
+	@echo "  📖 README: ./README.md"
+	@echo "  🏗️  Arquitetura: ./docs/DefineMe.md"
+	@echo "  📸 Instagram: ./docs/instagram/INSTAGRAM_QUICKSTART.md"
+	@echo "  🔌 Webhooks: ./docs/integrações/WEBHOOKS.md"
+	@echo "  🔗 Integrações: ./docs/integrações/"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+
 test-api:  ## Testa chamada à API do Mercado Livre com token atual
 	@TOKEN=$$(docker exec site cat /app/config/ml_tokens.json 2>/dev/null | jq -r '.access_token'); \
 	if [ -z "$$TOKEN" ]; then echo "❌ Token não encontrado. Execute: make serve-cloudflare"; exit 1; fi; \
@@ -328,14 +402,33 @@ _ensure-info-scrap: _ensure-site
 		sleep 4; \
 	fi
 
-prepare-ml:  ## ⭐ Prepara produto ML: API + OCR de preço promo  (URL=https://...)
-	@if [ -z "$(URL)" ]; then echo "❌ Uso: make prepare-ml URL=https://mercadolivre.com/sec/ABC123"; exit 1; fi
+prepare-ml:  ## ⭐ Prepara produto ML: API + OCR de preço promo  (URL=https://... | sem URL usa list_to_verify.json)
 	@$(MAKE) -s _ensure-info-scrap
 	@echo "" && echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "🚀 PREPARE ML — API Oficial + Screenshot OCR (preço promo)"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+ifneq ($(strip $(URL)),)
 	@echo "🔗 $(URL)" && echo ""
 	@docker exec -it site python3 scripts/prepare_ml_best.py "$(URL)"
+else
+	@FILE="services/site/list_to_prepare_and_stage/list_to_verify.json"; \
+		if [ ! -f "$$FILE" ]; then \
+			echo "❌ Arquivo não encontrado: $$FILE"; \
+			exit 1; \
+		fi; \
+		TOTAL=$$(jq '.links | length' "$$FILE"); \
+		echo "📦 Modo lote automático (sem URL)"; \
+		echo "📄 Fonte: $$FILE"; \
+		echo "📦 Total na fila: $$TOTAL"; \
+		echo ""; \
+		jq -r '.links[]' "$$FILE" | while read PURL; do \
+			echo "🔗 $$PURL"; \
+			docker exec site env FORCE_CATEGORY=geral python3 scripts/prepare_ml_best.py "$$PURL" || echo "❌ Erro neste produto"; \
+			echo ""; \
+		done; \
+		echo "✅ Lote concluído"
+endif
 	@docker exec site find /app/staging -type d -exec chmod o+rwx {} \; && docker exec site find /app/staging -name "*.json" -exec chmod o+rw {} \;
 
 prepare-shopee:  ## ⭐ Prepara produto Shopee: API + Playwright + OCR  (URL=https://...)

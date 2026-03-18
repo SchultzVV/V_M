@@ -13,7 +13,8 @@ make serve-cloudflare          ← sobe tudo + túnel HTTPS público
         ↓
 make check-tokens              ← verifica se o token ainda está válido
         ↓                         (se sim, pode usar direto — sem reautorizar)
-make prepare-ml URL=...        ← coleta produto (ML / Shopee / Amazon)
+make prepare-ml URL=...        ← coleta 1 produto do Mercado Livre
+make prepare-ml                ← coleta lote do list_to_verify.json
         ↓
 make verify-product-cheaper    ← confere se é o mais barato no catálogo
         ↓
@@ -148,6 +149,10 @@ make serve-cloudflare-fixed
 # Mercado Livre — API oficial + OCR preço promocional
 make prepare-ml URL="https://produto.mercadolivre.com.br/MLB-..."
 
+# Mercado Livre — lote automático a partir do arquivo
+# arquivo: services/site/list_to_prepare_and_stage/list_to_verify.json
+make prepare-ml
+
 # Shopee — API + Playwright + OCR
 make prepare-shopee URL="https://s.shopee.com.br/..."
 
@@ -280,6 +285,10 @@ schema_org (JSON-LD para SEO),
 criado_em, atualizado_em
 ```
 
+---
+```bash
+docker exec site python3 scripts/sync_short_links.py
+```
 ---
 
 ## 📚 Documentação
