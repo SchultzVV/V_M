@@ -470,7 +470,29 @@ prepare-all:  ## Prepara lote de produtos (list_to_prepare.json)
 		docker exec site python3 scripts/api_prepare_ml.py "$$PURL" "$$CAT" || echo "❌ Erro neste produto"; \
 		read -p "▶  Enter para próximo..."; \
 	done; \
-	echo "✅ Lote concluído. Próximo: make stage"
+	echo "✅ Lote concluído. Próximo: make organize-tags → make stage"
+
+organize-tags:  ## 🏷️  ⭐ Reorganiza tags dos produtos por TÍTULO (auto-cadastro + pergunta baixa confiança)
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🏷️  ORGANIZADOR DE TAGS — Modo Inteligente"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "✅ Auto-cadastro: confiança >= 50%"
+	@echo "❓ Pergunta ao usuário: confiança < 50%"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@$(MAKE) -s _ensure-site
+	@docker exec -it site python3 scripts/organize_tags.py
+
+organize-tags-auto:  ## 🔍 Reorganiza tags — auto-cadastro SILENCIOSO (não pergunta)
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔍 ORGANIZADOR DE TAGS — Modo Automático Silencioso"
+	@echo "  Auto-cadastra todos os produtos com confiança >= 50% (sem perguntar)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@$(MAKE) -s _ensure-site
+	@docker exec -it site python3 scripts/organize_tags.py --auto
 
 
 # ============================================================
