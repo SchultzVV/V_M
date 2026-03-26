@@ -20,6 +20,7 @@ else:
 
 import os
 from flask import Flask, request
+from flask_cors import CORS
 from routes.product_routes import product_bp
 from models.product import db, Product
 from models import Base
@@ -33,6 +34,20 @@ from routes.instagram_routes import instagram_bp
 from routes.price_validator_routes import price_validator_bp
 
 app = Flask(__name__)
+
+# ✅ Habilita CORS para frontend em localhost:5173
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["http://localhost:5173", "http://localhost:3000"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    },
+    r"/auth/*": {
+        "origins": ["http://localhost:5173", "http://localhost:3000"],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
 # # ✅ Middleware para remover tela do Ngrok e evitar cache agressivo
 @app.after_request

@@ -148,6 +148,18 @@ def api_products():
     except Exception as e:
         return jsonify({"error": f"Erro ao obter produtos: {str(e)}"}), 500
 
+@product_bp.route("/api/products/<product_id>", methods=["GET"])
+def get_product_detail(product_id):
+    """Retorna um produto específico em JSON"""
+    try:
+        product = Product.query.get(product_id)
+        if not product:
+            return jsonify({"error": "Produto não encontrado"}), 404
+        
+        return jsonify(product.to_dict()), 200
+    except Exception as e:
+        return jsonify({"error": f"Erro ao obter produto: {str(e)}"}), 500
+
 @product_bp.route("/minio_proxy/<bucket>/<path:filename>")
 def minio_proxy(bucket, filename):
     url = f"http://localhost:9000/{bucket}/{filename}"

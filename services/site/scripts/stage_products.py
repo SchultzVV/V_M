@@ -90,13 +90,18 @@ def upload_images(bucket_name, local_paths):
     return urls
 
 def ensure_fallback_bucket():
-    fallback_dir = "uploads/fallback_img"
+    # Caminho relativo ao container Flask (/app = services/site)
+    fallback_dir = "../uploads/fallback_img"
     bucket = "fallbacks"
 
     try:
         if not minio_client.bucket_exists(bucket):
             minio_client.make_bucket(bucket)
             set_bucket_public(bucket)
+
+        if not os.path.exists(fallback_dir):
+            print(f"⚠️  Diretório fallback não encontrado: {fallback_dir}")
+            return
 
         for img in os.listdir(fallback_dir):
             path = os.path.join(fallback_dir, img)
@@ -144,9 +149,18 @@ if not json_files:
 for json_path in json_files:
     rel_path = str(json_path.relative_to(staging_path))  # ex: eletronicos/smartphones/produto_xxx.json
 
+    # Pular arquivos de configuração/histórico (não são produtos)
+    if "short_link" in rel_path or "links.json" in str(json_path):
+        continue
+
     try:
         with open(json_path, "r") as f:
             data = json.load(f)
+
+        # Validar que tem os campos obrigatórios de um produto
+        if "platform" not in data or "title" not in data or "price" not in data:
+            print(f"[SKIP] {rel_path}: arquivo não é um produto válido (faltam campos)")
+            continue
 
         platform = data["platform"]
         local_imgs = data.get("images_local", [])

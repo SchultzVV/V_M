@@ -14,9 +14,14 @@ services/site/publish_ready/
 
 # Gerados em runtime — logs, temp files
 /tmp/cloudflare_tunnel.log
+/tmp/cloudflare_tunnel_react.log
 *.pyc
 *.pyo
 *.pyd
+
+# SSL certificates & logs
+/certs/
+/logs/
 
 # Certificados locais (apenas para dev)
 services/site/cert.pem

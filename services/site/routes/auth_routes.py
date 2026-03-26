@@ -6,6 +6,9 @@ import os
 import sys
 from flask import Blueprint, request, redirect, jsonify, render_template_string
 from services.ml_auth import ml_auth
+import jwt
+from datetime import datetime, timedelta
+from functools import wraps
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -212,3 +215,102 @@ def mercadolivre_refresh():
             "status": "error",
             "message": f"Erro ao renovar token: {str(e)}"
         }), 500
+
+
+# ============================================================================
+# ✅ ADMIN JWT AUTHENTICATION (NEW)
+# ============================================================================
+
+JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-key-change-in-production")
+JWT_ALGORITHM = "HS256"
+JWT_EXP_TIME = 86400  # 24 horas em segundos
+
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")  # ⚠️ MUDAR EM PRODUÇÃO
+
+
+def verify_jwt_token(f):
+    """Decorator para verificar JWT em rotas protegidas"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = None
+        
+        # Procura pelo token no header Authorization
+        if "Authorization" in request.headers:
+            auth_header = request.headers["Authorization"]
+            try:
+                token = auth_header.split(" ")[1]
+            except IndexError:
+                return jsonify({"error": "Bearer token malformado"}), 401
+        
+        if not token:
+            return jsonify({"error": "Token não fornecido"}), 401
+        
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            request.user = payload
+            return f(*args, **kwargs)
+        except jwt.ExpiredSignatureError:
+            return jsonify({"error": "Token expirado"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"error": "Token inválido"}), 401
+    
+    return decorated_function
+
+
+@auth_bp.route("/admin/login", methods=["POST"])
+def admin_login():
+    """
+    Login do admin - retorna JWT token
+    Body: {username: str, password: str}
+    """
+    try:
+        data = request.get_json() or {}
+        username = data.get("username")
+        password = data.get("password")
+        
+        if not username or not password:
+            return jsonify({"error": "Username e password obrigatórios"}), 400
+        
+        # Verifica credenciais (em produção, usar hash + DB)
+        if username != ADMIN_USERNAME or password != ADMIN_PASSWORD:
+            return jsonify({"error": "Credenciais inválidas"}), 401
+        
+        # Gera JWT token
+        payload = {
+            "username": username,
+            "iat": datetime.utcnow(),
+            "exp": datetime.utcnow() + timedelta(seconds=JWT_EXP_TIME),
+            "user_id": "admin"
+        }
+        
+        token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+        
+        return jsonify({
+            "access_token": token,
+            "token_type": "Bearer",
+            "expires_in": JWT_EXP_TIME,
+            "user": {"id": "admin", "username": username}
+        }), 200
+    
+    except Exception as e:
+        return jsonify({"error": f"Erro ao fazer login: {str(e)}"}), 500
+
+
+@auth_bp.route("/token/validate", methods=["POST"])
+@verify_jwt_token
+def validate_token():
+    """
+    Valida um JWT token
+    Header: Authorization: Bearer {token}
+    """
+    try:
+        return jsonify({
+            "valid": True,
+            "user": {
+                "id": request.user.get("user_id"),
+                "username": request.user.get("username")
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

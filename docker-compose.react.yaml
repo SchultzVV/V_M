@@ -1,0 +1,47 @@
+# ============================================================
+# Docker Compose Overlay for React Frontend with Nginx
+# Usage: docker-compose -f docker-compose.yaml -f docker-compose.react.yaml up -d
+# ============================================================
+
+version: '3.9'
+
+services:
+  # ============================================================
+  # Nginx: Reverse proxy + React static file server
+  # ============================================================
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile.nginx
+    container_name: nginx-react
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # React compiled files
+      - ./frontend/dist:/app/dist:ro
+
+      # Nginx configuration for React SPA
+      - ./nginx/nginx-react.conf:/etc/nginx/conf.d/default.conf:ro
+
+      # SSL certificates (shared with Flask backend)
+      - ${SSL_CERT_PATH:-./certs}:/etc/nginx/certs:ro
+
+      # Logs
+      - ./logs/nginx:/var/log/nginx
+
+    environment:
+      - TZ=America/Sao_Paulo
+
+    depends_on:
+      - site  # Wait for Flask backend to be ready
+
+    networks:
+      - backend
+
+    restart: unless-stopped
+
+
+networks:
+  backend:
+    driver: bridge

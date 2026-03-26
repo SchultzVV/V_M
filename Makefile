@@ -32,7 +32,8 @@ COMPOSE     = docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -
 up:  ## Sobe ambiente de desenvolvimento (build + detach)
 	@echo "🔧 Subindo containers..."
 	$(COMPOSE) up -d --build
-	@echo "✅ Site em https://localhost:5000"
+	@echo "✅ Backend em https://localhost:5000"
+	@echo "✅ Frontend: make frontend-dev (http://localhost:5173)"
 	@echo "💡 Próximo: make serve-cloudflare  (HTTPS público + auto-OAuth)"
 
 down:  ## Para e remove containers + volumes
@@ -70,6 +71,34 @@ shell:  ## Shell bash dentro do container site
 psql:  ## Terminal psql no container postgres
 	docker exec -it postgres-dev psql -U user -d produtos_db
 
+# ============================================================
+# 🎨  FRONTEND — React + Vite development
+# ============================================================
+
+frontend-install:  ## Instala dependências do frontend
+	@echo "📦 Installing npm packages..."
+	@cd frontend && npm install
+
+frontend-dev:  ## Inicia dev server frontend (localhost:5173)
+	@echo "🚀 Starting frontend dev server..."
+	@cd frontend && npm run dev
+
+frontend-build:  ## Build production frontend
+	@echo "🏗️  Building frontend for production..."
+	@cd frontend && npm run build
+	@echo "✅ Build completo em ./frontend/dist/"
+
+frontend-clean:  ## Remove node_modules e dist (limpa cache)
+	@rm -rf frontend/node_modules frontend/dist
+	@echo "✅ Frontend limpo"
+
+frontend-build-prod:  ## Build React para produção com Nginx (alias melhorado)
+	@echo "🏗️  Building React frontend for production..."
+	@cd frontend && npm run build
+	@echo "✅ Build completo: ./frontend/dist/"
+	@echo "   $(shell du -sh frontend/dist)"
+	@echo "   Pronto para servir com Nginx!"
+
 
 # ============================================================
 # 🌐  EXPOSE — Túneis HTTPS públicos
@@ -97,8 +126,7 @@ serve-cloudflare:  ## ⭐ Túnel Cloudflare: sobe tudo, captura URL e configura 
 	LOG=/tmp/cloudflare_tunnel.log; \
 	rm -f $$LOG; \
 	$$CLOUDFLARED_BIN tunnel \
-		--url https://localhost:5000 \
-		--no-tls-verify \
+		--url http://localhost:5555 \
 		--proxy-connect-timeout 60s \
 		--proxy-keepalive-timeout 5m \
 		--proxy-keepalive-connections 200 \
@@ -163,7 +191,112 @@ serve-cloudflare:  ## ⭐ Túnel Cloudflare: sobe tudo, captura URL e configura 
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 	echo "💡 Para parar o túnel: make stop-cloudflare"; \
 	echo ""
+serve-frontend-public:  ## ⭐ Frontend React (Nginx + Túnel Cloudflare) — alternativa ao Jinja2
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 REACT FRONTEND  +  NGINX  +  CLOUDFLARE TUNNEL"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "Step 1️⃣  Building React frontend..."
+	@cd frontend && npm run build > /dev/null 2>&1 || (echo "❌ Build falhou"; exit 1)
+	@echo "✅ React build completo"
+	@echo ""
+	@echo "Step 2️⃣  Checking SSL certificates..."
+	@if [ ! -f certs/localhost.crt ] || [ ! -f certs/localhost.key ]; then \
+		echo "⚠️  Certificados SSL não encontrados. Gerando..."; \
+		mkdir -p certs; \
+		openssl req -x509 -newkey rsa:2048 -keyout certs/localhost.key -out certs/localhost.crt -days 365 -nodes -subj "/CN=localhost" 2>/dev/null; \
+		echo "✅ Certificados gerados"; \
+	else \
+		echo "✅ Certificados OK"; \
+	fi
+	@echo ""
+	@echo "Step 3️⃣  Subindo containers (backend + Nginx)..."
+	@docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml up -d --build 2>&1 | grep -E "Creating|Starting|done" || echo "✅ Containers prontos"
+	@sleep 3
+	@echo "✅ Backend em https://localhost:5000"
+	@echo "✅ Nginx em https://localhost"
+	@echo ""
+	@CLOUDFLARED_BIN=$$(command -v cloudflared 2>/dev/null || echo /usr/local/bin/cloudflared); \
+	if [ ! -x "$$CLOUDFLARED_BIN" ]; then \
+		echo "❌ cloudflared não instalado. Execute: make install-cloudflared"; \
+		exit 1; \
+	fi; \
+	echo "Step 4️⃣  Iniciando túnel Cloudflare em background..."; \
+	pkill cloudflared 2>/dev/null || true; \
+	sleep 1; \
+	LOG=/tmp/cloudflare_tunnel_frontend.log; \
+	rm -f $$LOG; \
+	$$CLOUDFLARED_BIN tunnel \
+		--url https://localhost:443 \
+		--no-tls-verify \
+		--proxy-connect-timeout 60s \
+		--proxy-keepalive-timeout 5m \
+		--proxy-keepalive-connections 200 \
+		--proxy-tcp-keepalive 60s \
+		2>&1 | tee $$LOG & \
+	echo "⏳ Aguardando URL..."; \
+	CF_URL=""; \
+	for i in $$(seq 1 20); do \
+		CF_URL=$$(grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com' $$LOG 2>/dev/null | head -1); \
+		[ -n "$$CF_URL" ] && break; \
+		sleep 2; \
+	done; \
+	if [ -z "$$CF_URL" ]; then \
+		echo "❌ URL não capturada. Veja: cat /tmp/cloudflare_tunnel_frontend.log"; \
+		exit 1; \
+	fi; \
+	echo ""; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "✅ REACT FRONTEND ATIVO: $$CF_URL"; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	NEW_REDIRECT="$$CF_URL/auth/mercadolivre/callback"; \
+	echo "📝 Atualizando ML_REDIRECT_URI no .env..."; \
+	if grep -q '^ML_REDIRECT_URI=' .env; then \
+		sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=$$NEW_REDIRECT|" .env; \
+	else \
+		echo "ML_REDIRECT_URI=$$NEW_REDIRECT" >> .env; \
+	fi; \
+	echo "🔄 Reiniciando backend com nova URI..."; \
+	docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml restart site > /dev/null 2>&1; \
+	sleep 3; \
+	echo "✅ Backend reiniciado"; \
+	echo ""; \
+	APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2 | tr -d '[:space:]'); \
+	TOKEN=$$(docker exec site cat /app/config/ml_tokens.json 2>/dev/null | jq -r '.access_token // empty' 2>/dev/null); \
+	TOKEN_OK=0; \
+	if [ -n "$$TOKEN" ]; then \
+		STATUS=$$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $$TOKEN" https://api.mercadolibre.com/users/me); \
+		[ "$$STATUS" = "200" ] && TOKEN_OK=1; \
+	fi; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	if [ "$$TOKEN_OK" = "1" ]; then \
+		echo "🔑 TOKEN ML: ✅ válido"; \
+	else \
+		echo "🔑 TOKEN ML: ❌ expirado ou ausente — autorização necessária"; \
+		echo ""; \
+		AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NEW_REDIRECT"; \
+		echo "1️⃣  Atualize o Redirect URI no DevCenter ML:"; \
+		echo "   https://developers.mercadolivre.com.br/devcenter"; \
+		echo "   → URL de redirecionamento: $$NEW_REDIRECT"; \
+		echo ""; \
+		echo "2️⃣  Abra no navegador para autorizar:"; \
+		echo "   $$AUTH_URL"; \
+		echo ""; \
+		echo "3️⃣  Após autorizar: make check-tokens"; \
+	fi; \
+	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo ""; \
+	echo "📱 Abra no navegador: $$CF_URL"; \
+	echo "💡 Para parar: make stop-frontend-public"; \
+	echo ""
 
+stop-frontend-public:  ## Parar Frontend React (Nginx + Cloudflare)
+	@echo "🛑 Parando React + Nginx + Cloudflare tunnel..."
+	@pkill cloudflared 2>/dev/null || true
+	@docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml down 2>&1 | grep -E "Removing|Stopping|done" || echo "✅ Containers parados"
+	@echo "✅ React frontend encerrado"
 stop-cloudflare:  ## Para o túnel Cloudflare em background
 	@pkill cloudflared 2>/dev/null && echo "✅ Túnel encerrado" || echo "⚠️  Túnel não estava rodando"
 
@@ -775,8 +908,11 @@ help:  ## Mostra este menu
 	@echo "🧪 DEV"
 	@awk 'BEGIN{FS=":.*?## "}/^(up|down|restart-site|rebuild-site|logs|shell|psql):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
-	@echo "🌐 EXPOSE (túneis HTTPS)"
-	@awk 'BEGIN{FS=":.*?## "}/^(serve-cloudflare|serve-cloudflare-fixed|stop-cloudflare|serve-ngrok|stop-ngrok|install-cloudflared|setup-cloudflare-fixed):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@echo "� FRONTEND (React + Vite)"
+	@awk 'BEGIN{FS=":.*?## "}/^(frontend-install|frontend-dev|frontend-build|frontend-build-prod|frontend-clean):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "�🌐 EXPOSE (túneis HTTPS)"
+	@awk 'BEGIN{FS=":.*?## "}/^(serve-cloudflare|serve-frontend-public|stop-cloudflare|stop-frontend-public|serve-cloudflare-fixed|serve-ngrok|stop-ngrok|install-cloudflared|setup-cloudflare-fixed):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "🔑 OAUTH"
 	@awk 'BEGIN{FS=":.*?## "}/^(check-tokens|test-api):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)

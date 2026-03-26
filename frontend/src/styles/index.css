@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-black-deep text-gray-light;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold;
+  }
+
+  a {
+    @apply transition-colors duration-200;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-6 py-3 bg-neon-green text-black-deep font-bold rounded transition-all hover:bg-neon-green-dim hover:shadow-lg;
+  }
+
+  .btn-secondary {
+    @apply px-6 py-3 bg-gray-steel text-gray-light font-bold rounded transition-all hover:bg-gray-text;
+  }
+
+  .card-def {
+    @apply bg-dark-gray border border-gray-steel rounded-lg p-4 transition-all hover:border-neon-green;
+  }
+
+  .price-display {
+    @apply text-price font-mono font-bold;
+  }
+
+  .price-original {
+    @apply text-price-sm line-through text-neon-red opacity-75;
+  }
+
+  .container-def {
+    @apply max-w-7xl mx-auto px-gutter;
+  }
+
+  .grid-def {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
