@@ -9,6 +9,8 @@ services:
     env_file: .env
     volumes:
       - ./services/site:/app
+      - ./certs/localhost.crt:/app/cert.pem:ro
+      - ./certs/localhost.key:/app/key.pem:ro
     ports:
       - "5555:5000"
     depends_on:
