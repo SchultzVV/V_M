@@ -1,0 +1,124 @@
+# Flask API Endpoints
+
+## Product Management
+
+### Browse & Details
+- `GET /` — Homepage with all products
+- `GET /secao1` — Category 1 products
+- `GET /secao2` — Category 2 products
+- `GET /secao3` — Category 3 products
+- `GET /secao4` — Category 4 products
+- `GET /produto/<product_id>` — Product detail page
+
+### Product API
+- `GET /api/products` — List all products (JSON)
+- `GET /api/products/<product_id>` — Get single product (JSON)
+- `GET /api/list_ids` — List all product IDs
+- `POST /add_product` — Add new product (form submission)
+- `DELETE /api/delete/<product_id>` — Delete product
+
+### Media Proxying
+- `GET /minio_proxy/<bucket>/<path:filename>` — Direct image proxy
+- `GET /media/<bucket>/<path:filename>` — Media file serving
+- `GET /media/ping` — Media service health check
+
+### Admin & SEO
+- `GET /admin` — Admin dashboard
+- `GET /sitemap.xml` — XML sitemap for search engines
+- `GET /robots.txt` — Robots file for search engines
+
+---
+
+## Authentication (prefix: `/auth`)
+
+### Mercado Livre OAuth
+- `GET /auth/mercadolivre/login` — Start OAuth flow
+- `GET /auth/mercadolivre/callback` — OAuth callback handler
+- `GET /auth/mercadolivre/status` — Check ML authentication status
+- `POST /auth/mercadolivre/logout` — Logout from ML
+- `POST /auth/mercadolivre/refresh` — Refresh ML access token
+
+### Admin & Token
+- `POST /auth/admin/login` — Admin authentication
+- `POST /auth/token/validate` — Validate JWT token
+
+---
+
+## Product Synchronization (prefix: `/sync`)
+
+### Mercado Livre Sync
+- `POST /sync/mercadolivre/product/<external_id>` — Sync single ML product
+- `POST /sync/mercadolivre/all` — Sync all ML products
+- `GET /sync/mercadolivre/status` — Get ML sync status
+- `POST /sync/mercadolivre/cheapest-all` — Find cheapest seller for all products
+
+### Other Marketplaces
+- `POST /sync/shopee/product/<external_id>` — Sync Shopee product
+- `POST /sync/amazon/product/<external_id>` — Sync Amazon product
+
+---
+
+## Webhooks (prefix: `/webhook`)
+
+- `GET /webhook/health` — Webhook service health check
+- `POST /webhook/mercadolivre` — ML product update webhook
+- `POST /webhook/shopee` — Shopee product webhook
+- `POST /webhook/amazon` — Amazon product webhook
+- `POST /webhook/test` — Test webhook endpoint
+
+---
+
+## Instagram Automation (prefix: `/instagram`)
+
+### Post Operations
+- `POST /instagram/post` — Create Instagram post
+- `POST /instagram/post/auto` — Auto-post with AI filters
+- `POST /instagram/schedule` — Schedule post for later
+- `POST /instagram/test/image` — Test image generation
+
+### Status & History
+- `GET /instagram/workflow` — Get workflow status
+- `GET /instagram/history` — Post history
+- `GET /instagram/status` — Instagram system status
+- `GET /instagram/analytics/<media_id>` — Get post analytics
+- `GET /instagram/test/agents` — Test AI agents
+
+---
+
+## Price Validation (prefix: `/price_validator`)
+
+- `POST /price_validator/validate-prices` — Validate product prices
+- `GET /price_validator/validate-prices/health` — Health check
+
+---
+
+## AI & RAG (prefix: `/ai`)
+
+- `GET /ai` — AI system status
+- `POST /ai/ingest-url` — Ingest URL content into vector DB
+- `POST /ai/query` — Query AI system with semantic search
+
+---
+
+## Endpoint Summary
+
+| Category | Count | Key Operations |
+|----------|-------|-----------------|
+| Products | 11 | List, details, add, delete |
+| Auth | 7 | ML OAuth, admin login, token validation |
+| Sync | 6 | ML, Shopee, Amazon product sync |
+| Webhooks | 5 | ML, Shopee, Amazon event listeners |
+| Instagram | 9 | Post, schedule, analytics, history |
+| Price Validator | 2 | Validate prices, health |
+| AI/RAG | 3 | Ingest, query, status |
+| **Total** | **43** | - |
+
+---
+
+## Important Notes
+
+- All routes under blueprints are prefixed (e.g., `/auth/...`, `/sync/...`)
+- Product ID format varies by source (ML: `MLB...`, Shopee: `shopee_...`, Amazon: `asin_...`)
+- OAuth redirect URI must match tunnel URL (configured by `make serve-cloudflare`)
+- Webhooks expect specific JSON payloads per marketplace
+- AI endpoints depend on ingestion_service and retrieval_service (dev only)
