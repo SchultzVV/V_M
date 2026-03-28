@@ -30,9 +30,17 @@
 ## Cloudflare Tunnel (🌐 Main public exposure)
 
 ### Main Tunnel Commands
-- `make serve-cloudflare` ⭐ — **PRIMARY**: Start Cloudflare tunnel + auto-configure OAuth redirect URI
-- `make stop-cloudflare` — Stop active tunnel
-- `make tunnel-info` — Show current tunnel URL (without changing anything)
+- `make serve-cloudflare` ⭐ — **PRIMARY**: Backend + Nginx + Cloudflare tunnel + auto-configure OAuth
+- `make serve-frontend-public` ⭐ — Frontend + Nginx + reuses Cloudflare tunnel from serve-cloudflare
+- `make stop-cloudflare` — Stop active tunnel ONLY (keeps containers running)
+- `make stop-frontend-public` — Stop frontend containers (preserves tunnel for backend)
+- `make stop-all` — Stop everything (containers + tunnel)
+- `make tunnel-info` — Show current tunnel URL (read-only, doesn't change)
+
+### 🔑 Key Concepts
+- **Single Tunnel Architecture**: One `cloudflared` process serves both backend AND frontend via Nginx reverse proxy
+- **Tunnel Reuse**: `serve-frontend-public` automatically reuses the tunnel from `serve-cloudflare` if it's already running
+- **Shared ML_REDIRECT_URI**: Both commands update the same redirect URI in .env (no conflicts)
 
 ### Permanent Tunnel (Custom domain)
 - `make setup-cloudflare-fixed` — Create permanent named tunnel (one-time setup)

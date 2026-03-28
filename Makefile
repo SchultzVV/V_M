@@ -32,7 +32,7 @@ COMPOSE     = docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -
 up:  ## Sobe ambiente de desenvolvimento (build + detach)
 	@echo "🔧 Subindo containers..."
 	$(COMPOSE) up -d --build
-	@echo "✅ Backend em https://localhost:5000"
+	@echo "✅ Backend em https://localhost:5555"
 	@echo "✅ Frontend: make frontend-dev (http://localhost:5173)"
 	@echo "💡 Próximo: make serve-cloudflare  (HTTPS público + auto-OAuth)"
 
@@ -104,43 +104,29 @@ frontend-build-prod:  ## Build React para produção com Nginx (alias melhorado)
 # 🌐  EXPOSE — Túneis HTTPS públicos
 # ============================================================
 
-serve-cloudflare:  ## ⭐ Túnel Cloudflare: sobe tudo, captura URL e configura OAuth ML
+serve-cloudflare:  ## ⭐ Túnel Cloudflare (Flask): Backend HTTP + tunnel + auto-OAuth ML
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "🚀 CLOUDFLARE TUNNEL  +  AUTO-CONFIG OAUTH MERCADO LIVRE"
+	@echo "🚀 CLOUDFLARE TUNNEL  +  FLASK BACKEND  +  AUTO-CONFIG OAUTH"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
-	@CLOUDFLARED_BIN=$$(command -v cloudflared 2>/dev/null || echo /usr/local/bin/cloudflared); \
-	if [ ! -x "$$CLOUDFLARED_BIN" ]; then \
-		echo "❌ cloudflared não instalado. Execute: make install-cloudflared"; \
-		exit 1; \
+	@echo "Step 0️⃣  Housekeeping — removendo config persistente de quick tunnel...";\
+	if [ -f ~/.cloudflared/config.yml ]; then \
+		mv ~/.cloudflared/config.yml ~/.cloudflared/config.yml.bak; \
+		echo "   ✅ Config persistente movida para .bak (evita conflito)"; \
 	fi; \
-	echo "🔧 Subindo containers..."; \
+	echo ""
+	@echo "Step 1️⃣  Subindo containers (Backend apenas)..."; \
 	$(COMPOSE) up -d; \
 	sleep 2; \
-	echo "✅ Site em https://localhost:5000"; \
-	echo ""; \
-	echo "🌐 Iniciando túnel em background..."; \
-	pkill cloudflared 2>/dev/null || true; \
-	sleep 1; \
-	LOG=/tmp/cloudflare_tunnel.log; \
-	rm -f $$LOG; \
-	$$CLOUDFLARED_BIN tunnel \
-		--url http://localhost:5555 \
-		--proxy-connect-timeout 60s \
-		--proxy-keepalive-timeout 5m \
-		--proxy-keepalive-connections 200 \
-		--proxy-tcp-keepalive 60s \
-		2>&1 | tee $$LOG & \
-	echo "⏳ Aguardando URL..."; \
-	CF_URL=""; \
-	for i in $$(seq 1 20); do \
-		CF_URL=$$(grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com' $$LOG 2>/dev/null | head -1); \
-		[ -n "$$CF_URL" ] && break; \
-		sleep 2; \
-	done; \
-	if [ -z "$$CF_URL" ]; then \
-		echo "❌ URL não capturada. Veja: cat /tmp/cloudflare_tunnel.log"; \
+	echo "✅ Backend Flask em https://localhost:5555"; \
+	echo ""
+	@echo "Step 2️⃣  Iniciando túnel Cloudflare..."; \
+	bash scripts/tunnel-manager.sh /tmp/cloudflare_tunnel.log "https://127.0.0.1:5555" 20 > /tmp/cf_url.txt; \
+	CF_URL=$$(cat /tmp/cf_url.txt); \
+	if [ -z "$$CF_URL" ] || ! echo "$$CF_URL" | grep -q "https://"; then \
+		echo "❌ Falha ao capturar URL do túnel"; \
+		cat /tmp/cloudflare_tunnel.log; \
 		exit 1; \
 	fi; \
 	echo ""; \
@@ -149,26 +135,28 @@ serve-cloudflare:  ## ⭐ Túnel Cloudflare: sobe tudo, captura URL e configura 
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 	echo ""; \
 	NEW_REDIRECT="$$CF_URL/auth/mercadolivre/callback"; \
-	echo "📝 Atualizando ML_REDIRECT_URI no .env..."; \
+	echo "Step 3️⃣  Atualizando ML_REDIRECT_URI..."; \
 	if grep -q '^ML_REDIRECT_URI=' .env; then \
 		sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=$$NEW_REDIRECT|" .env; \
 	else \
 		echo "ML_REDIRECT_URI=$$NEW_REDIRECT" >> .env; \
 	fi; \
-	echo "🔄 Reiniciando site com nova URI..."; \
-	$(COMPOSE) stop site > /dev/null 2>&1; \
-	$(COMPOSE) rm -f site > /dev/null 2>&1; \
-	$(COMPOSE) up -d site > /dev/null 2>&1; \
-	sleep 3; \
-	echo "✅ Container reiniciado"; \
-	echo ""; \
-	APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2 | tr -d '[:space:]'); \
+	echo "✅ .env atualizado"; \
+	echo ""
+	@echo "Step 4️⃣  Reiniciando backend com nova URI..."; \
+	$(COMPOSE) restart site > /dev/null 2>&1; \
+	sleep 2; \
+	echo "✅ Backend reiniciado"; \
+	echo ""
+	@APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2 | tr -d '[:space:]'); \
 	TOKEN=$$(docker exec site cat /app/config/ml_tokens.json 2>/dev/null | jq -r '.access_token // empty' 2>/dev/null); \
 	TOKEN_OK=0; \
 	if [ -n "$$TOKEN" ]; then \
 		STATUS=$$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $$TOKEN" https://api.mercadolibre.com/users/me); \
 		[ "$$STATUS" = "200" ] && TOKEN_OK=1; \
 	fi; \
+	CF_URL=$$(cat /tmp/cf_url.txt); \
+	NEW_REDIRECT="$$CF_URL/auth/mercadolivre/callback"; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 	if [ "$$TOKEN_OK" = "1" ]; then \
 		echo "🔑 TOKEN ML: ✅ válido — não precisa reautorizar"; \
@@ -180,70 +168,51 @@ serve-cloudflare:  ## ⭐ Túnel Cloudflare: sobe tudo, captura URL e configura 
 		AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NEW_REDIRECT"; \
 		echo "1️⃣  Atualize o Redirect URI no DevCenter ML:"; \
 		echo "   https://developers.mercadolivre.com.br/devcenter"; \
-		echo "   → URL de redirecionamento: $$NEW_REDIRECT"; \
+		echo "   → URL: $$NEW_REDIRECT"; \
 		echo ""; \
 		echo "2️⃣  Abra no navegador para autorizar:"; \
-		echo ""; \
 		echo "   $$AUTH_URL"; \
 		echo ""; \
 		echo "3️⃣  Após autorizar: make check-tokens"; \
 	fi; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
-	echo "💡 Para parar o túnel: make stop-cloudflare"; \
+	echo ""; \
+	echo "🔗 API pública via Cloudflare:"; \
+	echo "   $$CF_URL"; \
+	echo ""; \
+	echo "💡 Para parar: make stop-cloudflare"; \
 	echo ""
-serve-frontend-public:  ## ⭐ Frontend React (Nginx + Túnel Cloudflare) — alternativa ao Jinja2
+serve-frontend-public:  ## ⭐ Frontend React (build agressivo + Nginx + reutiliza tunnel)
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "🚀 REACT FRONTEND  +  NGINX  +  CLOUDFLARE TUNNEL"
+	@echo "🚀 REACT FRONTEND  +  NGINX  +  CLOUDFLARE TUNNEL (compartilhado)"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
-	@echo "Step 1️⃣  Building React frontend..."
-	@cd frontend && npm run build > /dev/null 2>&1 || (echo "❌ Build falhou"; exit 1)
-	@echo "✅ React build completo"
+	@echo "✨ Este comando reutiliza o tunnel de 'make serve-cloudflare'"
+	@echo "   Se nenhum tunnel está rodando, um novo será criado"
 	@echo ""
-	@echo "Step 2️⃣  Checking SSL certificates..."
-	@if [ ! -f certs/localhost.crt ] || [ ! -f certs/localhost.key ]; then \
-		echo "⚠️  Certificados SSL não encontrados. Gerando..."; \
-		mkdir -p certs; \
-		openssl req -x509 -newkey rsa:2048 -keyout certs/localhost.key -out certs/localhost.crt -days 365 -nodes -subj "/CN=localhost" 2>/dev/null; \
-		echo "✅ Certificados gerados"; \
-	else \
-		echo "✅ Certificados OK"; \
+	@echo "Step 1️⃣  Limpando build anterior (aggressive)..."
+	@if [ -d "frontend/dist" ]; then \
+		rm -rf frontend/dist; \
+		echo "✅ Limpeza completa"; \
 	fi
 	@echo ""
-	@echo "Step 3️⃣  Subindo containers (backend + Nginx)..."
-	@docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml up -d --build 2>&1 | grep -E "Creating|Starting|done" || echo "✅ Containers prontos"
-	@sleep 3
-	@echo "✅ Backend em https://localhost:5000"
-	@echo "✅ Nginx em https://localhost"
-	@echo ""
-	@CLOUDFLARED_BIN=$$(command -v cloudflared 2>/dev/null || echo /usr/local/bin/cloudflared); \
-	if [ ! -x "$$CLOUDFLARED_BIN" ]; then \
-		echo "❌ cloudflared não instalado. Execute: make install-cloudflared"; \
-		exit 1; \
-	fi; \
-	echo "Step 4️⃣  Iniciando túnel Cloudflare em background..."; \
-	pkill cloudflared 2>/dev/null || true; \
-	sleep 1; \
-	LOG=/tmp/cloudflare_tunnel_frontend.log; \
-	rm -f $$LOG; \
-	$$CLOUDFLARED_BIN tunnel \
-		--url https://localhost:443 \
-		--no-tls-verify \
-		--proxy-connect-timeout 60s \
-		--proxy-keepalive-timeout 5m \
-		--proxy-keepalive-connections 200 \
-		--proxy-tcp-keepalive 60s \
-		2>&1 | tee $$LOG & \
-	echo "⏳ Aguardando URL..."; \
-	CF_URL=""; \
-	for i in $$(seq 1 20); do \
-		CF_URL=$$(grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com' $$LOG 2>/dev/null | head -1); \
-		[ -n "$$CF_URL" ] && break; \
-		sleep 2; \
-	done; \
-	if [ -z "$$CF_URL" ]; then \
-		echo "❌ URL não capturada. Veja: cat /tmp/cloudflare_tunnel_frontend.log"; \
+	@echo "Step 2️⃣  Building React frontend (fresh build)..."; \
+	@cd frontend && npm run build > /dev/null 2>&1 || (echo "❌ Build falhou"; exit 1); \
+	echo "✅ React build completo (fresh)"; \
+	echo ""
+	@echo "Step 3️⃣  Subindo containers (Backend + Nginx)..."; \
+	$(COMPOSE) up -d; \
+	sleep 2; \
+	echo "✅ Site em https://localhost:5000"; \
+	echo "✅ Nginx em https://localhost:443"; \
+	echo ""
+	@echo "Step 4️⃣  Iniciando túnel Cloudflare..."; \
+	bash scripts/tunnel-manager.sh /tmp/cloudflare_tunnel.log "https://127.0.0.1:443" 20 > /tmp/cf_url.txt 2>&1; \
+	CF_URL=$$(cat /tmp/cf_url.txt); \
+	if [ -z "$$CF_URL" ] || ! echo "$$CF_URL" | grep -q "https://"; then \
+		echo "❌ Falha ao capturar URL do túnel"; \
+		cat /tmp/cloudflare_tunnel.log; \
 		exit 1; \
 	fi; \
 	echo ""; \
@@ -252,51 +221,62 @@ serve-frontend-public:  ## ⭐ Frontend React (Nginx + Túnel Cloudflare) — al
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 	echo ""; \
 	NEW_REDIRECT="$$CF_URL/auth/mercadolivre/callback"; \
-	echo "📝 Atualizando ML_REDIRECT_URI no .env..."; \
+	echo "Step 5️⃣  Atualizando ML_REDIRECT_URI..."; \
 	if grep -q '^ML_REDIRECT_URI=' .env; then \
 		sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=$$NEW_REDIRECT|" .env; \
 	else \
 		echo "ML_REDIRECT_URI=$$NEW_REDIRECT" >> .env; \
 	fi; \
-	echo "🔄 Reiniciando backend com nova URI..."; \
-	docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml restart site > /dev/null 2>&1; \
-	sleep 3; \
+	echo "✅ .env atualizado"; \
+	echo ""
+	@echo "Step 6️⃣  Reiniciando backend..."; \
+	$(COMPOSE) restart site > /dev/null 2>&1; \
+	sleep 2; \
 	echo "✅ Backend reiniciado"; \
-	echo ""; \
-	APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2 | tr -d '[:space:]'); \
+	echo ""
+	@APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2 | tr -d '[:space:]'); \
 	TOKEN=$$(docker exec site cat /app/config/ml_tokens.json 2>/dev/null | jq -r '.access_token // empty' 2>/dev/null); \
 	TOKEN_OK=0; \
 	if [ -n "$$TOKEN" ]; then \
 		STATUS=$$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $$TOKEN" https://api.mercadolibre.com/users/me); \
 		[ "$$STATUS" = "200" ] && TOKEN_OK=1; \
 	fi; \
+	CF_URL=$$(cat /tmp/cf_url.txt); \
+	NEW_REDIRECT="$$CF_URL/auth/mercadolivre/callback"; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 	if [ "$$TOKEN_OK" = "1" ]; then \
 		echo "🔑 TOKEN ML: ✅ válido"; \
 	else \
-		echo "🔑 TOKEN ML: ❌ expirado ou ausente — autorização necessária"; \
+		echo "🔑 TOKEN ML: ❌ expirado — autorização necessária"; \
 		echo ""; \
 		AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NEW_REDIRECT"; \
-		echo "1️⃣  Atualize o Redirect URI no DevCenter ML:"; \
-		echo "   https://developers.mercadolivre.com.br/devcenter"; \
-		echo "   → URL de redirecionamento: $$NEW_REDIRECT"; \
+		echo "1️⃣  Atualize: https://developers.mercadolivre.com.br/devcenter"; \
+		echo "   → URL: $$NEW_REDIRECT"; \
 		echo ""; \
-		echo "2️⃣  Abra no navegador para autorizar:"; \
-		echo "   $$AUTH_URL"; \
+		echo "2️⃣  Autorizar: $$AUTH_URL"; \
 		echo ""; \
-		echo "3️⃣  Após autorizar: make check-tokens"; \
+		echo "3️⃣  make check-tokens"; \
 	fi; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 	echo ""; \
-	echo "📱 Abra no navegador: $$CF_URL"; \
+	echo "📱 Frontend via Nginx:"; \
+	echo "   $$CF_URL"; \
+	echo ""; \
 	echo "💡 Para parar: make stop-frontend-public"; \
 	echo ""
 
-stop-frontend-public:  ## Parar Frontend React (Nginx + Cloudflare)
-	@echo "🛑 Parando React + Nginx + Cloudflare tunnel..."
-	@pkill cloudflared 2>/dev/null || true
-	@docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml down 2>&1 | grep -E "Removing|Stopping|done" || echo "✅ Containers parados"
+stop-frontend-public:  ## Parar Frontend React (Nginx apenas — preserva tunnel compartilhado)
+	@echo "🛑 Parando Nginx + containers..."
+	@echo "⚠️  Nota: Tunnel Cloudflare permanece ativo para outros serviços"
+	@$(COMPOSE) down 2>&1 | grep -E "Removing|Stopping|done" || echo "✅ Containers parados"
 	@echo "✅ React frontend encerrado"
+	@echo "💡 Se quiser parar o tunnel: make stop-cloudflare"
+
+stop-all:  ## Para ALL: Frontend + Backend + Tunnel
+	@echo "🛑 Parando TUDO (containers + tunnel)..."
+	@pkill cloudflared 2>/dev/null || true
+	@$(COMPOSE) down 2>&1 | grep -E "Removing|Stopping|done" || echo "✅ Containers parados"
+	@echo "✅ Sistema completamente encerrado"
 stop-cloudflare:  ## Para o túnel Cloudflare em background
 	@pkill cloudflared 2>/dev/null && echo "✅ Túnel encerrado" || echo "⚠️  Túnel não estava rodando"
 
