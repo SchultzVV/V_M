@@ -198,11 +198,11 @@ serve-frontend-public:  ## ⭐ Frontend React (build agressivo + Nginx + reutili
 	fi
 	@echo ""
 	@echo "Step 2️⃣  Building React frontend (fresh build)..."; \
-	@cd frontend && npm run build > /dev/null 2>&1 || (echo "❌ Build falhou"; exit 1); \
+	cd frontend && npm run build > /dev/null 2>&1 || (echo "❌ Build falhou"; exit 1); \
 	echo "✅ React build completo (fresh)"; \
 	echo ""
 	@echo "Step 3️⃣  Subindo containers (Backend + Nginx)..."; \
-	$(COMPOSE) up -d; \
+	docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml --env-file .env up -d; \
 	sleep 2; \
 	echo "✅ Site em https://localhost:5000"; \
 	echo "✅ Nginx em https://localhost:443"; \
@@ -268,7 +268,7 @@ serve-frontend-public:  ## ⭐ Frontend React (build agressivo + Nginx + reutili
 stop-frontend-public:  ## Parar Frontend React (Nginx apenas — preserva tunnel compartilhado)
 	@echo "🛑 Parando Nginx + containers..."
 	@echo "⚠️  Nota: Tunnel Cloudflare permanece ativo para outros serviços"
-	@$(COMPOSE) down 2>&1 | grep -E "Removing|Stopping|done" || echo "✅ Containers parados"
+	@docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml --env-file .env down 2>&1 | grep -E "Removing|Stopping|done" || echo "✅ Containers parados"
 	@echo "✅ React frontend encerrado"
 	@echo "💡 Se quiser parar o tunnel: make stop-cloudflare"
 

@@ -8,7 +8,7 @@ export default defineConfig({
     middlewareMode: false,
     proxy: {
       '/api': {
-        target: 'https://localhost:5000',
+        target: 'https://localhost:443',
         changeOrigin: true,
         secure: false, // Aceita certificados auto-assinados
         rewrite: (path) => path, // Não reescreve, mantém /api
@@ -16,14 +16,14 @@ export default defineConfig({
         logLevel: 'debug'
       },
       '/auth': {
-        target: 'https://localhost:5000',
+        target: 'https://localhost:443',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path,
         ws: false
       },
       '/webhook': {
-        target: 'https://localhost:5000',
+        target: 'https://localhost:443',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path,
