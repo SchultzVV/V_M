@@ -11,22 +11,22 @@
 ### Development
 - **Vite Dev Server**: 5173 (localhost:5173, localhost only)
   - Used by: `make frontend-dev`
-  - Hot reload enabled
+  - **Proxy target**: https://localhost:443 (Nginx reverse proxy with Flask backend)
+  - Hot reload enabled with HTTPS proxying
 
 ### Public Exposure (Cloudflare Tunnel)
-- **Current Solution**: Flask direct exposure via port **5555**
+- **Current Solution**: Nginx Reverse Proxy via port **443**
   - Tunnel endpoint: `https://xxxxx.trycloudflare.com` (temporary URLs)
-  - Used by: `make serve-cloudflare` (development)
-  - SSL: HTTPS with `--no-tls-verify` for self-signed certs
-  - **Recommended for**: Dev, testing, quick demos
+  - Used by: `make serve-cloudflare` (backend) + `make serve-frontend-public` (frontend)
+  - Architecture: Nginx 443 (React + API reverse proxy) → Flask 5000 via HTTPS
+  - SSL: HTTPS with self-signed certificates (Flask: `/app/cert.pem`, `/app/key.pem`)
+  - **Recommended for**: Dev, testing, quick demos, and public exposure
+  - **Status**: ACTIVE — Nginx now standard solution for both development and Cloudflare tunnel
+  - **Benefits**: Consolidated SSL, unified entry point, serves React SPA + proxies API
 
-### Alternative (Not Currently Active)
-- **Nginx Reverse Proxy**: 443 (See `docker-compose.react.yaml`)
-  - Could be tunnel origin instead of Flask
-  - Would enable: React SPA + API together, consolidated SSL
-  - **Status**: Documented in `IMPLEMENTACAO_OPCAO_B.md` but NOT used by `make serve-cloudflare`
-  - **Why not primary**: Extra complexity for dev cycle; Flask 5555 direct is simpler
-  - **For production**: Consider using Nginx + custom domain tunnel
+### Legacy Solution
+- **Flask direct exposure**: port **5555** (historical, now superseded by Nginx 443)
+  - Reason for change: Nginx provides better SPA handling and consolidated proxy point
 
 ## Databases & Caching
 

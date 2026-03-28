@@ -20,7 +20,7 @@
 
 ### Setup & Build
 - `make frontend-install` — Install npm dependencies
-- `make frontend-dev` — Start dev server (localhost:5173 with proxy to 5000)
+- `make frontend-dev` — Start dev server (localhost:5173 with HTTPS proxy to 443/Nginx)
 - `make frontend-build` — Production build
 - `make frontend-build-prod` — Build React for production with Nginx
 - `make frontend-clean` — Remove node_modules and dist
@@ -30,8 +30,8 @@
 ## Cloudflare Tunnel (🌐 Main public exposure)
 
 ### Main Tunnel Commands
-- `make serve-cloudflare` ⭐ — **PRIMARY**: Backend + Nginx + Cloudflare tunnel + auto-configure OAuth
-- `make serve-frontend-public` ⭐ — Frontend + Nginx + reuses Cloudflare tunnel from serve-cloudflare
+- `make serve-cloudflare` ⭐ — **PRIMARY**: Backend + Nginx 443 + Cloudflare tunnel + auto-configure OAuth
+- `make serve-frontend-public` ⭐ — Frontend + Nginx 443 (React build) + reuses Cloudflare tunnel from serve-cloudflare (NOW WORKING)
 - `make stop-cloudflare` — Stop active tunnel ONLY (keeps containers running)
 - `make stop-frontend-public` — Stop frontend containers (preserves tunnel for backend)
 - `make stop-all` — Stop everything (containers + tunnel)

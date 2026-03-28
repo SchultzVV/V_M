@@ -36,6 +36,17 @@
 
 Added when using `docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml`:
 
+### nginx-react (New in Nginx-based architecture)
+- **Type**: Nginx reverse proxy
+- **Port**: 443 (HTTPS)
+- **Traffic Flow**: 
+  - `/api/*` → Flask https://localhost:5000 (via HTTPS with self-signed certs)
+  - `/*` → React SPA from dist/
+- **SSL Certs**: Self-signed (Nginx container)
+- **Status**: ACTIVE when `make serve-frontend-public` or `make serve-cloudflare` runs
+- **Config**: `nginx/nginx-react.conf`
+- **Role**: Reverse proxy for React SPA + API consolidation
+
 ### vector_db
 - **Type**: Qdrant
 - **Port**: 6333
