@@ -38,6 +38,37 @@ You MUST reference these shared context files for accuracy:
 - **ingestion_service**: 5003 (AI document ingestion)
 - **retrieval_service**: 5004 (AI RAG retrieval)
 
+## 🌐 Flask via Cloudflare Tunnel
+
+### Public HTTPS Access
+
+When running `make serve-cloudflare`:
+- **Public URL**: `https://opponents-stan-pacific-quad.trycloudflare.com/` (temporary, changes on restart)
+- **Origin**: `https://127.0.0.1:5555/` (Flask internal: 5000, mapped to host: 5555)
+- **Protocol**: HTTPS with automatic SSL termination
+- **Access Pattern**: All endpoints accessible at `https://opponents-stan-pacific-quad.trycloudflare.com/<endpoint>`
+
+### Example Remote Calls
+
+```bash
+# Get products list
+curl https://opponents-stan-pacific-quad.trycloudflare.com/api/products
+
+# Test OAuth login
+curl -L https://opponents-stan-pacific-quad.trycloudflare.com/auth/mercadolivre/login
+
+# Query AI system
+curl -X POST https://opponents-stan-pacific-quad.trycloudflare.com/ai/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "find red shoes"}'
+```
+
+### Important Notes
+- **No port in URL** — tunnel handles port mapping transparently
+- **HTTPS required** — Cloudflare provides SSL automatically
+- **Development only** — Temporary URLs change on restart
+- **OAuth works** — Redirect URI auto-configured by `make serve-cloudflare`
+
 ## 📋 Flask Blueprint Structure
 
 You manage 8 blueprints:
@@ -71,7 +102,38 @@ You manage 8 blueprints:
 - Forget to update endpoints.md when adding routes
 - Ignore Mercado Livre OAuth requirements (redirect_uri must match tunnel URL)
 
-## 🚀 Common Development Tasks
+## � Testing Remotely via Tunnel
+
+When developing endpoints that need external access (webhooks, OAuth):
+
+### Step 1: Start tunnel
+```bash
+make serve-cloudflare
+# Output shows: ✅ TÚNEL ATIVO: https://opponents-stan-pacific-quad.trycloudflare.com
+```
+
+### Step 2: Test endpoint via public URL
+```bash
+URL="https://opponents-stan-pacific-quad.trycloudflare.com"
+
+# Test endpoint
+curl -X GET ${URL}/api/products
+
+# Test with JSON
+curl -X POST ${URL}/sync/mercadolivre/all \
+  -H "Content-Type: application/json" \
+  -d '{"force": true}'
+
+# Verify OAuth redirect URI
+echo "Check .env for ML_REDIRECT_URI: $(grep ML_REDIRECT_URI .env)"
+```
+
+### Step 3: Troubleshoot
+- **502 error**: Container not running → `docker ps` check status
+- **Connection refused**: cloudflared not running → check `pgrep cloudflared`
+- **OAuth fails**: ML_REDIRECT_URI not updated → run `make check-tokens`
+
+## �🚀 Common Development Tasks
 
 ### Add a New Endpoint
 
@@ -140,7 +202,14 @@ Ingestion (5003) and retrieval (5004) services:
 
 - Flow: `/auth/mercadolivre/login` → redirect to ML → `/auth/mercadolivre/callback`
 - **Critical**: OAuth redirect_uri MUST match tunnel URL
-- Managed by `make serve-cloudflare` (auto-updates ML_REDIRECT_URI in .env)
+- **Auto-configured**: `make serve-cloudflare` automatically:
+  1. Starts Cloudflare tunnel
+  2. Captures public URL (e.g., `https://opponents-stan-pacific-quad.trycloudflare.com`)
+  3. Updates `.env`: `ML_REDIRECT_URI=<URL>/auth/mercadolivre/callback`
+  4. Restarts Flask container to load new .env
+  5. Shows authorization URL if token expired
+- **Verify**: `make check-tokens` shows current .env ML_REDIRECT_URI and token status
+- **Manual update** (if needed): Edit `.env` directly and run `make restart-site`
 - Refresh tokens with `/auth/mercadolivre/refresh`
 
 ### Webhooks
@@ -150,7 +219,12 @@ Three webhook listeners:
 - `POST /webhook/shopee` — Product availability changes
 - `POST /webhook/amazon` — Listing updates
 
-All require proper signature validation.
+**Important**: Webhooks now accessible via HTTPS public URL (`https://opponents-stan-pacific-squad.trycloudflare.com/webhook/...`)
+- All require proper signature validation
+- Register webhook URLs in marketplace dashboards using Cloudflare tunnel URL
+- Example ML webhook registration: `https://opponents-stan-pacific-quad.trycloudflare.com/webhook/mercadolivre`
+- Verify signature headers match marketplace expectations (SSL certificate valid via Cloudflare)
+- Test locally: `curl -X POST https://opponents-stan-pacific-quad.trycloudflare.com/webhook/mercadolivre`
 
 ### Product Sync
 

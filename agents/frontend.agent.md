@@ -33,6 +33,36 @@ You MUST reference these shared context files for accuracy:
 - **Backend Proxy**: Auto-proxies `/api`, `/auth`, `/webhook` to `localhost:5000`
 - Start with: `make frontend-dev` or `npm run dev`
 
+### 🌐 URL Bases
+
+**IMPORTANT**: Never hardcode URLs or ports in your code!
+
+| Environment | Frontend | Backend | API Calls |
+|-------------|----------|---------|----------|
+| **Local Dev** | `http://localhost:5173` | `http://localhost:5000` | Use `/api/*` (proxy) |
+| **Tunnel Test** | `http://localhost:5173` | `https://opponents-stan-pacific-quad.trycloudflare.com` | Use `/api/*` (proxy) |
+| **Production** | `https://yourdomain.com` | Same tunnel/Nginx | Use `/api/*` (Nginx proxy) |
+
+**Golden Rule**: Always call `/api`, `/auth`, `/webhook` prefixes — never `localhost:5000` or tunnel URLs.
+The proxy layer handles the rest.
+
+### ⚙️ Proxy & CORS Configuration
+
+**Development** (`npm run dev`):
+- Vite dev server proxies `/api/*`, `/auth/*`, `/webhook/*` to `localhost:5000`
+- CORS is **not an issue** because proxy makes it same-origin
+- Configuration: [frontend/vite.config.ts](frontend/vite.config.ts)
+
+**Production** (Nginx + Cloudflare Tunnel):
+- Nginx reverse proxy handles routing (same domain, no CORS issues)
+- CORS headers handled by Nginx or Flask
+- **Never modify `Access-Control-Allow-Origin`** — proxy/Nginx handles it
+
+**Testing via Tunnel**:
+- When testing via `https://opponents-stan-pacific-quad.trycloudflare.com/`
+- Frontend still uses `/api` (proxy to Flask on same tunnel)
+- CORS works automatically
+
 ### Production Build
 - **Build Tool**: Vite 5.0.8
 - **React**: 18.2
@@ -279,13 +309,48 @@ When deployed with Nginx (`make serve-frontend-public`), the same proxy rules ap
 
 ## 🚀 Deployment with Cloudflare Tunnel
 
-The **AgentTunelador** handles public exposure:
+When **AgentTunelador** runs `make serve-cloudflare`:
 
-1. Runs `make serve-cloudflare` to expose port 5555 (Flask)
-2. Frontend doesn't change — it still uses `/api` proxy
-3. Nginx reverse proxy routes `/api/*` to Flask on 5555
+### Architecture
+```
+User Browser
+  ↓
+https://opponents-stan-pacific-quad.trycloudflare.com/
+  ↓
+Cloudflare Edge (SSL termination)
+  ↓
+cloudflared (host process) → localhost:5555
+  ↓
+Flask (container port 5000, exposed as 5555)
+```
 
-**Your job**: Make sure components work with the proxy setup.
+### How Frontend Adapts
+
+1. **Local dev** (`npm run dev`): Proxy to `localhost:5000` ✅ No changes needed
+2. **Tunnel test**: DevTools shows origin as `https://opponents-stan-pacific-quad.trycloudflare.com`
+3. **Requests still use `/api/*`** (proxy in vite.config.ts)
+
+### Testing Frontend via Tunnel
+
+```bash
+# Step 1: Start tunnel
+make serve-cloudflare
+# Output: ✅ TÚNEL ATIVO: https://opponents-stan-pacific-quad.trycloudflare.com
+
+# Step 2: In another terminal, start frontend dev
+cd frontend && npm run dev
+# Frontend still at localhost:5173, proxies to Flask via tunnel
+
+# Step 3: Open browser
+# http://localhost:5173/ (local dev)
+# DevTools Network tab shows: https://opponents-stan-pacific-quad.trycloudflare.com/api/products
+```
+
+### Important Notes
+- Frontend code **doesn't change** for tunnel testing
+- Proxy setup handles everything transparently
+- CORS is not a concern (same-domain proxying)
+- Test OAuth redirect URI: `https://opponents-stan-pacific-quad.trycloudflare.com/auth/mercadolivre/callback`
 
 ## 🤝 When to Collaborate
 

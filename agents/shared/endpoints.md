@@ -122,3 +122,46 @@
 - OAuth redirect URI must match tunnel URL (configured by `make serve-cloudflare`)
 - Webhooks expect specific JSON payloads per marketplace
 - AI endpoints depend on ingestion_service and retrieval_service (dev only)
+
+---
+
+## 🌐 Public HTTPS Access (Cloudflare Tunnel)
+
+### How It Works
+When running `make serve-cloudflare`:
+- Flask API becomes accessible at: `https://xxxxx.trycloudflare.com/`
+- All endpoints are accessible publicly via HTTPS
+- URLs are temporary (change on restart)
+- Self-signed certs verified automatically by Cloudflare
+
+### Testing Remote Endpoints
+```bash
+# After running: make serve-cloudflare
+URL="https://xxxxx.trycloudflare.com"
+
+# Test API
+curl -H "Accept: application/json" ${URL}/api/products
+
+# Test OAuth redirect URI
+echo "Check DevCenter ML for: ${URL}/auth/mercadolivre/callback"
+
+# Test webhooks (from external service)
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"test": "data"}' \
+  ${URL}/webhook/mercadolivre
+```
+
+### Important: HTTPS is Mandatory
+- Mercado Livre OAuth **requires HTTPS** (Cloudflare provides this)
+- Webhook callbacks from external services **must be HTTPS** 
+- Self-signed certificates work fine (Cloudflare edge terminates SSL)
+- **Do NOT use HTTP** for external integrations
+
+### Troubleshooting Remote Access
+| Error | Cause | Solution |
+|-------|-------|----------|
+| 502 Bad Gateway | Tunnel can't reach Flask | Check: `docker inspect site` container IP |
+| OAuth redirect fails | ML_REDIRECT_URI not updated | Run: `make check-tokens` |
+| Webhook not received | Timeout or invalid endpoint | Check logs: `docker logs site` |
+| Certificate error (some clients) | HTTPS mismatch | Not an issue with Cloudflare tunnel (proxy handles it) |

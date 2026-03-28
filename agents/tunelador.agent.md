@@ -129,6 +129,56 @@ ML_REDIRECT_URI = https://<tunnel-url>/auth/mercadolivre/callback
    # Shows current OAuth tokens and status
    ```
 
+## 🔧 Como Funciona a Auto-Configuração (Internals)
+
+### Pipeline Técnico de `make serve-cloudflare`
+
+```
+Step 1: Subir containers Docker
+  └─ docker-compose up -d
+  └─ Flask exposto em localhost:5555
+
+Step 2: Iniciar Cloudflare Tunnel
+  └─ Executar: bash scripts/tunnel-manager.sh
+  ├─ tunnel-manager.sh descobre IP interno do container (172.18.0.x:5000)
+  ├─ Inicia: cloudflared tunnel --url https://172.18.0.x:5000
+  ├─ Aguarda URL ser gerada (~5-10s)
+  └─ Extrai URL via regex: grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com'
+
+Step 3: Capturar URL do Tunnel
+  └─ Salva em /tmp/cf_url.txt
+  └─ Exemplo: https://wise-mountains-coral-dragons.trycloudflare.com
+
+Step 4: Atualizar .env com Redirect URI
+  └─ sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=<URL>/auth/mercadolivre/callback|" .env
+  └─ .env agora contém URL pública do Mercado Livre redirect
+
+Step 5: Reiniciar Flask
+  └─ docker-compose restart site
+  └─ Flask recarrega .env com nova ML_REDIRECT_URI
+
+Step 6: Validar OAuth Token
+  └─ Se token expirado: Mostra URL de autorização
+  └─ Guia usuário para re-autorizar no DevCenter ML
+```
+
+### Arquivos Chave
+
+| Arquivo | Propósito |
+|---------|-----------|
+| `scripts/tunnel-manager.sh` | Inicia cloudflared, captura URL via logs, retorna APENAS a URL |
+| `Makefile` (serve-cloudflare) | Orquestra pipeline completo: containers → tunnel → .env → restart |
+| `.env` | Armazenador de ML_REDIRECT_URI (gerado dinamicamente) |
+
+### Pontos Críticos de Falha Comum
+
+| Problema | Causa | Solução |
+|----------|-------|--------|
+| Tunnel não inicia | cloudflared não instalado | `make install-cloudflared` |
+| URL "ERR" no .env | tunnel-manager retorna erro | Checar `/tmp/cloudflare_tunnel.log` |
+| 502 Bad Gateway | cloudflared não consegue alcançar Flask | Verificar container IP: `docker inspect site` |
+| OAuth redirect não funciona | ML_REDIRECT_URI incorreta em .env | `make check-tokens` mostra URL esperada |
+
 ## 🌐 Tunnel Commands Reference
 
 ### Primary Tunnel Operations

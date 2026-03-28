@@ -8,8 +8,25 @@
 
 ## Frontend
 
-- **Dev server**: 5173 (Vite, localhost:5173)
-- **Reverse proxy**: 443 (Nginx in production)
+### Development
+- **Vite Dev Server**: 5173 (localhost:5173, localhost only)
+  - Used by: `make frontend-dev`
+  - Hot reload enabled
+
+### Public Exposure (Cloudflare Tunnel)
+- **Current Solution**: Flask direct exposure via port **5555**
+  - Tunnel endpoint: `https://xxxxx.trycloudflare.com` (temporary URLs)
+  - Used by: `make serve-cloudflare` (development)
+  - SSL: HTTPS with `--no-tls-verify` for self-signed certs
+  - **Recommended for**: Dev, testing, quick demos
+
+### Alternative (Not Currently Active)
+- **Nginx Reverse Proxy**: 443 (See `docker-compose.react.yaml`)
+  - Could be tunnel origin instead of Flask
+  - Would enable: React SPA + API together, consolidated SSL
+  - **Status**: Documented in `IMPLEMENTACAO_OPCAO_B.md` but NOT used by `make serve-cloudflare`
+  - **Why not primary**: Extra complexity for dev cycle; Flask 5555 direct is simpler
+  - **For production**: Consider using Nginx + custom domain tunnel
 
 ## Databases & Caching
 
