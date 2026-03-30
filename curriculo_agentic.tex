@@ -1,0 +1,185 @@
+\documentclass[]{deedy-resume-reversed}
+\usepackage[margin=0.55in, top=0.55in, bottom=0.55in]{geometry} % tighter margins
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{} % keeps style as requested (no extra footer)
+
+% --- Reduce size of name and contacts (compact look) ---
+\renewcommand{\namesection}[2]{%
+  \begin{center}
+    \Large \bfseries #1 % smaller than Huge
+    \vspace{1pt}\\
+    \small #2 % smaller contacts
+  \end{center}
+  \vspace{-10pt} % pulls content up
+}
+
+% --- Compact general spacing ---
+\renewcommand{\baselinestretch}{0.96} % slightly tighter line spacing
+\small % reduce main text size (still readable)
+\providecommand{\sectionsep}{\vspace{6pt}} % spacing between sections
+
+% tightemize compact (applies to lists)
+% \provideenvironment{tightemize}{%
+\begin{itemize}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}\setlength{\parsep}{0pt}\setlength{\topsep}{2pt}{%
+\end{itemize}
+
+% reduce spacing between runsubsection / descriptions if template uses these commands
+\makeatletter
+\providecommand{\runsubsection}[1]{\vspace{2pt}\noindent\textbf{#1}}
+\providecommand{\descript}[1]{\hfill\textit{#1}\par\vspace{-2pt}}
+\makeatother
+
+\begin{document}
+
+\namesection{Vítor Vaz Schultz}{
+\href{mailto:vitorvazschultz@gmail.com}{vitorvazschultz@gmail.com} \,|\, 
+\href{tel:+5555996941986}{+55 55 99694 1986} \\
+\href{https://github.com/SchultzVV}{github.com/SchultzVV} \,|\, 
+\href{https://linkedin.com/in/vitor-vaz-schultz}{linkedin.com/in/vitor-vaz-schultz}
+}
+
+\vspace{0pt}
+\begin{minipage}[t]{0.62\textwidth}
+\section{Summary}
+\textbf{AI-first Software Engineer} with Master's in Physics (Quantum Information Theory) and 5+ years building production-grade AI systems. Specialized in designing \textbf{multi-agent agentic systems} where \textbf{LLMs generate and orchestrate most of the implementation}, using \textbf{structured context engineering} and \textbf{GitHub Copilot} as primary development interface.
+
+Expert in \textbf{MLOps}, \textbf{CI/CD}, and cloud-native architectures across \textbf{AWS}, \textbf{Azure}, and \textbf{GCP}. Proven experience deploying \textbf{RAG pipelines}, \textbf{LangChain/LangGraph agents}, and \textbf{AI-driven workflows} that accelerate development across large multi-file codebases. Strong background in designing modular, containerized systems with \textbf{observability stacks} (\textbf{ElasticSearch}, \textbf{Prometheus}, \textbf{Grafana}, \textbf{OpenTelemetry}).
+
+Currently architecting AI-first development workflows with specialized agents (backend, frontend, infrastructure) coordinated via shared context — enabling scalable, LLM-assisted code generation across full-stack systems. Combines solid mathematical foundations with software engineering best practices (\textbf{SOLID}, clean architecture) to build robust, maintainable AI systems. \sectionsep
+
+\section{Experience}
+
+\runsubsection{AI-First Development System (Personal / Open Source)}
+\descript{| Agentic Architecture Lead}
+\location{Mar 2026 – Present | Remote}
+\vspace{2mm}
+\begin{tightemize}
+\item Architected multi-agent orchestration system with \textbf{specialized agents} (Backend, Frontend, Infrastructure, Tech Lead) using \textbf{GitHub Copilot} as primary code generation engine.
+\item Designed \textbf{context engineering framework} with shared knowledge bases (\texttt{ports.md}, \texttt{endpoints.md}, \texttt{make\_commands.md}) enabling LLMs to generate production-ready code across full-stack systems.
+\item Built AI-first workflows: \textbf{Vite + React} frontend with HTTPS proxy orchestration, \textbf{Flask + LangChain} backend with RAG integration, \textbf{Docker + Nginx} infrastructure automation via LLM coordination.
+\item Implemented \textbf{Cloudflare tunnel orchestration} and \textbf{OAuth auto-configuration} using AI-driven scripts and Make commands.
+\item Demonstrated scalable agentic development where most code is \textbf{LLM-generated and LLM-validated}, with human oversight only on architectural decisions.
+\end{tightemize}
+\sectionsep
+
+\runsubsection{Capgemini (Client: Vivo)}
+\descript{| Senior Solutions Consultant (Level III)}
+\location{Jul 2025 – Present | Remote / São Paulo, Brazil}
+\vspace{2mm}
+\begin{tightemize}
+\item Developed standardized API templates on \textbf{GCP Cloud Run}.
+\item Led migration of legacy models to distributed environments using \textbf{PySpark on Databricks}.
+\item Structured benchmarks for \textbf{Observability, Telemetry, and Continuous Training}.
+\item Refined and adjusted business rules in production ML models, focusing on governance.
+\end{tightemize}
+\sectionsep
+
+\runsubsection{GATEWARE (client: BRF)}
+\descript{| ML Engineer \& Chatbot Developer}
+\location{May 2025 – Dec 2025 | Remote / Brazil}
+\begin{tightemize}
+\item Designed and deployed a \textbf{production-ready RAG-based chatbot} using \textbf{LangChain}, \textbf{LangGraph}, \textbf{Agno}, \textbf{OpenAI}, and \textbf{Google Gemini}.
+\item Built modular, containerized stack with \textbf{FastAPI}, \textbf{Redis}, \textbf{MongoDB}, and Watson integrations.
+\item Developed RAG pipelines with monitoring via \textbf{ElasticSearch}; applied SOLID principles for maintainability.
+\item Structured codebase for LLM comprehension and assisted development via AI tools.
+\end{tightemize}
+\sectionsep
+
+\runsubsection{IoT Analytics (client: IPIRANGA)}
+\descript{| Machine Learning Engineer → MLOps Engineer \& AI Agent Developer}
+\location{Feb 2022 – May 2025 | Remote / Campinas, Brazil}
+\begin{tightemize}
+\item Productionized 7 ML models by migrating to \textbf{PySpark} with CI/CD in \textbf{Databricks/Azure}.
+\item Optimized \textbf{Kedro pipelines} via Docker containerization; converted notebooks into SOLID-compliant production code.
+\item Built churn models on \textbf{AWS (S3, EC2, SageMaker)} and sales forecasting with \textbf{Prophet/ARIMA}.
+\item Trained \textbf{YOLOv5} models for document field detection; built \textbf{LLM agents} and RAG pipelines using LangChain.
+\item Established observability stacks with \textbf{Prometheus, Grafana, ElasticSearch}, enabling real-time monitoring of ML systems.
+\end{tightemize}
+\sectionsep
+
+\runsubsection{Getter Amplified Industry}
+\descript{| ML \& Computer Vision Engineer}
+\location{Oct 2021 – Jan 2022 | Remote / Manaus, Brazil}
+\begin{tightemize}
+\item Built autoencoder models for weld classification; developed polygonal image annotation tooling.
+\end{tightemize}
+\sectionsep
+
+\end{minipage}
+\hspace{0.03\textwidth}
+\begin{minipage}[t]{0.35\textwidth}
+
+\section{Education}
+\subsection{Federal University of Santa Maria}
+\descript{Master in Physics (Quantum Information Theory)}
+\location{Oct 2021 – Oct 2023}
+\descript{Bachelor in Physics}
+\location{Jan 2015 – Oct 2021}
+\sectionsep
+
+\section{Skills}
+\subsection{Languages}
+Python \textbullet{} SQL \textbullet{} Bash \textbullet{} TypeScript
+
+\subsection{AI-First Development}
+\textbf{GitHub Copilot} \textbullet{} LLM-driven workflows \\
+\textbf{Multi-agent systems} \textbullet{} Context engineering \\
+Prompt orchestration \textbullet{} Code generation
+
+\subsection{LLMs \& Agents}
+LangChain \textbullet{} LangGraph \textbullet{} Agno \\
+Qdrant \textbullet{} RAG \textbullet{} Hugging Face \\
+OpenAI \textbullet{} Google Gemini
+
+\subsection{ML / Data}
+PySpark \textbullet{} Scikit-learn \textbullet{} XGBoost \\
+MLflow \textbullet{} SageMaker \textbullet{} Kedro \textbullet{} Databricks
+
+\subsection{Backend}
+FastAPI \textbullet{} Flask \textbullet{} PostgreSQL \\
+Redis \textbullet{} MongoDB \textbullet{} SQLAlchemy
+
+\subsection{Frontend}
+React \textbullet{} Vite \textbullet{} TypeScript \\
+Tailwind CSS \textbullet{} Zustand
+
+\subsection{DevOps \& Infrastructure}
+Docker \textbullet{} Nginx \textbullet{} CI/CD \\
+Makefile \textbullet{} Git \textbullet{} MinIO \\
+Cloudflare Tunnels \textbullet{} IAC
+\sectionsep
+
+\subsection{Observability}
+ElasticSearch \textbullet{} Prometheus \\
+Grafana \textbullet{} OpenTelemetry
+\sectionsep
+
+\subsection{Computer Vision}
+YOLOv5/v8 \textbullet{} OpenCV \\
+DeepFace \textbullet{} MQTT
+\sectionsep
+
+\subsection{Cloud \& Infrastructure}
+AWS (Bedrock, SageMaker, Lambda, S3) \\
+Azure \textbullet{} GCP \textbullet{} Microservices
+\sectionsep
+
+\subsection{Best Practices}
+SOLID \textbullet{} Clean Architecture \\
+Pytest \textbullet{} Black \textbullet{} MyPy \textbullet{} Flake8
+\sectionsep
+
+\section{Languages}
+English (Fluent) \textbullet{} Portuguese (Native)
+\sectionsep
+
+\section{Key Differentiators}
+\textbf{AI-First Mindset:} Programs *through* LLMs, not just *with* them \\
+\textbf{Context Engineering:} Structures codebases for optimal LLM comprehension \\
+\textbf{Scalable Agentic Systems:} Multi-agent orchestration with shared knowledge \\
+\textbf{Full-Stack AI:} Backend + Frontend + Infra automated via AI coordination
+\sectionsep
+
+\end{minipage}
+\end{document}

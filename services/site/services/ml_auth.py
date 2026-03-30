@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict
 import json
 from pathlib import Path
+from urllib.parse import urlencode
 
 
 class MercadoLivreAuth:
@@ -40,8 +41,15 @@ class MercadoLivreAuth:
             "redirect_uri": self.redirect_uri
         }
         
-        query_string = "&".join([f"{k}={v}" for k, v in params.items()])
-        return f"{self.auth_url}?{query_string}"
+        # Usar urlencode para encoding correto dos parâmetros
+        query_string = urlencode(params)
+        auth_url = f"{self.auth_url}?{query_string}"
+        
+        print(f"🔗 URL de Autorização:", flush=True)
+        print(f"   {auth_url}", flush=True)
+        sys.stdout.flush()
+        
+        return auth_url
     
     def exchange_code_for_token(self, code: str) -> Dict:
         """
@@ -63,13 +71,25 @@ class MercadoLivreAuth:
         
         # Debug: Log dos dados enviados
         print(f"🔍 DEBUG - Trocando código por token:", flush=True)
+        print(f"   Token URL: {self.token_url}", flush=True)
         print(f"   client_id: {self.app_id}", flush=True)
         print(f"   redirect_uri: {repr(self.redirect_uri)}", flush=True)
         print(f"   code: {code[:20]}...", flush=True)
+        print(f"   grant_type: {data.get('grant_type')}", flush=True)
         sys.stdout.flush()
         
         try:
-            response = requests.post(self.token_url, data=data)
+            # Usar headers explícito para application/x-www-form-urlencoded
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
+            response = requests.post(self.token_url, data=data, headers=headers)
+            
+            print(f"📊 Resposta do servidor:", flush=True)
+            print(f"   Status Code: {response.status_code}", flush=True)
+            print(f"   Headers: {dict(response.headers)}", flush=True)
+            sys.stdout.flush()
+            
             response.raise_for_status()
             
             token_data = response.json()
