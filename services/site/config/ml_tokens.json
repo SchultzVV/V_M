@@ -1,9 +1,9 @@
 {
-  "access_token": "APP_USR-3186869212482819-033014-8b60663458f1801be34a62adf13a0bcc-205650450",
+  "access_token": "APP_USR-3186869212482819-041114-b2d2a987b7e69cd4c4862dd8e54b5b15-205650450",
   "token_type": "Bearer",
   "expires_in": 21600,
   "scope": "offline_access read urn:global:admin:info:/read-only urn:global:admin:info:/read-write urn:global:admin:oauth:/read-only urn:global:admin:oauth:/read-write urn:global:admin:users:/read-only urn:global:admin:users:/read-write urn:ml:all:comunication:/read-only urn:ml:all:publish-sync:/read-only urn:ml:mktp:ads:/read-only urn:ml:mktp:comunication:/read-only urn:ml:mktp:invoices:/read-only urn:ml:mktp:metrics:/read-only urn:ml:mktp:offers:/read-only urn:ml:mktp:orders-shipments:/read-only urn:ml:mktp:publish-sync:/read-only urn:ml:vis:comunication:/read-only urn:ml:vis:publish-sync:/read-only write",
   "user_id": 205650450,
-  "refresh_token": "TG-69cabb79519ab500017b88e6-205650450",
-  "expires_at": "2026-03-31T00:05:46.028455"
+  "refresh_token": "TG-69da8df45888a30001c044fc-205650450",
+  "expires_at": "2026-04-12T00:07:49.030342"
 }
