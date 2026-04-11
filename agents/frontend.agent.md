@@ -89,6 +89,94 @@ frontend/
 └── index.html              (HTML entry point)
 ```
 
+## 🎨 DEF Visual Identity & Design System
+
+**Fontes de verdade**: [docs/conceito.md](docs/conceito.md) e [docs/conceito eng_visual.md](docs/conceito%20eng_visual.md)
+
+> "DEF não é loja. É catálogo de sobrevivência pós-sistema."
+> "Nada aqui é decorativo."
+
+### Paleta de Cores (Tailwind tokens)
+
+| Papel | Token | Hex | Uso |
+|-------|-------|-----|-----|
+| Background primário | `bg-[#0a0a0a]` ou `bg-black-deep` | `#0a0a0a` | Fundo de página |
+| Background card | `bg-dark-gray` | `#1a1a1a` | Cards, modais, painéis |
+| Surface secundária | `bg-gray-steel` | `#2a2a2a` | Inputs, tooltips, sidebars |
+| Borda padrão | `border-zinc-700` | — | Todos os containers |
+| Neon vermelho (primário) | `text-neon-red` / `border-neon-red` | `#ff004d` | CTAs, alertas, destaque |
+| Neon verde (secundário) | `text-neon-green` / `border-neon-green` | `#00ff41` | Sucesso, preços, status OK |
+| Texto principal | `text-white` / `text-zinc-100` | — | Headlines, nomes de produto |
+| Texto secundário | `text-gray-text` | `#9ca3af` | Descrições, metadados |
+| Texto highlight | `text-gray-light` | `#d1d5db` | Labels, subtítulos |
+
+### Tipografia
+
+- **Font principal**: `font-sans` (Inter) — corpo de texto, labels
+- **Font técnica**: `font-mono` (IBM Plex Mono) — preços, SKUs, badges de status, IDs, códigos
+- **Casing**: UPPERCASE para labels curtos e badges — jamais sentence case em botões
+- **Preços**: sempre com `font-mono text-neon-green font-bold` ou `text-price`
+
+### Princípios UX Brutalist
+
+1. **Zero arredondamento** — use `rounded-none` ou omita `rounded-*`. Bordas são retas e duras.
+2. **Alto contraste** — fundo preto profundo + texto branco + accent neon. Nunca gray-on-gray.
+3. **Minimalismo funcional** — sem decoração. Cada elemento existe por um motivo operacional.
+4. **Borders > shadows** — use `border border-zinc-700` em vez de sombras suaves.
+5. **Hover states neon** — no hover, borda e/ou texto mudam para `neon-red` ou `neon-green`.
+6. **Espaçamento denso** — grids compactos, padding `p-3` ou `p-4`. Não usar `p-8` generoso.
+7. **Texto frio e imperativo** — CTAs: "ADICIONAR", "SINCRONIZAR", "EXECUTAR". Não "Clique aqui".
+8. **Sem imagens decorativas** — imagens são apenas de produto (com fundo cyberpunk gerado via prompts do conceito).
+
+### Padrões de Componente
+
+```tsx
+// ✅ ProductCard — estética DEF
+<div className="border border-zinc-700 bg-dark-gray hover:border-neon-red transition-colors p-4 rounded-none">
+  <img src={product.image} alt={product.title} className="w-full aspect-square object-cover" />
+  <h3 className="font-sans text-white uppercase text-sm mt-3 tracking-wide">{product.title}</h3>
+  <p className="font-mono text-neon-green text-price-sm font-bold mt-1">
+    R$ {product.price.toFixed(2)}
+  </p>
+  <p className="font-mono text-gray-text text-xs mt-1">SKU: {product.sku}</p>
+</div>
+
+// ✅ Badge de status
+<span className="font-mono text-xs uppercase tracking-widest px-2 py-1 border border-neon-green text-neon-green">
+  ATIVO
+</span>
+
+// ✅ Botão primário (CTA)
+<button className="bg-neon-red text-black font-mono font-bold text-sm uppercase tracking-widest px-6 py-3 rounded-none hover:bg-neon-red-dim transition-colors">
+  ADICIONAR
+</button>
+
+// ✅ Botão secundário / outline
+<button className="border border-zinc-700 text-zinc-400 font-mono text-sm uppercase tracking-widest px-6 py-3 rounded-none hover:border-neon-red hover:text-neon-red transition-colors">
+  CANCELAR
+</button>
+
+// ✅ Input / campo
+<input className="w-full bg-gray-steel border border-zinc-700 text-white font-mono text-sm px-3 py-2 rounded-none focus:outline-none focus:border-neon-green placeholder-zinc-600" />
+
+// ✅ Grid de produtos
+<div className="grid grid-cols-2 gap-px bg-zinc-800 md:grid-cols-4 lg:grid-cols-5">
+  {products.map(p => <ProductCard key={p.id} product={p} />)}
+</div>
+
+// ❌ EVITAR — não usa a identidade DEF:
+// rounded-lg border-gray-200 text-green-600 hover:shadow-lg bg-white
+```
+
+### Categorias e Fundos de Produto
+
+Cada categoria tem seu prompt de fundo gerado (documentado em `docs/conceito eng_visual.md`). A UI deve respeitar a imagem de fundo ao exibir categoria pages:
+- Overlay escuro `bg-black/70` sobre a imagem de fundo para legibilidade
+- Texto sempre sobre overlay — nunca direto sobre a imagem
+- Exemplo: `<div className="relative"><img .../><div className="absolute inset-0 bg-black/70 flex items-end p-4">...</div></div>`
+
+---
+
 ## 📦 Tech Stack
 
 | Tool | Version | Purpose |
@@ -138,10 +226,11 @@ import { Product } from '../types';
 
 export const ProductCard: FC<{ product: Product }> = ({ product }) => {
   return (
-    <div className="rounded-lg border border-gray-200 p-4 hover:shadow-lg">
-      <h3 className="font-bold text-lg">{product.name}</h3>
-      <p className="text-gray-600">{product.description}</p>
-      <p className="text-xl font-semibold text-green-600">${product.price}</p>
+    // DEF aesthetic: preto profundo, borda zinc, hover neon vermelho, mono para preço
+    <div className="bg-dark-gray border border-zinc-700 p-4 rounded-none hover:border-neon-red transition-colors">
+      <h3 className="font-sans text-white uppercase text-sm tracking-wide">{product.name}</h3>
+      <p className="font-sans text-gray-text text-xs mt-1">{product.description}</p>
+      <p className="font-mono text-neon-green font-bold text-price-sm mt-2">R$ {product.price}</p>
     </div>
   );
 };
@@ -187,14 +276,24 @@ export const useProductStore = create((set) => ({
 }));
 ```
 
-### 4. Style with Tailwind
+### 4. Style with Tailwind (DEF Brand)
 
 ```tsx
-<div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+// Grid de produtos — gap-px cria separador de 1px usando o fundo escuro como cor de grout
+<div className="grid grid-cols-2 gap-px bg-zinc-800 md:grid-cols-4 lg:grid-cols-5">
   {products.map((product) => (
     <ProductCard key={product.id} product={product} />
   ))}
 </div>
+
+// Página de categoria com imagem de fundo cyberpunk + overlay
+<section className="relative min-h-[40vh]">
+  <img src={category.bgImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+  <div className="absolute inset-0 bg-black/70" />
+  <div className="relative z-10 p-6">
+    <h1 className="font-mono text-white text-xl uppercase tracking-widest">{category.name}</h1>
+  </div>
+</section>
 ```
 
 ### 5. Add Authentication (OAuth)

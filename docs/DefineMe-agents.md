@@ -97,11 +97,14 @@ Esta pasta contém **agentes LLM (Large Language Models)** baseados em LangChain
 - ✅ Mais imagens (melhor para carrossel)
 - ✅ Filtros específicos (categoria, tag, etc)
 
+**Fonte de dados:** JSONs de `staging/` (arquivos locais, não PostgreSQL)
+**Histórico de postados:** arquivo `insta_staging/.posted` (não Redis)
+
 **Lógica de Seleção:**
 ```python
-# 1. Busca no Redis produtos publicados
+# 1. Lê JSONs de staging/ via glob
 # 2. Filtra produtos disponíveis
-# 3. Remove já postados nas últimas 24h
+# 3. Remove já postados (checa insta_staging/.posted)
 # 4. Ordena por desconto (maior primeiro)
 # 5. Retorna o melhor candidato
 ```
@@ -176,19 +179,21 @@ A legenda deve:
 
 **Função:** Realiza a publicação efetiva no Instagram via API oficial.
 
+**Cliente Instagram:** `instagrapi` (lib não-oficial, autenticação via `INSTAGRAM_USERNAME` + `INSTAGRAM_PASSWORD` — não usa OAuth)
+**Image Generator:** `InstagramImageGenerator` de `services.instagram_image_service_cv2` (OpenCV)
+
 **Processo:**
-1. **Prepara imagens:**
-   - Redimensiona para 1080x1080
-   - Adiciona marca d'água (opcional)
-   - Otimiza qualidade
-2. **Upload no Instagram:**
-   - Cria container de mídia
-   - Faz upload das imagens
-   - Publica o post (photo ou carousel)
+1. **Gera imagens:**
+   - Carrossel: `image_generator.generate_carousel_images(product)`
+   - Foto única: `image_generator.generate_product_image(product)`
+   - Redimensiona para 1080x1080 via OpenCV
+2. **Posta no Instagram:**
+   - Usa `instagrapi.Client()` (lazy loading)
+   - Se `instagrapi` não instalado → modo simulação automático
+   - Publica photo ou carousel
 3. **Registra histórico:**
-   - Salva no Redis (histórico 7 dias)
-   - Atualiza banco de dados
-   - Log de auditoria
+   - Salva no Redis (lista `instagram_history`, 1000 entradas)
+   - TTL configurável via `redis.setex`
 
 **Modos de Operação:**
 
@@ -247,9 +252,9 @@ result = poster_agent.execute(product, simulate=False)
 │  3. AGENTE DECISOR                              │
 │     product_decision_agent.execute()            │
 │                                                  │
-│     • Consulta banco de dados PostgreSQL        │
+│     • Lê JSONs de staging/ (arquivos locais)     │
 │     • Filtra produtos disponíveis               │
-│     • Verifica Redis (já postados)              │
+│     • Checa insta_staging/.posted               │
 │     • Seleciona melhor candidato                │
 │                                                  │
 │  Output: selected_product                       │

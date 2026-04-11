@@ -78,7 +78,7 @@ SYSTEM_ARCHITECTURE = """
                     │                                   │
        ┌────────────┴─────────────┐                    │
        │                          │                    │
-       │  • Gera imagem (Pillow)  │                    │
+       │  • Gera imagem (OpenCV) │                    │
        │  • Adiciona overlays     │                    │
        │  • Posta (instagrapi)    │◄───────────────────┘
        │  • Registra histórico    │
@@ -130,7 +130,7 @@ COMPONENTS_DETAIL = """
 │  🔀 LangGraph          → Orquestração de workflows                          │
 │  🧠 OpenAI GPT         → Modelos de linguagem                               │
 │  🗄️  Redis              → Cache semântico e memória                         │
-│  🖼️  Pillow             → Geração de imagens                                │
+│  🖼️  OpenCV (cv2)       → Geração de imagens (instagram_image_service_cv2)  │
 │  📸 instagrapi         → Instagram API                                      │
 │  🐍 Flask              → Web framework                                       │
 │  🐳 Docker             → Containerização                                     │
@@ -195,12 +195,13 @@ REDIS_KEYS = """
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  KEY: instagram:posted_products                                              │
-│  TYPE: List (LPUSH/LRANGE)                                                   │
-│  DESC: IDs dos produtos já postados (evita duplicação)                       │
-│  SIZE: Últimos 500 produtos                                                  │
+│  FILE: insta_staging/.posted                                                 │
+│  TYPE: Arquivo texto (append, uma linha por produto)                         │
+│  DESC: Produtos já postados no Instagram (evita duplicação)                  │
+│  NOTE: NÃO é Redis — é gerenciado por ProductDecisionAgent diretamente       │
 │  EXAMPLE:                                                                    │
-│    ["MLB19571567", "MLB19571566", "MLB19571565", ...]                        │
+│    robo-aspirador_20260128.json                                              │
+│    produto-x_20260130.json                                                   │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
