@@ -38,14 +38,20 @@ Added when using `docker-compose -f docker-compose.yaml -f docker-compose.dev.ya
 
 ### nginx-react (New in Nginx-based architecture)
 - **Type**: Nginx reverse proxy
-- **Port**: 443 (HTTPS)
+- **Port**: 443 (HTTPS), 80 (redirects to 443)
 - **Traffic Flow**: 
-  - `/api/*` → Flask https://localhost:5000 (via HTTPS with self-signed certs)
-  - `/*` → React SPA from dist/
-- **SSL Certs**: Self-signed (Nginx container)
+  - `/health` → 200 OK immediately (no auth, no proxy — used for health check)
+  - `/api/*`, `/auth/*`, `/sync/*`, `/webhook/*`, `/instagram/*` → Flask `https://site:5000` (HTTPS with self-signed cert)
+  - `/*` → React SPA from `/app/dist/`
+- **DNS**: Uses `resolver 127.0.0.11 valid=10s` to re-resolve `site` after Flask restarts
+- **SSL Certs**: Self-signed mounted from `./certs/` (localhost.crt / localhost.key)
 - **Status**: ACTIVE when `make serve-frontend-public` or `make serve-cloudflare` runs
 - **Config**: `nginx/nginx-react.conf`
-- **Role**: Reverse proxy for React SPA + API consolidation
+- **Dockerfile**: `nginx/Dockerfile.nginx`
+- **Role**: Reverse proxy for React SPA + API consolidation + Cloudflare tunnel entry point
+
+### ⚠️ Known Gotcha: 502 after Flask restart
+If Flask restarts/redeploys, Nginx automatically picks up the new IP within 10s thanks to the `$flask_backend` variable pattern. No Nginx restart needed.
 
 ### vector_db
 - **Type**: Qdrant
@@ -78,7 +84,11 @@ For React frontend deployment:
 - **Type**: Nginx reverse proxy
 - **Ports**: 80 → 443 (HTTP redirect to HTTPS)
 - **Role**: Serves React SPA (static files in /app/dist)
-- **Proxy rules**: /api/* → Flask backend
+- **Proxy rules**: `/api/*`, `/auth/*`, `/sync/*`, `/webhook/*`, `/instagram/*` → Flask backend
+- **DNS resolver**: `127.0.0.11 valid=10s` (Docker embedded DNS, prevents stale IP after Flask restarts)
+- **Proxy pattern**: `set $flask_backend "site:5000"` + `proxy_pass https://$flask_backend` — forces re-resolution per TTL (not cached at startup)
+- **Health check endpoint**: `GET /health` → returns 200 OK (plain text, no auth required)
+- **Health check command**: `wget --no-check-certificate https://127.0.0.1/health` (IPv4, skips SSL verify)
 - **Depends on**: site (Flask backend)
 
 ## Service Dependencies

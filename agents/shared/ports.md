@@ -50,7 +50,9 @@
 | Service | Port | Purpose | Protocol |
 |---------|------|---------|----------|
 | Flask (internal) | 5000 | Main API | HTTPS |
-| Flask (exposed) | 5555 | Cloudflare tunnel endpoint | HTTP |
+| Flask (exposed) | 5555 | Direct access (debug/fallback) | HTTPS |
+| Nginx React | 80 | HTTP → HTTPS redirect | HTTP |
+| Nginx React | 443 | Main entry point (React SPA + API proxy) | HTTPS |
 | Vite Dev Server | 5173 | Frontend development | HTTP |
 | PostgreSQL | 5432 | Relational database | TCP |
 | Redis | 6379 | Cache & queue | TCP |
@@ -60,3 +62,18 @@
 | info-scrap | 8001 | Scraping service | HTTP |
 | ingestion_service | 5003 | Document ingestion | HTTP |
 | retrieval_service | 5004 | RAG retrieval | HTTP |
+
+## Traffic Flow (Public → Internal)
+
+```
+Browser/Cloudflare → https://localhost:443 (Nginx)
+  ├── /health          → 200 OK (local, no proxy)
+  ├── /api/*           → https://site:5000  (Flask, re-resolved via Docker DNS)
+  ├── /auth/*          → https://site:5000
+  ├── /sync/*          → https://site:5000
+  ├── /webhook/*       → https://site:5000
+  └── /*               → /app/dist/ (React SPA static files)
+```
+
+### ⚠️ Nginx DNS Note
+Nginx resolves `site` on startup **and** on every request after TTL (10s) using Docker's embedded DNS `127.0.0.11`. This prevents 502 errors after Flask container restarts.

@@ -22,6 +22,9 @@
 - `GET /media/<bucket>/<path:filename>` — Media file serving
 - `GET /media/ping` — Media service health check
 
+### Health Check (Nginx)
+- `GET /health` — Nginx health check endpoint (returns `200 OK`, plain text, no Flask involved)
+
 ### Admin & SEO
 - `GET /admin` — Admin dashboard
 - `GET /sitemap.xml` — XML sitemap for search engines
@@ -158,10 +161,12 @@ curl -X POST \
 - Self-signed certificates work fine (Cloudflare edge terminates SSL)
 - **Do NOT use HTTP** for external integrations
 
-### Troubleshooting Remote Access
+## Troubleshooting Remote Access
 | Error | Cause | Solution |
 |-------|-------|----------|
-| 502 Bad Gateway | Tunnel can't reach Flask | Check: `docker inspect site` container IP |
+| 502 Bad Gateway | Nginx has stale Flask IP (old behavior, now fixed) | Fixed via Docker DNS resolver — waits up to 10s for new IP |
+| 502 persistente | Flask container down | `docker ps` + `make restart-site` |
 | OAuth redirect fails | ML_REDIRECT_URI not updated | Run: `make check-tokens` |
 | Webhook not received | Timeout or invalid endpoint | Check logs: `docker logs site` |
 | Certificate error (some clients) | HTTPS mismatch | Not an issue with Cloudflare tunnel (proxy handles it) |
+| nginx-react unhealthy | `/health` endpoint failing | Fixed: uses `https://127.0.0.1/health` + `--no-check-certificate` |

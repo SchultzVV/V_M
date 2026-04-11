@@ -31,7 +31,7 @@
 
 ### Main Tunnel Commands
 - `make serve-cloudflare` ⭐ — **PRIMARY**: Backend + Nginx 443 + Cloudflare tunnel + auto-configure OAuth
-- `make serve-frontend-public` ⭐ — Frontend + Nginx 443 (React build) + reuses Cloudflare tunnel from serve-cloudflare (NOW WORKING)
+- `make serve-frontend-public` ⭐ — Frontend + Nginx 443 (React build) + reuses Cloudflare tunnel from serve-cloudflare
 - `make stop-cloudflare` — Stop active tunnel ONLY (keeps containers running)
 - `make stop-frontend-public` — Stop frontend containers (preserves tunnel for backend)
 - `make stop-all` — Stop everything (containers + tunnel)
@@ -41,6 +41,8 @@
 - **Single Tunnel Architecture**: One `cloudflared` process serves both backend AND frontend via Nginx reverse proxy
 - **Tunnel Reuse**: `serve-frontend-public` automatically reuses the tunnel from `serve-cloudflare` if it's already running
 - **Shared ML_REDIRECT_URI**: Both commands update the same redirect URI in .env (no conflicts)
+- **Nginx DNS resolver**: After `make restage` or Flask restart, Nginx picks up the new Flask IP within 10s automatically — no Nginx restart needed
+- **Health check**: `GET /health` on Nginx returns 200 OK (used by Docker). No Flask dependency.
 
 ### Permanent Tunnel (Custom domain)
 - `make setup-cloudflare-fixed` — Create permanent named tunnel (one-time setup)
