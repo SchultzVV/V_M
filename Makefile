@@ -34,7 +34,8 @@ up:  ## Sobe ambiente de desenvolvimento (build + detach)
 	$(COMPOSE) up -d --build
 	@echo "✅ Backend em https://localhost:5555"
 	@echo "✅ Frontend: make frontend-dev (http://localhost:5173)"
-	@echo "💡 Próximo: make serve-cloudflare  (HTTPS público + auto-OAuth)"
+	@echo "💡 Para site completo local: make frontup"
+	@echo "💡 Para expor público:       make serve-cloudflare"
 
 down:  ## Para e remove containers + volumes
 	$(COMPOSE) down -v
@@ -99,6 +100,28 @@ frontend-build-prod:  ## Build React para produção com Nginx (alias melhorado)
 	@echo "   $(shell du -sh frontend/dist)"
 	@echo "   Pronto para servir com Nginx!"
 
+frontup:  ## ⭐ Sobe site completo para testes locais (build React + Nginx + Backend)
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 FRONTUP — React + Nginx + Backend (local, sem túnel)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@echo "🏗️  Buildando React..."
+	@rm -rf frontend/dist
+	@cd frontend && npm run build > /dev/null 2>&1 || (echo "❌ Build falhou"; exit 1)
+	@echo "✅ Build completo"
+	@echo ""
+	@echo "🐳 Subindo containers..."
+	@docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml --env-file .env up -d
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "✅ Site: https://localhost"
+	@echo "✅ API:  https://localhost/api/products"
+	@echo "✅ Flask direto: https://localhost:5555"
+	@echo "✅ MinIO: http://localhost:9000"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+
 
 # ============================================================
 # 🌐  EXPOSE — Túneis HTTPS públicos
@@ -157,24 +180,22 @@ serve-cloudflare:  ## ⭐ Túnel Cloudflare (Flask): Backend HTTP + tunnel + aut
 	fi; \
 	CF_URL=$$(cat /tmp/cf_url.txt); \
 	NEW_REDIRECT="$$CF_URL/auth/mercadolivre/callback"; \
+	AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NEW_REDIRECT"; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 	if [ "$$TOKEN_OK" = "1" ]; then \
-		echo "🔑 TOKEN ML: ✅ válido — não precisa reautorizar"; \
-		echo ""; \
-		echo "   Pode usar a API direto: make test-api"; \
+		echo "🔑 TOKEN ML: ✅ válido"; \
 	else \
-		echo "🔑 TOKEN ML: ❌ expirado ou ausente — autorização necessária"; \
-		echo ""; \
-		AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NEW_REDIRECT"; \
-		echo "1️⃣  Atualize o Redirect URI no DevCenter ML:"; \
-		echo "   https://developers.mercadolivre.com.br/devcenter"; \
-		echo "   → URL: $$NEW_REDIRECT"; \
-		echo ""; \
-		echo "2️⃣  Abra no navegador para autorizar:"; \
-		echo "   $$AUTH_URL"; \
-		echo ""; \
-		echo "3️⃣  Após autorizar: make check-tokens"; \
+		echo "🔑 TOKEN ML: ❌ expirado ou ausente"; \
 	fi; \
+	echo ""; \
+	echo "1️⃣  Cadastre o Redirect URI no DevCenter ML (nova URL a cada run):"; \
+	echo "   https://developers.mercadolivre.com.br/devcenter"; \
+	echo "   → URL: $$NEW_REDIRECT"; \
+	echo ""; \
+	echo "2️⃣  Abra no navegador para autorizar (ou re-autorizar):"; \
+	echo "   $$AUTH_URL"; \
+	echo ""; \
+	echo "3️⃣  Após autorizar: make check-tokens"; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 	echo ""; \
 	echo "🔗 API pública via Cloudflare:"; \
@@ -204,12 +225,12 @@ serve-frontend-public:  ## ⭐ Frontend React (build agressivo + Nginx + reutili
 	@echo "Step 3️⃣  Subindo containers (Backend + Nginx)..."; \
 	docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml --env-file .env up -d; \
 	sleep 2; \
-	echo "✅ Site em https://localhost:5000"; \
-	echo "✅ Nginx em https://localhost:443"; \
+	echo "✅ Flask API em https://localhost:5555"; \
+	echo "✅ Site (Nginx/Frontend) em https://localhost"; \
 	echo ""
 	@echo "Step 4️⃣  Iniciando túnel Cloudflare..."; \
-	bash scripts/tunnel-manager.sh /tmp/cloudflare_tunnel.log "https://127.0.0.1:443" 20 > /tmp/cf_url.txt 2>&1; \
-	CF_URL=$$(cat /tmp/cf_url.txt); \
+	bash scripts/tunnel-manager.sh /tmp/cloudflare_tunnel.log "https://127.0.0.1:443" 20 > /tmp/cf_url.txt; \
+	CF_URL=$$(grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com' /tmp/cf_url.txt | head -1); \
 	if [ -z "$$CF_URL" ] || ! echo "$$CF_URL" | grep -q "https://"; then \
 		echo "❌ Falha ao capturar URL do túnel"; \
 		cat /tmp/cloudflare_tunnel.log; \
@@ -241,22 +262,24 @@ serve-frontend-public:  ## ⭐ Frontend React (build agressivo + Nginx + reutili
 		STATUS=$$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $$TOKEN" https://api.mercadolibre.com/users/me); \
 		[ "$$STATUS" = "200" ] && TOKEN_OK=1; \
 	fi; \
-	CF_URL=$$(cat /tmp/cf_url.txt); \
+	CF_URL=$$(grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com' /tmp/cf_url.txt | head -1); \
 	NEW_REDIRECT="$$CF_URL/auth/mercadolivre/callback"; \
+	AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NEW_REDIRECT"; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 	if [ "$$TOKEN_OK" = "1" ]; then \
 		echo "🔑 TOKEN ML: ✅ válido"; \
 	else \
-		echo "🔑 TOKEN ML: ❌ expirado — autorização necessária"; \
-		echo ""; \
-		AUTH_URL="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=$$APP_ID&redirect_uri=$$NEW_REDIRECT"; \
-		echo "1️⃣  Atualize: https://developers.mercadolivre.com.br/devcenter"; \
-		echo "   → URL: $$NEW_REDIRECT"; \
-		echo ""; \
-		echo "2️⃣  Autorizar: $$AUTH_URL"; \
-		echo ""; \
-		echo "3️⃣  make check-tokens"; \
+		echo "🔑 TOKEN ML: ❌ expirado ou ausente"; \
 	fi; \
+	echo ""; \
+	echo "1️⃣  Cadastre o Redirect URI no DevCenter ML (nova URL a cada run):"; \
+	echo "   https://developers.mercadolivre.com.br/devcenter"; \
+	echo "   → URL: $$NEW_REDIRECT"; \
+	echo ""; \
+	echo "2️⃣  Abra no navegador para autorizar (ou re-autorizar):"; \
+	echo "   $$AUTH_URL"; \
+	echo ""; \
+	echo "3️⃣  Após autorizar: make check-tokens"; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 	echo ""; \
 	echo "📱 Frontend via Nginx:"; \
@@ -313,10 +336,10 @@ serve-ngrok:  ## Túnel ngrok com domínio estático (NGROK_SUBDOMAIN no .env)
 	@SUBDOMAIN=$$(grep '^NGROK_SUBDOMAIN=' .env | cut -d'=' -f2 | tr -d '[:space:]'); \
 	if [ -n "$$SUBDOMAIN" ]; then \
 		echo "🌐 Usando domínio estático: https://$$SUBDOMAIN.ngrok-free.app"; \
-		ngrok http --domain=$$SUBDOMAIN.ngrok-free.app --request-header-add="ngrok-skip-browser-warning:true" https://localhost:5000 > /dev/null 2>&1 & \
+		ngrok http --domain=$$SUBDOMAIN.ngrok-free.app --request-header-add="ngrok-skip-browser-warning:true" https://localhost:5555 > /dev/null 2>&1 & \
 	else \
 		echo "🌐 Usando URL aleatória (defina NGROK_SUBDOMAIN no .env para URL fixa)"; \
-		ngrok http --request-header-add="ngrok-skip-browser-warning:true" https://localhost:5000 > /dev/null 2>&1 & \
+		ngrok http --request-header-add="ngrok-skip-browser-warning:true" https://localhost:5555 > /dev/null 2>&1 & \
 	fi
 	@sleep 6
 	@echo "🌐 URL ngrok:" && curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
@@ -339,7 +362,7 @@ setup-cloudflare-fixed:  ## Cria túnel Cloudflare com URL permanente (executar 
 	$$CLOUDFLARED_BIN tunnel create def 2>/dev/null || echo "Túnel já existe"; \
 	TUNNEL_ID=$$($$CLOUDFLARED_BIN tunnel list | grep ' def ' | awk '{print $$1}'); \
 	echo "📝 Gerando ~/.cloudflared/config.yml..."; \
-	printf "tunnel: %s\ncredentials-file: /home/%s/.cloudflared/%s.json\n\ningress:\n  - service: https://localhost:5000\n    originRequest:\n      noTLSVerify: true\n      connectTimeout: 30s\n      tlsTimeout: 30s\n      tcpKeepAlive: 30s\n      keepAliveConnections: 10\n      keepAliveTimeout: 90s\n" "$$TUNNEL_ID" "$$USER" "$$TUNNEL_ID" > ~/.cloudflared/config.yml; \
+	printf "tunnel: %s\ncredentials-file: /home/%s/.cloudflared/%s.json\n\ningress:\n  - service: https://localhost:5555\n    originRequest:\n      noTLSVerify: true\n      connectTimeout: 30s\n      tlsTimeout: 30s\n      tcpKeepAlive: 30s\n      keepAliveConnections: 10\n      keepAliveTimeout: 90s\n" "$$TUNNEL_ID" "$$USER" "$$TUNNEL_ID" > ~/.cloudflared/config.yml; \
 	CF_HOST=$$(grep '^CF_HOSTNAME=' .env | cut -d'=' -f2 | tr -d '[:space:]'); \
 	if [ -n "$$CF_HOST" ]; then \
 		echo "🌐 Criando rota DNS: $$CF_HOST → túnel def..."; \
@@ -379,7 +402,7 @@ serve-cloudflare-fixed:  ## ⭐ Túnel Cloudflare URL FIXA: requer CF_HOSTNAME n
 	echo "🔧 Subindo containers..."; \
 	$(COMPOSE) up -d; \
 	sleep 2; \
-	echo "✅ Site em https://localhost:5000"; \
+	echo "✅ Flask API em https://localhost:5555"; \
 	echo ""; \
 	FIXED_URL="https://$$CF_HOST"; \
 	APP_ID=$$(grep "^ML_APP_ID=" .env | cut -d'=' -f2 | tr -d '[:space:]'); \
@@ -451,8 +474,9 @@ links:  ## 🔗 Expõe todos os links importantes: Cloudflare, ML, Instagram, si
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@echo "🌐 SITE & TÚNEIS:"
-	@echo "  📍 Local: https://localhost:5000"
-	@echo "  🔧 MinIO: http://localhost:9000"
+	@echo "  🌐 Site (Nginx/Frontend): https://localhost"
+	@echo "  🔧 Flask API direto: https://localhost:5555"
+	@echo "  📦 MinIO: http://localhost:9000"
 	@echo "  🗄️  PostgreSQL: postgresql://user:password@localhost:5432/produtos_db"
 	@CF_HOST=$$(grep '^CF_HOSTNAME=' .env | cut -d'=' -f2 | cut -d'#' -f1 | xargs); \
 	if [ -n "$$CF_HOST" ]; then \
@@ -476,9 +500,7 @@ links:  ## 🔗 Expõe todos os links importantes: Cloudflare, ML, Instagram, si
 	@echo ""
 	@echo "🛠️  DASHBOARDS:"
 	@echo "  📊 Redis: redis://localhost:6379"
-	@echo "  🗄️  pgAdmin: http://localhost:5050"
-	@echo "     (email: admin@example.com)"
-	@echo "  📦 MinIO Console: http://localhost:9001"
+	@echo "   MinIO Console: http://localhost:9001"
 	@echo "     (user: minio / pass: minio123)"
 	@echo ""
 	@echo "📚 DOCUMENTAÇÃO:"
@@ -715,20 +737,20 @@ reprepare-associate-ml:  ## ⭐ ML: reprepare COM link de afiliado (preço mais 
 instagram-post:  ## ⭐ Posta produto no Instagram (feed + story automáticos)
 	@$(MAKE) -s _ensure-site
 	@echo "📸 Postando no Instagram..."
-	@curl -sX POST "http://localhost:5000/instagram/post/auto?simulate=false" \
+	@curl -sX POST "http://localhost:5555/instagram/post/auto?simulate=false" \
 		-H "Content-Type: application/json" | jq .
 
 instagram-test:  ## Simula postagem Instagram sem publicar de verdade
 	@$(MAKE) -s _ensure-site
 	@echo "🎭 Simulando postagem Instagram..."
-	@curl -sX POST "http://localhost:5000/instagram/post/auto?simulate=true" \
+	@curl -sX POST "http://localhost:5555/instagram/post/auto?simulate=true" \
 		-H "Content-Type: application/json" | jq .
 
 instagram-status:  ## Status do sistema Instagram (tokens, permissões)
-	@curl -s "http://localhost:5000/instagram/status" | jq .
+	@curl -s "http://localhost:5555/instagram/status" | jq .
 
 instagram-history:  ## Histórico de posts no Instagram (últimos 10)
-	@curl -s "http://localhost:5000/instagram/history?limit=10" | jq .
+	@curl -s "http://localhost:5555/instagram/history?limit=10" | jq .
 
 prepare-post-image:  ## ⭐ Gera imagem 1080x1080 para post (FILE=caminho.json ou --all)
 	@$(MAKE) -s _ensure-site
