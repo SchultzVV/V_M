@@ -40,7 +40,7 @@
   }
 
   .price-original {
-    @apply text-price-sm line-through text-neon-red opacity-75;
+    @apply text-price-sm line-through text-gray-text opacity-75;
   }
 
   .container-def {
@@ -48,7 +48,7 @@
   }
 
   .grid-def {
-    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4;
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4;
   }
 
   .badge-status-ok {
