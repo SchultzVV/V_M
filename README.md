@@ -1,5 +1,19 @@
 # DEF Site
 
+## 🛠️ Organização / Manutenção
+
+| Comando | Função |
+|---------|--------|
+| `make organize-tags` | Reclassifica produtos por categoria (interativo) |
+| `make organize-tags-auto` | Reclassifica silenciosamente |
+| `make staging-dedup` | Remove JSONs duplicados no staging |
+| `make staging-fix-perms` | Corrige permissões de `/staging` |
+| `make clear-minio` | Remove todas imagens do MinIO (com confirmação) |
+| `make check-tokens` | Verifica se o token OAuth ML está válido |
+| `make tunnel-info` | Mostra URL do túnel ativo |
+
+---
+
 Plataforma de afiliados e comparação de produtos com scraping automático, publicação de conteúdo e arquitetura de agentes de IA baseados em **LangGraph**. O sistema coleta produtos de múltiplas plataformas (Mercado Livre, Shopee, Amazon), organiza os dados em um pipeline de staging, publica no site e — em breve — delega todo esse fluxo a agentes autônomos com raciocínio encadeado via LLM.
 
 Para todos os comandos disponíveis: `make help`

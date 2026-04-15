@@ -26,7 +26,7 @@ from datetime import datetime
 from slugify import slugify
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 import sys as _sys; _sys.path.insert(0, __import__('os').path.dirname(__file__))
-from category_selector import ask_user_category, ask_user_subcategory
+from category_selector import ask_user_category, ask_user_subcategory, detect_product_category
 
 
 def resolve_amazon_link(url: str) -> str:
@@ -706,7 +706,18 @@ def main():
         print("\n" + "━"*70)
         print("ETAPA 7: Categorização")
         print("━"*70)
-        tag, subcategory = ask_user_category_amazon()
+        _force_cat = os.environ.get("FORCE_CATEGORY", "").strip()
+        _force_sub = os.environ.get("FORCE_SUBCATEGORY", "").strip()
+        if _force_cat and _force_cat.upper() == "AUTO":
+            tag = detect_product_category(product_data.get('title', ''))
+            subcategory = _force_sub
+            print(f"  📦 Categoria (regex auto): {tag}" + (f" / {subcategory}" if subcategory else ""))
+        elif _force_cat:
+            tag = _force_cat.upper()
+            subcategory = _force_sub
+            print(f"  📦 Categoria (forçada): {tag}" + (f" / {subcategory}" if subcategory else ""))
+        else:
+            tag, subcategory = ask_user_category_amazon()
         
         # ETAPA 8: Download de imagens
         print("\n" + "━"*70)

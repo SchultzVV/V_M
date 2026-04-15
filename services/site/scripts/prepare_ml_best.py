@@ -965,12 +965,18 @@ def main():
         print(f"\n📦 Produto: {product_data['title']}")
 
         # Permite bypass não-interativo via env vars (usado por reprepare_all_ml.py)
+        # FORCE_CATEGORY=auto  → usa regex sobre o título (pipeline_publish)
+        # FORCE_CATEGORY=E     → força categoria específica (reprepare_all_ml)
         force_cat  = os.environ.get("FORCE_CATEGORY", "").strip()
         force_sub  = os.environ.get("FORCE_SUBCATEGORY", "").strip()
-        if force_cat:
+        if force_cat and force_cat.upper() == "AUTO":
+            selected_category    = suggested_category  # resultado de detect_product_category
+            selected_subcategory = force_sub
+            print(f"  📦 Categoria (regex auto): {selected_category}" + (f" / {selected_subcategory}" if selected_subcategory else ""))
+        elif force_cat:
             selected_category    = force_cat.upper()
             selected_subcategory = force_sub
-            print(f"  📦 Categoria (auto): {selected_category}" + (f" / {selected_subcategory}" if selected_subcategory else ""))
+            print(f"  📦 Categoria (forçada): {selected_category}" + (f" / {selected_subcategory}" if selected_subcategory else ""))
         else:
             selected_category    = ask_user_category(suggested_category)
             selected_subcategory = ask_user_subcategory(selected_category)

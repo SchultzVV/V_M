@@ -73,19 +73,41 @@ def _normalize_price(raw: str) -> float:
 
 def _parse_prices_from_text(text: str) -> list[float]:
     """
-    Extrai preços BRL de texto DOM limpo (sem artefatos OCR).
+    Extrai preços BRL de texto DOM limpo.
     Retorna lista de floats ordenada, filtrada para [50, 100000].
+
+    O inner_text do Playwright em páginas ML (SPA React) retorna preços
+    com quebras de linha entre R$, inteiro e centavos — igual ao formato:
+        R$\n3.799\nR$\n1.799\n,\n89
+    O padrão DOM split captura esse formato corretamente.
     """
     prices: list[float] = []
 
-    # Padrão 0 — número puro de meta tag (já foi extraído antes — passado como texto)
-    # apenas normaliza se vier como "1299.00" ou "1099,00"
+    # Mascara valores de parcela antes de parsear — evita falsos positivos
+    # "em 10x R$\n199\n,\n89" → removido antes dos padrões
+    masked = re.sub(
+        r'em\s+\d+x\b[^\r\n]*(?:[\r\n][^\r\n]*){0,4}',
+        ' ',
+        text, flags=re.IGNORECASE
+    )
+
+    # Padrão DOM split — ML renderiza R$ e valor em linhas separadas no inner_text
+    # R$\n3.799  ou  R$\n1.998\n,\n89  (formato real do Playwright em SPA React)
+    for m in re.finditer(
+        r'R\$\s*[\r\n]\s*([\d]{1,3}(?:[.\s]?\d{3})*)\s*(?:[\r\n,]\s*(\d{2}))?\b',
+        masked, re.IGNORECASE
+    ):
+        integer_part = m.group(1).replace('.', '').replace(' ', '')
+        cents_part   = m.group(2) or '00'
+        v = _normalize_price(f"{integer_part}.{cents_part}")
+        if v:
+            prices.append(v)
 
     # Padrão 1 — R$ completo na mesma linha
     # Captura: R$ 1.299,00 | R$1.299 | R$ 1299,00 | R$ 999,90
     for m in re.finditer(
         r'R\$\s{0,3}([\d]{1,3}(?:[.\s]?\d{3})*(?:[,\.]\d{1,2})?)',
-        text, re.IGNORECASE
+        masked, re.IGNORECASE
     ):
         v = _normalize_price(m.group(1))
         if v:
@@ -95,17 +117,16 @@ def _parse_prices_from_text(text: str) -> list[float]:
     # Captura: "De R$ 1.299" | "era R$ 999" | "antes R$ 1.099,00"
     for m in re.finditer(
         r'\b(?:de|era|antes|por)\s+R\$\s{0,3}([\d]{1,3}(?:[.\s]?\d{3})*(?:[,\.]\d{1,2})?)',
-        text, re.IGNORECASE
+        masked, re.IGNORECASE
     ):
         v = _normalize_price(m.group(1))
         if v:
             prices.append(v)
 
     # Padrão 3 — número isolado no formato milhar BR (1.099 ou 1.099,90)
-    # OCR às vezes lê "R$" como "RS", "R8", etc.; texto DOM pode omitir símbolo
     for m in re.finditer(
         r'(?<![\d,\.])(\d{1,3}\.\d{3}(?:,\d{2})?)(?![\d,\.])',
-        text
+        masked
     ):
         v = _normalize_price(m.group(1))
         if v >= 100:
@@ -183,6 +204,13 @@ def _extract_price_from_page(url: str) -> dict:
                 # Página carregou mas JS ainda rodando — tenta mesmo assim
                 pass
 
+            # ── Carrega body_text uma única vez (evita timeouts múltiplos) ──
+            body_text = ''
+            try:
+                body_text = page.inner_text('body', timeout=10_000) or ''
+            except Exception:
+                pass
+
             # ── Camada 1 — meta tags ──────────────────────────────────────
             for prop in ('og:price:amount', 'product:price:amount'):
                 el = page.query_selector(f'meta[property="{prop}"]')
@@ -233,8 +261,7 @@ def _extract_price_from_page(url: str) -> dict:
                 print(f"   🎯 DOM selector → original: R$ {dom_old:.2f}")
 
             # ── Camada 3 — fallback inner_text + regex ────────────────────
-            if result['price'] == 0.0:
-                body_text = page.inner_text('body') or ''
+            if result['price'] == 0.0 and body_text:
                 found = _parse_prices_from_text(body_text)
                 if found:
                     result['price'] = found[0]
@@ -244,16 +271,25 @@ def _extract_price_from_page(url: str) -> dict:
                         result['old_price'] = found[-1]
                         print(f"   📄 page_text regex → original: R$ {found[-1]:.2f}")
 
-            # ── Desconto badge ─────────────────────────────────────────────
-            disc_match = re.search(
-                r'(\d{1,2})\s*%\s*(?:de\s+)?(?:OFF|DESCONTO|off|desconto)',
-                page.inner_text('body') if result['source'] == 'none' else '',
-                re.IGNORECASE,
-            )
-            if disc_match:
-                result['discount_pct'] = int(disc_match.group(1))
+            # ── Pix price — menor preço exibido na página (promoção Pix) ──
+            # O ML mostra: R$\n1.799\n52% OFF\nno Pix ou Saldo no Mercado Pago
+            pix_price = 0.0
+            if body_text:
+                pix_m = re.search(
+                    r'R\$\s*[\r\n]\s*([\d]{1,3}(?:[.\s]?\d{3})*)\s*(?:[\r\n,]\s*(\d{2}))?'
+                    r'\s*(?:[^\r\n]*[\r\n]){0,4}?[^\r\n]*(?:no\s+Pix|Pix\b)',
+                    body_text, re.IGNORECASE
+                )
+                if pix_m:
+                    int_p = pix_m.group(1).replace('.', '').replace(' ', '')
+                    cts_p = pix_m.group(2) or '00'
+                    v = _normalize_price(f"{int_p}.{cts_p}")
+                    if v >= 50:
+                        pix_price = v
+                        print(f"   💳 Pix price      : R$ {pix_price:.2f}")
+            result['pix_price'] = pix_price
 
-            # Desconto badge via selector
+            # ── Desconto badge ─────────────────────────────────────────────
             badge_el = page.query_selector('.ui-pdp-price__discounts .ui-pdp-media__badge')
             if not badge_el:
                 badge_el = page.query_selector('[class*="price__discount"]')
@@ -263,15 +299,21 @@ def _extract_price_from_page(url: str) -> dict:
                 if bm:
                     result['discount_pct'] = int(bm.group(1))
                     print(f"   🎉 badge desconto: {result['discount_pct']}% OFF")
+            elif body_text:
+                disc_m = re.search(
+                    r'(\d{1,2})\s*%\s*(?:de\s+)?(?:OFF|DESCONTO|off|desconto)',
+                    body_text, re.IGNORECASE
+                )
+                if disc_m:
+                    result['discount_pct'] = int(disc_m.group(1))
+                    print(f"   🎉 desconto badge (texto): {result['discount_pct']}% OFF")
 
             # ── Frete grátis ───────────────────────────────────────────────
+            # Usa query_selector (não-bloqueante) + body_text — evita timeout
             free_ship_el = page.query_selector('[class*="free-shipping"], [class*="frete-gratis"]')
-            if not free_ship_el:
-                # texto fallback
-                page_snippet = (page.inner_text('.ui-pdp-container__col--right') or '')[:500]
-                if re.search(r'frete\s+gr[aá]ti', page_snippet, re.IGNORECASE):
-                    result['free_shipping'] = True
-            else:
+            if free_ship_el:
+                result['free_shipping'] = True
+            elif body_text and re.search(r'frete\s+gr[aá]ti', body_text[:4000], re.IGNORECASE):
                 result['free_shipping'] = True
 
             if result['free_shipping']:
@@ -358,11 +400,12 @@ def _decide_prices(api: dict, dom: dict, current_price: float) -> dict:
     Combina dados da API + DOM e decide preços finais.
 
     Lógica:
-    • price (preço final) = menor entre (cheapest_price da API, dom_price),
-      priorizando o mais confiável (dom_selector ou meta_tag > cheapest API).
-    • old_price = dom.old_price se > price; senão api.original_price; senão current_price.
+    • pix_price: se encontrado na página e <= api_cheapest → promoção real, usa como price.
+    • Se dom_price >= 1.5× api_cheapest → CSS selector pegou preço original/riscado;
+      promove para old_price candidate e confia na API para price.
+    • price final = menor entre (api_cheapest, dom_price, pix_price) com validações.
+    • old_price = dom.old_price > api.original_price > current_price > price.
     • desconto = calculado quando old_price > price.
-    • free_shipping = API ou DOM.
 
     Retorna: {price, old_price, desconto, free_shipping, title, source}
     """
@@ -371,13 +414,31 @@ def _decide_prices(api: dict, dom: dict, current_price: float) -> dict:
     dom_old      = dom.get('old_price', 0.0)
     dom_source   = dom.get('source', 'none')
     api_original = api.get('original_price', 0.0)
+    pix_price    = dom.get('pix_price', 0.0)
 
-    # Escolhe preço principal
+    # ── Detecta se DOM capturou o preço original em vez do atual ──────────
+    # Ex: Motorola Edge 60 Neo — CSS selector retornou R$ 3799 (riscado)
+    # enquanto api_cheapest = 1998. Razão >= 1.5× indica preço original.
+    dom_is_original = (
+        dom_price >= 50
+        and api_cheapest >= 50
+        and dom_price >= api_cheapest * 1.5
+    )
+    if dom_is_original:
+        if dom_old == 0:
+            dom_old = dom_price   # promove para preço original
+        dom_price = 0.0           # não usar como preço final
+        print(f"   ℹ️  DOM price ({dom_old:.2f}) >> API ({api_cheapest:.2f}) → tratado como preço original")
+
+    # ── Candidatos a preço final ───────────────────────────────────────────
     candidates = []
     if api_cheapest >= 50:
         candidates.append(('api_cheapest', api_cheapest))
     if dom_price >= 50 and dom_source in ('meta_tag', 'dom_selector', 'page_text'):
         candidates.append((f'dom_{dom_source}', dom_price))
+    # Pix price: válido somente se <= api_cheapest (garante que é promoção, não parcela)
+    if pix_price >= 50 and (api_cheapest == 0 or pix_price <= api_cheapest):
+        candidates.append(('pix_price', pix_price))
 
     if not candidates:
         final_price  = current_price
@@ -385,19 +446,22 @@ def _decide_prices(api: dict, dom: dict, current_price: float) -> dict:
     elif len(candidates) == 1:
         price_source, final_price = candidates[0]
     else:
-        # Ambos disponíveis → usa DOM se a diferença for plausível (< 30% menor que API cheapest)
-        dom_val = next(v for s, v in candidates if s.startswith('dom_'))
-        api_val = next(v for s, v in candidates if s == 'api_cheapest')
-        if dom_val >= api_val * 0.70:
-            # DOM confirma um preço próximo do catálogo → confiável; usa o menor
+        pix_val = next((v for s, v in candidates if s == 'pix_price'), 0.0)
+        api_val = next((v for s, v in candidates if s == 'api_cheapest'), 0.0)
+        dom_val = next((v for s, v in candidates if s.startswith('dom_')), 0.0)
+
+        if pix_val and api_val and pix_val < api_val * 0.98:
+            # Pix price genuinamente mais barato que o catálogo
+            final_price  = pix_val
+            price_source = 'pix_price'
+        elif dom_val and api_val and dom_val >= api_val * 0.70:
             final_price  = min(dom_val, api_val)
             price_source = 'dom_confirmed' if dom_val < api_val else 'api_cheapest'
         else:
-            # Grande discrepância → DOM pode ter pego parcela; confia na API
-            final_price  = api_val
-            price_source = 'api_cheapest_safe'
+            final_price  = api_val if api_val else (pix_val or dom_val or current_price)
+            price_source = 'api_cheapest_safe' if api_val else 'fallback'
 
-    # Escolhe old_price (preço "de")
+    # ── Preço "de" (original antes do desconto) ───────────────────────────
     if dom_old >= 50 and dom_old > final_price:
         old_price = dom_old
     elif api_original >= 50 and api_original > final_price:
@@ -407,9 +471,11 @@ def _decide_prices(api: dict, dom: dict, current_price: float) -> dict:
     else:
         old_price = final_price  # sem desconto detectável
 
-    desconto = round((old_price - final_price) / old_price * 100) if old_price > final_price else 0
-    free_ship = api.get('free_shipping', False) or dom.get('free_shipping', False) or (
-        api.get('cheapest_free_shipping', False)
+    desconto  = round((old_price - final_price) / old_price * 100) if old_price > final_price else 0
+    free_ship = (
+        api.get('free_shipping', False)
+        or dom.get('free_shipping', False)
+        or api.get('cheapest_free_shipping', False)
     )
 
     return {

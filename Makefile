@@ -156,6 +156,8 @@ serve-cloudflare:  ## ⭐ Túnel Cloudflare (Flask): Backend HTTP + tunnel + aut
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 	echo "✅ TÚNEL ATIVO: $$CF_URL"; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "$$CF_URL" > /tmp/cf_active_url.txt; \
+	echo "backend" >> /tmp/cf_active_url.txt; \
 	echo ""; \
 	NEW_REDIRECT="$$CF_URL/auth/mercadolivre/callback"; \
 	echo "Step 3️⃣  Atualizando ML_REDIRECT_URI..."; \
@@ -238,6 +240,8 @@ serve-frontend-public:  ## ⭐ Frontend React (build agressivo + Nginx + reutili
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
 	echo "✅ REACT FRONTEND ATIVO: $$CF_URL"; \
 	echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; \
+	echo "$$CF_URL" > /tmp/cf_active_url.txt; \
+	echo "frontend" >> /tmp/cf_active_url.txt; \
 	echo ""; \
 	NEW_REDIRECT="$$CF_URL/auth/mercadolivre/callback"; \
 	echo "Step 5️⃣  Atualizando ML_REDIRECT_URI..."; \
@@ -472,15 +476,36 @@ links:  ## 🔗 Expõe todos os links importantes: Cloudflare, ML, Instagram, si
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@echo "🌐 SITE & TÚNEIS:"
-	@echo "  🌐 Site (Nginx/Frontend): https://localhost"
-	@echo "  🔧 Flask API direto: https://localhost:5555"
-	@echo "  📦 MinIO: http://localhost:9000"
-	@echo "  🗄️  PostgreSQL: postgresql://user:password@localhost:5432/produtos_db"
-	@CF_HOST=$$(grep '^CF_HOSTNAME=' .env | cut -d'=' -f2 | cut -d'#' -f1 | xargs); \
-	if [ -n "$$CF_HOST" ]; then \
-		echo "  ☁️  Cloudflare: https://$$CF_HOST"; \
+	@echo "  🖥️  Site local  (Nginx) : https://localhost"
+	@echo "  🔧 API local   (Flask) : https://localhost:5555"
+	@ACTIVE_FILE=/tmp/cf_active_url.txt; \
+	LOG_FILE=/tmp/cloudflare_tunnel.log; \
+	CF_HOST=$$(grep '^CF_HOSTNAME=' .env 2>/dev/null | cut -d'=' -f2 | cut -d'#' -f1 | xargs); \
+	if [ -f "$$ACTIVE_FILE" ]; then \
+		CF_URL=$$(head -1 "$$ACTIVE_FILE"); \
+		CF_TYPE=$$(sed -n '2p' "$$ACTIVE_FILE"); \
+		if [ -n "$$CF_URL" ]; then \
+			if [ "$$CF_TYPE" = "frontend" ]; then \
+				echo "  ☁️  Cloudflare  (frontend): $$CF_URL"; \
+			else \
+				echo "  ☁️  Cloudflare  (backend) : $$CF_URL"; \
+				echo "  ☁️  Cloudflare  API       : $$CF_URL/api"; \
+			fi; \
+			echo "  🔁 Callback ML            : $$CF_URL/auth/mercadolivre/callback"; \
+		else \
+			echo "  ☁️  Cloudflare: arquivo vazio — execute make serve-cloudflare"; \
+		fi; \
+	elif [ -f "$$LOG_FILE" ]; then \
+		CF_URL=$$(grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com' "$$LOG_FILE" | head -1); \
+		if [ -n "$$CF_URL" ]; then \
+			echo "  ☁️  Cloudflare  (log)     : $$CF_URL"; \
+			echo "  🔁 Callback ML            : $$CF_URL/auth/mercadolivre/callback"; \
+		fi; \
+	elif [ -n "$$CF_HOST" ]; then \
+		echo "  ☁️  Cloudflare  (fixo)    : https://$$CF_HOST"; \
+		echo "  🔁 Callback ML            : https://$$CF_HOST/auth/mercadolivre/callback"; \
 	else \
-		echo "  ☁️  Cloudflare: (execute: make serve-cloudflare)"; \
+		echo "  ☁️  Cloudflare: nenhum túnel ativo — execute make serve-cloudflare"; \
 	fi
 	@echo ""
 	@echo "💰 MERCADO LIVRE:"
@@ -700,6 +725,22 @@ update-prices-ml-right:  ## ⭐ ML: atualiza preço+promo+info via API+DOM texto
 	if [ "$(NO_BROWSER)" = "1" ]; then _ARGS="$$_ARGS --no-browser"; fi; \
 	echo "   Args: $$_ARGS"; echo ""; \
 	docker exec -it site python3 scripts/update_ml_prices_right.py $$_ARGS
+
+prepare-and-publish:  ## ⭐ Pipeline completo: lê links → prepare → organize → stage → update preços  (DRY=1, FILE=caminho, NO_PRICE=1, NO_STAGE=1)
+	@$(MAKE) -s _ensure-site
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 PREPARE & PUBLISH — Pipeline Completo"
+	@echo "   Detecta ML/Shopee/Amazon pela URL"
+	@echo "   Categoria detectada automaticamente por regex no título"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@_ARGS=""; \
+	if [ "$(DRY)" = "1" ] || [ "$(DRY_RUN)" = "1" ]; then _ARGS="$$_ARGS --dry-run"; fi; \
+	if [ -n "$(FILE)" ]; then _ARGS="$$_ARGS --file $(FILE)"; fi; \
+	if [ "$(NO_PRICE)" = "1" ]; then _ARGS="$$_ARGS --no-price-update"; fi; \
+	if [ "$(NO_STAGE)" = "1" ]; then _ARGS="$$_ARGS --no-stage"; fi; \
+	echo "   Args: $$_ARGS"; echo ""; \
+	docker exec -it site python3 scripts/pipeline_publish.py $$_ARGS
 
 reprepare-ml:  ## ⭐ ML: refaz prepare (API+OCR+imgs) de todos os produtos, mantém tags, faz stage
 	@$(MAKE) -s _ensure-site
