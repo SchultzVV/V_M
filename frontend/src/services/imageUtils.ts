@@ -12,25 +12,17 @@ export const getImageUrl = (imagePath: string | undefined, fallback: string = '/
   // Remove token query param se existir
   const pathWithoutToken = imagePath.split('?')[0]
   
-  // If starts with /media/, it's stored in MinIO
+  // If starts with /media/, serve via nginx proxy (nginx → minio:9000 internally)
+  // This avoids mixed-content (HTTPS page → HTTP) and works via Cloudflare tunnel
   if (pathWithoutToken.startsWith('/media/')) {
-    // Path format: /media/{bucket}/{product-name}/{image}.jpg
-    // MinIO structure: http://localhost:9000/{bucket}/{path}
-    // We need to extract bucket and rest of path
-    const parts = pathWithoutToken.split('/').filter(p => p) // Remove empty strings
-    if (parts.length >= 3 && parts[0] === 'media') {
-      const bucket = parts[1] // e.g., 'mercadolivre'
-      const restPath = parts.slice(2).join('/') // e.g., 'produto/image.jpg'
-      const minioUrl = `http://localhost:9000/${bucket}/${restPath}`
-      console.log(`[getImageUrl] Converted /media path → MinIO: ${minioUrl}`)
-      return minioUrl
-    }
+    console.log(`[getImageUrl] MinIO path via nginx proxy: ${pathWithoutToken}`)
+    return pathWithoutToken
   }
 
-  // Fallback: try to construct MinIO URL directly
-  const minioUrl = `http://localhost:9000${pathWithoutToken}`
-  console.log(`[getImageUrl] Fallback MinIO URL: ${minioUrl}`)
-  return minioUrl
+  // Fallback: treat as a /media/ relative path through nginx proxy
+  const proxiedUrl = `/media${pathWithoutToken.startsWith('/') ? '' : '/'}${pathWithoutToken}`
+  console.log(`[getImageUrl] Fallback proxied URL: ${proxiedUrl}`)
+  return proxiedUrl
 }
 
 export const formatPrice = (price: number): string => {

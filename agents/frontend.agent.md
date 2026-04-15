@@ -131,14 +131,40 @@ frontend/
 ### Padrões de Componente
 
 ```tsx
-// ✅ ProductCard — estética DEF
-<div className="border border-zinc-700 bg-dark-gray hover:border-neon-red transition-colors p-4 rounded-none">
-  <img src={product.image} alt={product.title} className="w-full aspect-square object-cover" />
-  <h3 className="font-sans text-white uppercase text-sm mt-3 tracking-wide">{product.title}</h3>
-  <p className="font-mono text-neon-green text-price-sm font-bold mt-1">
-    R$ {product.price.toFixed(2)}
-  </p>
-  <p className="font-mono text-gray-text text-xs mt-1">SKU: {product.sku}</p>
+// ✅ ProductCard — estética DEF (layout atual)
+// Ordem: Imagem → Preço → Título → Subcategoria → Tags → Disponibilidade → Botões
+<div className="card-def group overflow-hidden flex flex-col hover:shadow-neon-red">
+  {/* Imagem no topo — h-64, nunca aspect-square */}
+  <div className="relative overflow-hidden bg-gray-steel">
+    <img src={imageUrl} alt={product.title} className="w-full h-64 object-cover group-hover:scale-105 transition-transform" />
+    {/* Badge plataforma: bg-black/80 text-white (não neon-green) */}
+  </div>
+
+  {/* Preço com acento verde à esquerda — text-2xl (não text-price/3rem) */}
+  <div className="bg-black-deep px-4 pt-4 pb-3">
+    <div className="border-l-2 border-neon-green pl-3">
+      <span className="text-2xl font-mono font-bold text-neon-green">{formatPrice(product.price)}</span>
+      {/* Desconto: bg-neon-red text-white | Original riscado: text-gray-text line-through */}
+    </div>
+  </div>
+
+  {/* Info: título text-base, subcategoria text-xs text-gray-text, tags bg-gray-steel chips */}
+  <div className="px-4 pt-3 pb-3 flex-1 flex flex-col gap-2">
+    <h3 className="text-base font-semibold text-gray-light group-hover:text-neon-green transition-colors">{product.title}</h3>
+    <p className="text-xs text-gray-text capitalize">{product.subcategory}</p>
+    <div className="flex flex-wrap gap-1">
+      {displayTags.map(tag => (
+        <span key={tag} className="text-[10px] font-mono uppercase bg-gray-steel text-gray-text px-2 py-0.5">{tag}</span>
+      ))}
+    </div>
+    <span className="text-xs font-mono text-neon-green mt-auto">● Disponível</span>
+  </div>
+
+  {/* Sempre dois botões: COMPRAR (btn-primary) + DETALHES (btn-secondary) */}
+  <div className="p-4 border-t border-gray-steel flex gap-2">
+    <a href={product.link} className="btn-primary flex-1 text-sm text-center">COMPRAR</a>
+    <button className="btn-secondary flex-1 text-sm">DETALHES</button>
+  </div>
 </div>
 
 // ✅ Badge de status
@@ -159,8 +185,8 @@ frontend/
 // ✅ Input / campo
 <input className="w-full bg-gray-steel border border-zinc-700 text-white font-mono text-sm px-3 py-2 rounded-none focus:outline-none focus:border-neon-green placeholder-zinc-600" />
 
-// ✅ Grid de produtos
-<div className="grid grid-cols-2 gap-px bg-zinc-800 md:grid-cols-4 lg:grid-cols-5">
+// ✅ Grid de produtos (3 colunas desktop, 2 tablet, 1 mobile)
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
   {products.map(p => <ProductCard key={p.id} product={p} />)}
 </div>
 
@@ -221,19 +247,36 @@ Cada categoria tem seu prompt de fundo gerado (documentado em `docs/conceito eng
 
 ```tsx
 // src/components/ProductCard.tsx
-import { FC } from 'react';
-import { Product } from '../types';
-
-export const ProductCard: FC<{ product: Product }> = ({ product }) => {
+// Layout atual: Imagem (h-64) → Preço (text-2xl neon-green, border-l) → Info (título + tags chips) → Botões
+// Grid: lg:grid-cols-3 (NÃO usar 4 ou 5 — cards ficam estreitos demais)
+export default function ProductCard({ product }: ProductCardProps) {
   return (
-    // DEF aesthetic: preto profundo, borda zinc, hover neon vermelho, mono para preço
-    <div className="bg-dark-gray border border-zinc-700 p-4 rounded-none hover:border-neon-red transition-colors">
-      <h3 className="font-sans text-white uppercase text-sm tracking-wide">{product.name}</h3>
-      <p className="font-sans text-gray-text text-xs mt-1">{product.description}</p>
-      <p className="font-mono text-neon-green font-bold text-price-sm mt-2">R$ {product.price}</p>
+    <div className="card-def group overflow-hidden flex flex-col hover:shadow-neon-red transition-shadow">
+      {/* 1. Imagem — h-64, object-cover, scale on hover */}
+      <div className="relative overflow-hidden bg-gray-steel">
+        <img src={imageUrl} className="w-full h-64 object-cover group-hover:scale-105 transition-transform" />
+      </div>
+      {/* 2. Preço — border-l-2 border-neon-green, text-2xl font-mono */}
+      <div className="bg-black-deep px-4 pt-4 pb-3">
+        <div className="border-l-2 border-neon-green pl-3">
+          <span className="text-2xl font-mono font-bold text-neon-green">{formatPrice(product.price)}</span>
+        </div>
+      </div>
+      {/* 3. Info — título text-base, subcategoria text-xs, tags bg-gray-steel chips */}
+      <div className="px-4 pt-3 pb-3 flex-1 flex flex-col gap-2">
+        <h3 className="text-base font-semibold text-gray-light">{product.title}</h3>
+        <div className="flex flex-wrap gap-1">
+          {displayTags.map(tag => <span key={tag} className="text-[10px] font-mono uppercase bg-gray-steel text-gray-text px-2 py-0.5">{tag}</span>)}
+        </div>
+      </div>
+      {/* 4. Botões — COMPRAR (btn-primary) + DETALHES (btn-secondary) */}
+      <div className="p-4 border-t border-gray-steel flex gap-2">
+        <a href={product.link} className="btn-primary flex-1 text-sm text-center">COMPRAR</a>
+        <button className="btn-secondary flex-1 text-sm" onClick={() => navigate(`/produto/${product.id}`)}>DETALHES</button>
+      </div>
     </div>
   );
-};
+}
 ```
 
 ### 2. Fetch Data from Backend

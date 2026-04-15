@@ -146,28 +146,34 @@ Step 2: Iniciar Cloudflare Tunnel
   └─ Extrai URL via regex: grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com'
 
 Step 3: Capturar URL do Tunnel
-  └─ Salva em /tmp/cf_url.txt
+  └─ Salva em /tmp/cf_url.txt (somente stdout — NUNCA redirecionar stderr junto com 2>&1)
+  └─ Extrai URL limpa: CF_URL=$(grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com' /tmp/cf_url.txt | head -1)
   └─ Exemplo: https://wise-mountains-coral-dragons.trycloudflare.com
 
 Step 4: Atualizar .env com Redirect URI
-  └─ sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=<URL>/auth/mercadolivre/callback|" .env
+  └─ sed -i "s|^ML_REDIRECT_URI=.*|ML_REDIRECT_URI=$CF_URL/auth/mercadolivre/callback|" .env
   └─ .env agora contém URL pública do Mercado Livre redirect
 
 Step 5: Reiniciar Flask
   └─ docker-compose restart site
   └─ Flask recarrega .env com nova ML_REDIRECT_URI
 
-Step 6: Validar OAuth Token
-  └─ Se token expirado: Mostra URL de autorização
-  └─ Guia usuário para re-autorizar no DevCenter ML
+Step 6: Report OAuth (SEMPRE exibido, independente do status do token)
+  └─ Mostra status do token (✅ válido / ❌ expirado) como informação apenas
+  └─ URL muda a cada run — sempre exibe os 3 passos obrigatórios:
+     1️⃣  Cadastrar novo Redirect URI no DevCenter ML
+     2️⃣  Abrir URL de autorização no navegador
+     3️⃣  make check-tokens
 ```
 
 ### Arquivos Chave
 
 | Arquivo | Propósito |
 |---------|-----------|
-| `scripts/tunnel-manager.sh` | Inicia cloudflared, captura URL via logs, retorna APENAS a URL |
+| `scripts/tunnel-manager.sh` | Inicia cloudflared, captura URL via logs, retorna APENAS a URL no stdout (stderr = mensagens de progresso) |
 | `Makefile` (serve-cloudflare) | Orquestra pipeline completo: containers → tunnel → .env → restart |
+| `Makefile` (serve-frontend-public) | Mesma orquestração com React build + Nginx |
+| `/tmp/cf_url.txt` | URL bruta — sempre usar `grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com'` para extrair |
 | `.env` | Armazenador de ML_REDIRECT_URI (gerado dinamicamente) |
 
 ### Pontos Críticos de Falha Comum
@@ -176,6 +182,8 @@ Step 6: Validar OAuth Token
 |----------|-------|--------|
 | Tunnel não inicia | cloudflared não instalado | `make install-cloudflared` |
 | URL "ERR" no .env | tunnel-manager retorna erro | Checar `/tmp/cloudflare_tunnel.log` |
+| CF_URL vazia ou multi-linha | `2>&1` na chamada do tunnel-manager | NUNCA usar `2>&1` — só redirecionar stdout: `> /tmp/cf_url.txt` |
+| `sed` "unterminated command" | CF_URL multi-linha (stderr misturado) | Usar `grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com' /tmp/cf_url.txt \| head -1` |
 | 502 Bad Gateway | cloudflared não consegue alcançar Flask | Verificar container IP: `docker inspect site` |
 | OAuth redirect não funciona | ML_REDIRECT_URI incorreta em .env | `make check-tokens` mostra URL esperada |
 

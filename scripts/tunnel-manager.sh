@@ -55,31 +55,30 @@ start_tunnel() {
         protocol="https"
     fi
     
-    # Start tunnel in background (discard tee stdout to prevent capture)
-    # Use minimal flags — avoid TLS verification for HTTP origins
+    # Start tunnel in background with nohup so it survives shell/terminal exit
+    # Log via redirection (avoids tee PID capture issue)
     if [ "$protocol" = "http" ]; then
-        # For HTTP origins, no TLS needed
-        "$CLOUDFLARED_BIN" tunnel \
+        nohup "$CLOUDFLARED_BIN" tunnel \
             --url "$tunnel_url" \
             --proxy-connect-timeout 60s \
             --proxy-keepalive-timeout 5m \
             --proxy-keepalive-connections 200 \
             --proxy-tcp-keepalive 60s \
-            2>&1 | tee "$LOG_FILE" >/dev/null &
+            > "$LOG_FILE" 2>&1 &
     else
-        # For HTTPS origins, use --no-tls-verify
-        "$CLOUDFLARED_BIN" tunnel \
+        nohup "$CLOUDFLARED_BIN" tunnel \
             --url "$tunnel_url" \
             --no-tls-verify \
             --proxy-connect-timeout 60s \
             --proxy-keepalive-timeout 5m \
             --proxy-keepalive-connections 200 \
             --proxy-tcp-keepalive 60s \
-            2>&1 | tee "$LOG_FILE" >/dev/null &
+            > "$LOG_FILE" 2>&1 &
     fi
-    
-    # Store PID
+
+    # Store cloudflared PID (not tee's)
     TUNNEL_PID=$!
+    disown $TUNNEL_PID
     echo $TUNNEL_PID > "/tmp/cloudflare_tunnel.pid"
 }
 

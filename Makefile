@@ -107,12 +107,12 @@ frontup:  ## ⭐ Sobe site completo para testes locais (build React + Nginx + Ba
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@echo "🏗️  Buildando React..."
-	@rm -rf frontend/dist
+	@rm -rf frontend/dist/assets frontend/dist/*.js frontend/dist/*.css frontend/dist/index.html 2>/dev/null; mkdir -p frontend/dist
 	@cd frontend && npm run build > /dev/null 2>&1 || (echo "❌ Build falhou"; exit 1)
 	@echo "✅ Build completo"
 	@echo ""
 	@echo "🐳 Subindo containers..."
-	@docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml --env-file .env up -d
+	@docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml --env-file .env up -d --force-recreate nginx
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "✅ Site: https://localhost"
@@ -212,18 +212,16 @@ serve-frontend-public:  ## ⭐ Frontend React (build agressivo + Nginx + reutili
 	@echo "✨ Este comando reutiliza o tunnel de 'make serve-cloudflare'"
 	@echo "   Se nenhum tunnel está rodando, um novo será criado"
 	@echo ""
-	@echo "Step 1️⃣  Limpando build anterior (aggressive)..."
-	@if [ -d "frontend/dist" ]; then \
-		rm -rf frontend/dist; \
-		echo "✅ Limpeza completa"; \
-	fi
+	@echo "Step 1️⃣  Limpando build anterior (preservando pasta para inode estável)..."
+	@rm -rf frontend/dist/assets frontend/dist/*.js frontend/dist/*.css frontend/dist/index.html 2>/dev/null; mkdir -p frontend/dist
+	@echo "✅ Limpeza completa"
 	@echo ""
 	@echo "Step 2️⃣  Building React frontend (fresh build)..."; \
 	cd frontend && npm run build > /dev/null 2>&1 || (echo "❌ Build falhou"; exit 1); \
 	echo "✅ React build completo (fresh)"; \
 	echo ""
 	@echo "Step 3️⃣  Subindo containers (Backend + Nginx)..."; \
-	docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml --env-file .env up -d; \
+	docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml --env-file .env up -d --force-recreate nginx; \
 	sleep 2; \
 	echo "✅ Flask API em https://localhost:5555"; \
 	echo "✅ Site (Nginx/Frontend) em https://localhost"; \
@@ -689,6 +687,19 @@ update-ml-prices:  ## ⭐ ML: busca o vendedor mais barato p/ cada produto (DRY=
 		echo "   Modo: TODOS os produtos ML ativos"; echo ""; \
 		docker exec -it site python3 scripts/update_ml_prices.py; \
 	fi
+
+update-prices-ml-right:  ## ⭐ ML: atualiza preço+promo+info via API+DOM texto (sem screenshot/OCR) (DRY=1, ID=MLB..., NO_BROWSER=1)
+	@$(MAKE) -s _ensure-site
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔄 UPDATE PRICES ML RIGHT — API + DOM texto + regex"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@_ARGS=""; \
+	if [ "$(DRY)" = "1" ] || [ "$(DRY_RUN)" = "1" ]; then _ARGS="$$_ARGS --dry-run"; fi; \
+	if [ -n "$(ID)" ]; then _ARGS="$$_ARGS --id $(ID)"; fi; \
+	if [ "$(NO_BROWSER)" = "1" ]; then _ARGS="$$_ARGS --no-browser"; fi; \
+	echo "   Args: $$_ARGS"; echo ""; \
+	docker exec -it site python3 scripts/update_ml_prices_right.py $$_ARGS
 
 reprepare-ml:  ## ⭐ ML: refaz prepare (API+OCR+imgs) de todos os produtos, mantém tags, faz stage
 	@$(MAKE) -s _ensure-site
