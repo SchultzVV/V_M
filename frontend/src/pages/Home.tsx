@@ -90,18 +90,21 @@ export default function Home() {
     <div className="bg-black-deep">
       {/* Hero Section */}
       <section className="border-b border-gray-steel">
-        <div className="container-def py-12 md:py-20">
-          <div className="max-w-3xl">
-            <h1 className="text-4xl md:text-5xl font-mono font-bold mb-4">
+        <div className="container-def py-6 md:py-10">
+          {/* Logo + tagline compacta */}
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-5">
+            <h1 className="font-mono font-bold text-2xl md:text-3xl leading-none">
               <span className="text-neon-green">DEF</span>
-              <span className="mx-2">.</span>
-              <span className="block mt-2 text-gray-light">Equipamento para</span>
-              <span className="text-neon-red">Ambientes Hostis</span>
+              <span className="text-gray-text">.</span>
             </h1>
-            <p className="text-lg text-gray-text">
-              Catálogo de sobrevivência pós-sistema. Funcional. Frio. Necessário.
+            <p className="font-mono text-xs text-gray-text tracking-widest uppercase">
+              Equipamento para{' '}
+              <span className="text-neon-red">Ambientes Hostis</span>
+              {' '}—{' '}Funcional. Frio. Necessário.
             </p>
           </div>
+          {/* Barra de busca principal */}
+          <SearchBar hero />
         </div>
       </section>
 
@@ -111,9 +114,8 @@ export default function Home() {
           {/* Category tabs */}
           <CategoryNav />
 
-          {/* Search + count + sort row */}
+          {/* count row */}
           <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-            <SearchBar />
             <p className="font-mono text-sm text-gray-text">
               {isLoading ? (
                 <span className="animate-pulse">carregando...</span>

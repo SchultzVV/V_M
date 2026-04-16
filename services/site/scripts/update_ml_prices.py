@@ -161,7 +161,26 @@ def _check_and_update(product: Product, session, dry_run: bool) -> dict:
     affiliate = generate_affiliate_link(cheapest.permalink) if cheapest.permalink else ""
     report["affiliate_link"] = affiliate
 
-    # Já é o mais barato (margem de 1%)
+    # Guarda de integridade: verifica se o item mais barato é o mesmo produto.
+    # Se o titulo do listing for completamente diferente, recusa a atualização —
+    # evita que produtos de categoria errada no catalogo ML contaminem o banco.
+    cheapest_title = getattr(cheapest, 'title', '') or ''
+    if cheapest_title:
+        def _title_words(t):
+            import re
+            return set(w for w in re.sub(r'[^a-z0-9 ]', ' ', t.lower()).split() if len(w) > 3)
+        our_words     = _title_words(product.title or '')
+        cheaper_words = _title_words(cheapest_title)
+        common = our_words & cheaper_words
+        if our_words and len(common) / len(our_words) < 0.2:
+            report["status"] = "title_mismatch"
+            report["error"]  = f"título divergente: nosso={product.title[:40]!r} vs ML={cheapest_title[:40]!r}"
+            print(f"   ⚠️  Título divergente — link NÃO atualizado")
+            print(f"      nosso: {product.title[:60]}")
+            print(f"      ML:    {cheapest_title[:60]}")
+            return report
+
+
     if current_price > 0 and cheapest.real_price >= current_price * 0.99:
         report["status"] = "cheapest"
         return report

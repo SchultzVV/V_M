@@ -142,6 +142,11 @@ def api_products():
 
         q = Product.query
 
+        # Exclui produtos sem preço válido (preço 0, vazio ou nulo)
+        # Opera direto no SQL: price deve conter pelo menos um dígito 1-9
+        q = q.filter(Product.price.isnot(None))
+        q = q.filter(Product.price.op('~')('[1-9]'))
+
         if search:
             q = q.filter(Product.title.ilike(f'%{search}%'))
 

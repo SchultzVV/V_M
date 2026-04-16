@@ -19,6 +19,7 @@ else:
     exit(1)
 
 import os
+import re
 from flask import Flask, request
 from flask_cors import CORS
 from routes.product_routes import product_bp
@@ -35,15 +36,25 @@ from routes.price_validator_routes import price_validator_bp
 
 app = Flask(__name__)
 
-# ✅ Habilita CORS para frontend em localhost:5173
+# ✅ CORS: permite localhost + Cloudflare tunnels + domínios extras via CORS_ORIGINS env
+_base_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://localhost",
+]
+_cloudflare_re = re.compile(r"https://[a-z0-9\-]+\.trycloudflare\.com")
+_cfargotunnel_re = re.compile(r"https://[a-z0-9\-]+\.cfargotunnel\.com")
+_env_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
+_cors_origins = _base_origins + [_cloudflare_re, _cfargotunnel_re] + _env_origins
+
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:5173", "http://localhost:3000"],
+        "origins": _cors_origins,
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     },
     r"/auth/*": {
-        "origins": ["http://localhost:5173", "http://localhost:3000"],
+        "origins": _cors_origins,
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }

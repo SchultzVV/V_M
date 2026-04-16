@@ -37,8 +37,19 @@ up:  ## Sobe ambiente de desenvolvimento (build + detach)
 	@echo "💡 Para site completo local: make frontup"
 	@echo "💡 Para expor público:       make serve-cloudflare"
 
-down:  ## Para e remove containers + volumes
+down:  ## Para containers (preserva volumes/banco de dados)
+	$(COMPOSE) down
+
+down-purge:  ## ⚠️  DESTRÓI VOLUMES — apaga banco, minio e redis permanentemente
+	@echo ""
+	@echo "⚠️  ATENÇÃO: isto vai APAGAR PERMANENTEMENTE:"
+	@echo "   • Banco de dados PostgreSQL (produtos, configurações)"
+	@echo "   • Imagens do MinIO"
+	@echo "   • Cache do Redis"
+	@echo ""
+	@echo "   Pressione Ctrl+C para cancelar (5 segundos)..."; sleep 5
 	$(COMPOSE) down -v
+	@echo "✅ Volumes removidos"
 
 restart-site:  ## Reinicia apenas o container site
 	$(COMPOSE) restart site
@@ -139,11 +150,12 @@ serve-cloudflare:  ## ⭐ Túnel Cloudflare (Flask): Backend HTTP + tunnel + aut
 		echo "   ✅ Config persistente movida para .bak (evita conflito)"; \
 	fi; \
 	echo ""
-	@echo "Step 1️⃣  Subindo containers (Backend apenas)..."; \
-	$(COMPOSE) up -d; \
+	@echo "Step 1️⃣  Subindo containers (Backend apenas — sem serviços LLM)..."; \
+	$(COMPOSE) up -d --no-deps db minio redis site; \
 	sleep 2; \
 	echo "✅ Backend Flask em https://localhost:5555"; \
 	echo ""
+	@bash scripts/ensure_products.sh
 	@echo "Step 2️⃣  Iniciando túnel Cloudflare..."; \
 	bash scripts/tunnel-manager.sh /tmp/cloudflare_tunnel.log "https://127.0.0.1:5555" 20 > /tmp/cf_url.txt; \
 	CF_URL=$$(cat /tmp/cf_url.txt); \
@@ -222,12 +234,13 @@ serve-frontend-public:  ## ⭐ Frontend React (build agressivo + Nginx + reutili
 	cd frontend && npm run build > /dev/null 2>&1 || (echo "❌ Build falhou"; exit 1); \
 	echo "✅ React build completo (fresh)"; \
 	echo ""
-	@echo "Step 3️⃣  Subindo containers (Backend + Nginx)..."; \
-	docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml --env-file .env up -d --force-recreate nginx; \
+	@echo "Step 3️⃣  Subindo containers (Backend + Nginx — sem serviços LLM)..."; \
+	docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml --env-file .env up -d --no-deps db minio redis site nginx; \
 	sleep 2; \
 	echo "✅ Flask API em https://localhost:5555"; \
 	echo "✅ Site (Nginx/Frontend) em https://localhost"; \
 	echo ""
+	@bash scripts/ensure_products.sh
 	@echo "Step 4️⃣  Iniciando túnel Cloudflare..."; \
 	bash scripts/tunnel-manager.sh /tmp/cloudflare_tunnel.log "https://127.0.0.1:443" 20 > /tmp/cf_url.txt; \
 	CF_URL=$$(grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com' /tmp/cf_url.txt | head -1); \
@@ -681,6 +694,32 @@ check-stage:  ## Verifica imagens no staging antes de publicar
 	@$(MAKE) -s _ensure-site
 	@docker exec -it site python3 scripts/check_stage_images.py
 
+verify-prices:  ## 🔍 Verifica preços zerados via OCR → Tesseract → info-scrap (remove se falhar)
+	@$(MAKE) -s _ensure-info-scrap
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔍 VERIFY PRICES — OCR → Tesseract → info-scrap scraping"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@if [ "$(DRY)" = "1" ] || [ "$(DRY_RUN)" = "1" ]; then \
+		echo "   Modo: DRY-RUN (nenhuma alteração no banco)"; echo ""; \
+		if [ -n "$(ID)" ]; then \
+			docker exec -it site python3 scripts/verify_prices.py --dry-run --id "$(ID)"; \
+		elif [ "$(ALL)" = "1" ]; then \
+			docker exec -it site python3 scripts/verify_prices.py --dry-run --all; \
+		else \
+			docker exec -it site python3 scripts/verify_prices.py --dry-run; \
+		fi; \
+	else \
+		if [ -n "$(ID)" ]; then \
+			docker exec -it site python3 scripts/verify_prices.py --id "$(ID)"; \
+		elif [ "$(ALL)" = "1" ]; then \
+			docker exec -it site python3 scripts/verify_prices.py --all; \
+		else \
+			docker exec -it site python3 scripts/verify_prices.py; \
+		fi; \
+	fi
+
 verify-product-cheaper:  ## ⭐ Verifica se o link ML é o menor preço do catálogo  (FILE= ou URL=)
 	@$(MAKE) -s _ensure-site
 	@echo ""
@@ -1025,7 +1064,7 @@ help:  ## Mostra este menu
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@echo "🧪 DEV"
-	@awk 'BEGIN{FS=":.*?## "}/^(up|down|restart-site|rebuild-site|logs|shell|psql):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*?## "}/^(up|down|down-purge|restart-site|rebuild-site|logs|shell|psql):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "� FRONTEND (React + Vite)"
 	@awk 'BEGIN{FS=":.*?## "}/^(frontend-install|frontend-dev|frontend-build|frontend-build-prod|frontend-clean):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
@@ -1040,7 +1079,7 @@ help:  ## Mostra este menu
 	@awk 'BEGIN{FS=":.*?## "}/^(prepare-ml|prepare-shopee|prepare-amazon|prepare-all):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📤 STAGE / ATUALIZAÇÃO"
-	@awk 'BEGIN{FS=":.*?## "}/^(stage|restage|api-update|shopee-update|check-stage|verify-product-cheaper|update-ml-prices|reprepare-ml):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*?## "}/^(stage|restage|api-update|shopee-update|check-stage|verify-prices|verify-product-cheaper|update-ml-prices|reprepare-ml|reprepare-associate-ml|organize-tags|organize-tags-auto):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📸 INSTAGRAM"
 	@awk 'BEGIN{FS=":.*?## "}/^(prepare-post-image|instagram-post|instagram-test|instagram-status|instagram-history|stage-and-post):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)

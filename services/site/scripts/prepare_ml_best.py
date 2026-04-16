@@ -425,13 +425,18 @@ def merge_api_with_ocr_price(api_data: dict, ocr_result: dict) -> dict:
     # Isso evita que OCR aleatório (parcela, erro de leitura) substitua preço oficial.
     elif api_price > 0 and ocr_price > 0 and ocr_price < api_price * 0.98:
         ocr_confirms_promo = ocr_old >= api_price * 0.95  # OCR viu api_price como riscado
-        if ocr_confirms_promo:
+        # Guarda: desconto real máximo de 70%. Acima disso OCR provavelmente
+        # capturou uma parcela ou preço de outro produto na tela.
+        discount_pct = round((api_price - ocr_price) / api_price * 100)
+        if ocr_confirms_promo and discount_pct <= 70:
             merged['price']         = f"R$ {ocr_price:.2f}"
             merged['old_price']     = f"R$ {api_price:.2f}"
             merged['_price_source'] = 'ocr_promo'
-            discount_pct = round((api_price - ocr_price) / api_price * 100)
             print(f"   🔥 Promoção CONFIRMADA via OCR: {discount_pct}% OFF!")
             print(f"      De: R$ {api_price:.2f} → Por: R$ {ocr_price:.2f}")
+        elif ocr_confirms_promo and discount_pct > 70:
+            print(f"   ⚠️  OCR sugeriu {discount_pct}% OFF (R$ {ocr_price:.2f}) — desconto irreal, ignorando")
+            print(f"   ✅ Preço oficial da API mantido: R$ {api_price:.2f}")
         else:
             print(f"   ✅ Preço oficial da API mantido: R$ {api_price:.2f}")
             print(f"      (OCR leu R$ {ocr_price:.2f} mas não confirmou preço riscado — ignorado)")
@@ -611,6 +616,13 @@ def generate_staging_json(product_data: dict, images_dir: str, original_url: str
     # Garante que oldPrice é sempre >= price (evita inversão de promoção)
     if old_price_val < price_val:
         old_price_val = price_val
+
+    # Guarda: rejeita produto se o desconto implícito for irreal (old/price > 5x = >80% OFF)
+    # Isso evita que parcelas salvas como price gerem descontos absurdos no site
+    if price_val > 0 and old_price_val > 0 and old_price_val / price_val > 5:
+        print(f"   ❌ REJEITADO: desconto irreal {round((old_price_val/price_val - 1)*100)}% OFF "
+              f"(R$ {price_val:.2f} vs R$ {old_price_val:.2f}) — provável parcela salva como preço")
+        price_val = 0.0  # Força price=0 → vai aparecer como inválido no banco
 
     price_str = f"R$ {price_val:.2f}"
     old_price_str = f"R$ {old_price_val:.2f}"
