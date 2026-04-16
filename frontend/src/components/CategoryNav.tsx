@@ -11,7 +11,6 @@ const CATEGORIES: Category[] = [
   { label: 'ELETRÔNICOS', value: 'E' },
   { label: 'CASA', value: 'CD' },
   { label: 'MODA', value: 'ME' },
-  { label: 'GERAL', value: 'geral' },
 ]
 
 export default function CategoryNav() {

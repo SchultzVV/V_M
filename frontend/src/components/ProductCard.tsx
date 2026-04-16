@@ -89,15 +89,6 @@ export default function ProductCard({ product }: ProductCardProps) {
           }}
         />
 
-        {/* ESGOTADO overlay */}
-        {!product.available && (
-          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20">
-            <span className="font-mono font-bold text-xl tracking-widest text-neon-red border border-neon-red px-4 py-2 bg-black/80">
-              ESGOTADO
-            </span>
-          </div>
-        )}
-
         {/* Platform Badge */}
         {platformBadge && (
           <div className="absolute top-2 left-2 bg-black/80 text-white font-mono text-[10px] px-2 py-0.5 z-10">
@@ -216,15 +207,15 @@ export default function ProductCard({ product }: ProductCardProps) {
 
       {/* CTA - Two Action Buttons */}
       <div className="p-4 border-t border-gray-steel flex gap-2">
-        {product.link && product.available ? (
+        {product.link ? (
           <a
             href={product.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-primary flex-1 text-sm text-center"
+            className={`btn-primary flex-1 text-sm text-center ${!product.available ? 'opacity-60' : ''}`}
             onClick={(e) => e.stopPropagation()}
           >
-            COMPRAR
+            {product.available ? 'COMPRAR' : 'VER PRODUTO'}
           </a>
         ) : (
           <button className="btn-primary flex-1 text-sm opacity-50 cursor-not-allowed" disabled>

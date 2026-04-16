@@ -8,6 +8,22 @@ import { Product, productService } from '../services/productService'
 
 const PAGE_SIZE = 20
 
+type SortMode = 'none' | 'price_asc' | 'price_desc' | 'discount'
+
+function sortProducts(products: Product[], mode: SortMode): Product[] {
+  if (mode === 'none') return products
+  return [...products].sort((a, b) => {
+    if (mode === 'price_asc')  return a.price - b.price
+    if (mode === 'price_desc') return b.price - a.price
+    if (mode === 'discount') {
+      const discA = a.old_price ? (a.old_price - a.price) / a.old_price : 0
+      const discB = b.old_price ? (b.old_price - b.price) / b.old_price : 0
+      return discB - discA
+    }
+    return 0
+  })
+}
+
 export default function Home() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [products, setProducts] = useState<Product[]>([])
@@ -15,6 +31,7 @@ export default function Home() {
   const [pages, setPages] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [sort, setSort] = useState<SortMode>('none')
 
   const tag = searchParams.get('tag') ?? ''
   const search = searchParams.get('search') ?? ''
@@ -94,8 +111,8 @@ export default function Home() {
           {/* Category tabs */}
           <CategoryNav />
 
-          {/* Search + count row */}
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          {/* Search + count + sort row */}
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
             <SearchBar />
             <p className="font-mono text-sm text-gray-text">
               {isLoading ? (
@@ -114,8 +131,33 @@ export default function Home() {
             </p>
           </div>
 
+          {/* Sort buttons */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            {([
+              ['price_asc',  '↓ MAIS BARATO',   'green'],
+              ['discount',   '🔥 MAIOR PROMOÇÃO', 'red'],
+              ['price_desc', '↑ MAIS CARO',      'gray'],
+            ] as const).map(([mode, label, color]) => {
+              const active = sort === mode
+              const colorMap = {
+                green: active ? 'bg-neon-green text-black border-neon-green shadow-[0_0_12px_theme(colors.neon-green)]' : 'text-neon-green border-neon-green/40 hover:border-neon-green hover:shadow-[0_0_8px_theme(colors.neon-green/50%)]',
+                red:   active ? 'bg-neon-red text-black border-neon-red shadow-[0_0_12px_theme(colors.neon-red)]'     : 'text-neon-red border-neon-red/40 hover:border-neon-red hover:shadow-[0_0_8px_theme(colors.neon-red/50%)]',
+                gray:  active ? 'bg-gray-light text-black border-gray-light shadow-[0_0_8px_#fff3]'                   : 'text-gray-text border-gray-steel hover:border-gray-light hover:text-gray-light',
+              }
+              return (
+                <button
+                  key={mode}
+                  onClick={() => setSort(prev => prev === mode ? 'none' : mode)}
+                  className={`font-mono text-xs font-bold tracking-widest px-4 py-2 border transition-all duration-200 ${colorMap[color]}`}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+
           {/* Grid */}
-          <ProductGrid products={products} isLoading={isLoading} error={error} />
+          <ProductGrid products={sortProducts(products, sort)} isLoading={isLoading} error={error} />
 
           {/* Pagination */}
           {!isLoading && !error && (

@@ -292,23 +292,25 @@ export default function ProductDetail() {
 
                   {/* Redirect notice + Action Button */}
                   <div className="mt-auto">
-                    {product.link && product.available && (
+                    {product.link && (
                       <p className="text-xs font-mono text-gray-text mb-3">
-                        ↗ Você será redirecionado para {platform === 'ML' ? 'o Mercado Livre' : platform || 'o site externo'}
+                        {product.available
+                          ? `↗ Você será redirecionado para ${platform === 'ML' ? 'o Mercado Livre' : platform || 'o site externo'}`
+                          : '⚠ Produto indisponível no momento — o link pode trazer opções similares'}
                       </p>
                     )}
-                    {product.link && product.available ? (
+                    {product.link ? (
                       <a
                         href={product.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn-primary inline-block w-full text-center"
+                        className={`btn-primary inline-block w-full text-center ${!product.available ? 'opacity-60' : ''}`}
                       >
-                        COMPRAR
+                        {product.available ? 'COMPRAR' : 'VER NO SITE'}
                       </a>
                     ) : (
                       <button className="btn-primary w-full opacity-50 cursor-not-allowed" disabled>
-                        {product.available ? 'COMPRAR' : 'INDISPONÍVEL'}
+                        INDISPONÍVEL
                       </button>
                     )}
                   </div>
