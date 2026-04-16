@@ -726,6 +726,48 @@ update-prices-ml-right:  ## ⭐ ML: atualiza preço+promo+info via API+DOM texto
 	echo "   Args: $$_ARGS"; echo ""; \
 	docker exec -it site python3 scripts/update_ml_prices_right.py $$_ARGS
 
+price-oracle:  ## 🤖 Price Oracle: coleta fontes → LLM decide → publica no banco  FILE=links.json ou LINK=https://meli.la/xxx ou ML_ID=MLB123 [DRY=1] [NO_PUBLISH=1]
+	@$(MAKE) -s _ensure-site
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🤖 PRICE ORACLE — coleta fontes → hsmart LLM → publica no banco"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@if [ -z "$(FILE)" ] && [ -z "$(LINK)" ] && [ -z "$(ML_ID)" ]; then \
+		_ID_ARG="--file /app/list_to_prepare_and_stage/links_to_publish.json"; \
+	elif [ -n "$(FILE)" ]; then \
+		_ID_ARG="--file $(FILE)"; \
+	elif [ -n "$(LINK)" ]; then \
+		_ID_ARG="--link $(LINK)"; \
+	else \
+		_ID_ARG="--ml-id $(ML_ID)"; \
+	fi; \
+	_ARGS="$$_ID_ARG"; \
+	if [ "$(DRY)" = "1" ]; then _ARGS="$$_ARGS --dry-run"; fi; \
+	if [ "$(NO_PUBLISH)" = "1" ]; then _ARGS="$$_ARGS --no-publish"; fi; \
+	echo "   Args: $$_ARGS"; echo ""; \
+	docker exec -it site python3 agents/price_oracle_agent.py $$_ARGS
+
+init-qdrant:  ## 🗄️  Cria as 4 coleções Qdrant do projeto (idempotente)
+	@$(MAKE) -s _ensure-site
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🗄️  INIT QDRANT — Cria coleções: agent_rules, price_history, product_catalog, site_knowledge"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@docker exec -it site python3 scripts/init_qdrant_collections.py
+
+reprice-all:  ## 🔄 Revisa todos os produtos do banco: atualiza preços + remove itens com valor 0/inválido  [DRY=1] [ZERO_ONLY=1] [BATCH=N]
+	@$(MAKE) -s _ensure-site
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔄 REPRICE ALL — atualiza preços + limpa zeros/inválidos"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@_ARGS=""; \
+	if [ "$(DRY)" = "1" ]; then _ARGS="$$_ARGS --dry-run"; fi; \
+	if [ "$(ZERO_ONLY)" = "1" ]; then _ARGS="$$_ARGS --fix-zero-only"; fi; \
+	if [ -n "$(BATCH)" ]; then _ARGS="$$_ARGS --batch-size $(BATCH)"; fi; \
+	echo "   Args: $$_ARGS"; echo ""; \
+	docker exec -it site python3 agents/reprice_all.py $$_ARGS
+
 prepare-and-publish:  ## ⭐ Pipeline completo: lê links → prepare → organize → stage → update preços  (DRY=1, FILE=caminho, NO_PRICE=1, NO_STAGE=1)
 	@$(MAKE) -s _ensure-site
 	@echo ""
@@ -741,6 +783,16 @@ prepare-and-publish:  ## ⭐ Pipeline completo: lê links → prepare → organi
 	if [ "$(NO_STAGE)" = "1" ]; then _ARGS="$$_ARGS --no-stage"; fi; \
 	echo "   Args: $$_ARGS"; echo ""; \
 	docker exec -it site python3 scripts/pipeline_publish.py $$_ARGS
+
+tag-classify:  ## 🏷️  LLM classifica tag+subtag dos JSONs em staging  [DRY=1]
+	@$(MAKE) -s _ensure-site
+	@docker exec -it site python3 agents/tag_classifier_agent.py $(if $(filter 1,$(DRY)),--dry-run,)
+
+tag-classify-db:  ## 🏷️  LLM classifica tag+subtag dos produtos no banco (sem tag ou tag=geral)  [DRY=1] [ID=uuid]
+	@$(MAKE) -s _ensure-site
+	@docker exec -it site python3 agents/tag_classifier_agent.py --db \
+		$(if $(filter 1,$(DRY)),--dry-run,) \
+		$(if $(ID),--product-id $(ID),)
 
 reprepare-ml:  ## ⭐ ML: refaz prepare (API+OCR+imgs) de todos os produtos, mantém tags, faz stage
 	@$(MAKE) -s _ensure-site

@@ -23,8 +23,7 @@ services:
     depends_on:
       - db
       - minio
-      - ingestion_service
-      - retrieval_service
+      - hsmart
     ports:
       - "5555:5000"
     networks:
@@ -80,36 +79,33 @@ services:
     networks:
       - backend
 
-  ingestion_service:
-    image: ghcr.io/schultzvv/hsmart-ingestion_service:latest
-    container_name: ingestion_service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
     ports:
-      - "5003:5003"
+      - "11434:11434"
     volumes:
-      - ./shared:/app/shared
-    depends_on:
-      - vector_db
-      - redis
+      - ollama_data:/root/.ollama
     restart: always
-    env_file: .env
-    environment:
-      - DEBUG=${DEBUG}
     networks:
       - backend
 
-  retrieval_service:
-    image: ghcr.io/schultzvv/hsmart-retrieval_service:latest
-    container_name: retrieval_service
+  hsmart:
+    image: ghcr.io/schultzvv/hsmart:latest
+    container_name: hsmart
     ports:
-      - "5004:5004"
-    volumes:
-      - ./shared:/app/shared
+      - "5005:5005"
     depends_on:
       - vector_db
       - redis
+      - ollama
     restart: always
     env_file: .env
     environment:
+      - QDRANT_HOST=vector_db
+      - QDRANT_PORT=6333
+      - OLLAMA_HOST=http://ollama:11434
+      - LLM_PROVIDER=ollama
       - DEBUG=${DEBUG}
     networks:
       - backend
@@ -117,6 +113,7 @@ services:
 volumes:
   pgdata:
   minio_data:
+  ollama_data:
 
 networks:
   backend:
