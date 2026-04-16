@@ -283,11 +283,22 @@ def admin_login():
             "exp": datetime.utcnow() + timedelta(seconds=JWT_EXP_TIME),
             "user_id": "admin"
         }
-        
+
         token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-        
+
+        # Gera refresh token (validade 30 dias)
+        refresh_payload = {
+            "username": username,
+            "iat": datetime.utcnow(),
+            "exp": datetime.utcnow() + timedelta(days=30),
+            "user_id": "admin",
+            "type": "refresh"
+        }
+        refresh_token = jwt.encode(refresh_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
         return jsonify({
             "access_token": token,
+            "refresh_token": refresh_token,
             "token_type": "Bearer",
             "expires_in": JWT_EXP_TIME,
             "user": {"id": "admin", "username": username}

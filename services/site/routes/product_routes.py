@@ -131,20 +131,46 @@ def auto_categorize_product(title):
 @product_bp.route("/api/products")
 def api_products():
     try:
-        tag = request.args.get('tag', 'all')
+        tag    = request.args.get('tag', '').strip()
+        subtag = request.args.get('subtag', '').strip()
         search = request.args.get('search', '').strip()
-        
+        try:
+            page  = max(1, int(request.args.get('page', 1)))
+            limit = min(100, max(1, int(request.args.get('limit', 50))))
+        except (ValueError, TypeError):
+            page, limit = 1, 50
+
+        q = Product.query
+
         if search:
-            # Busca por nome (case-insensitive)
-            products = Product.query.filter(
-                Product.title.ilike(f'%{search}%')
-            ).all()
-        elif tag == 'all':
-            products = get_all_products()
-        else:
-            products = get_products_by_tag(tag)
-            
-        return jsonify([p.to_dict() for p in products])
+            q = q.filter(Product.title.ilike(f'%{search}%'))
+
+        if tag and tag.lower() != 'all':
+            # tags stored as JSON text: ["geral","CD","ML"] — ilike for case safety
+            q = q.filter(Product.tags.ilike(f'%"{tag}"%'))
+
+        if subtag:
+            q = q.filter(Product.subcategory == subtag.lower())
+
+        total  = q.count()
+        pages  = max(1, (total + limit - 1) // limit)
+        page   = min(page, pages)
+        offset = (page - 1) * limit
+
+        products = (
+            q.order_by(Product.created_at.desc())
+             .offset(offset)
+             .limit(limit)
+             .all()
+        )
+
+        return jsonify({
+            "items":  [p.to_dict() for p in products],
+            "total":  total,
+            "page":   page,
+            "pages":  pages,
+            "limit":  limit,
+        })
     except Exception as e:
         return jsonify({"error": f"Erro ao obter produtos: {str(e)}"}), 500
 

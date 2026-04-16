@@ -74,15 +74,16 @@ _SUBTAG_HINTS: dict[str, dict[str, list[str]]] = {
         "cozinha":  ["panela","frigideira","faca","prato","tigela","mesa jantar","mesa cozinha","pia","utensílio"],
         "sala":     ["sofá","sofa","poltrona","cristaleira","rack","painel tv","mesa sala","aparador","mesa de centro"],
         "acessorios":["luminária","vaso decorativo","espelho","quadro","decoração","tapete sala","almofada","cortina",
-                      "escrivaninha","mesa escritório","cadeira escritório","prateleira","estante","mesa lateral"],
+                      "escrivaninha","escritório","escritorio","home office","cadeira escritório",
+                      "prateleira","estante","mesa lateral","sit-stand","sit stand","standing desk"],
     },
     "ME": {
         # calcados antes de feminino/masculino para sapatos gerais sem marcador de gênero
         "calcados":  ["sapato","tênis","tenis","bota","chinelo","mocassim","calçado","loafer","scarpin"],
         "bolsas":    ["bolsa","mochila","carteira","necessaire"],
         "relogios":  ["relógio","relogio"],
-        "masculino": ["masculino","bermuda","calça jeans","camisa polo","polo masculin","camisa masculin"],
-        "feminino":  ["vestido","saia","blusa","top feminino","feminino"],
+        "feminino":  ["vestido","saia","blusa","top feminino","feminino","feminina"],
+        "masculino": ["masculino","masculina","bermuda","camisa polo","polo masculin","camisa masculin"],
     },
     "PET": {
         "racao":      ["ração","racao","petisco","alimento pet","pasta gatos","pasta pet","sachê"],
@@ -157,61 +158,70 @@ def _query(question: str) -> str:
 
 def _ask_llm(title: str, description: str = "") -> Tuple[str, str, float]:
     """
-    Classifica via LLM usando perguntas binárias (sim/não) por categoria.
-    Subtag é determinada por keyword matching (mais confiável que LLM para modelos pequenos).
+    LLM chamado APENAS para títulos ambíguos (conf keyword < 0.62).
 
-    Ordem de verificação: PET → ME → CD → E (do mais específico ao mais geral).
+    Estratégia focada:
+    1. Calcula scores de keyword para todas as categorias.
+    2. Pega as top-2 candidatas (as que tiveram mais keyword hits).
+    3. Faz UMA única pergunta ao LLM com só essas 2 opções + "outro".
+       → prompt curto, modelo pequeno responde bem a escolhas binárias/ternárias.
+    4. Subtag via keyword (determinístico).
+
     Retorna (tag, subtag, confidence).
     """
     import re
 
-    ctx = f'"{title}"'
+    # ── Calcular top-2 candidatas por score de keyword ─────────────────────
+    t = title.lower()
+    scores: dict[str, int] = {
+        cat: sum(1 for w in words if w in t)
+        for cat, words in _KW.items()
+    }
+    ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    # top-2 com pelo menos 1 hit; se nenhuma tem hit, pega as 2 primeiras mesmo
+    top2 = [c for c, s in ranked[:2] if s > 0] or [ranked[0][0], ranked[1][0]]
+
+    if len(top2) < 2:
+        top2 = [ranked[0][0], ranked[1][0]]
+
+    # Labels para o prompt
+    _LABELS = {"PET": "pet/animal", "E": "eletrônico/eletrodoméstico", "CD": "casa/decoração", "ME": "moda/roupa"}
+    opt_a = _LABELS.get(top2[0], top2[0])
+    opt_b = _LABELS.get(top2[1], top2[1])
+
+    ctx = title[:80]
     if description:
-        ctx += f". {description[:60]}"
+        ctx += f" — {description[:40]}"
 
-    _binary_questions: list[tuple[str, str]] = [
-        ("PET", f"Produto: {ctx}.\nEste produto é especificamente para animais de estimação (ração, coleira, brinquedo pet, aquário)?\nResponda: sim ou não"),
-        ("CD",  f"Produto: {ctx}.\nEste produto é item para casa ou decoração (sofá, mesa, cristaleira, guarda-roupa, cama, chuveiro, panela, tapete, quadro, cadeira de escritório)?\nResponda: sim ou não"),
-        ("E",   f"Produto: {ctx}.\nEste produto é eletrônico ou eletrodoméstico (celular, TV, notebook, console, fone, ar-condicionado, microondas, refrigerador)?\nResponda: sim ou não"),
-        ("ME",  f"Produto: {ctx}.\nEste produto é vestuário ou acessório de moda (roupa, sapato, tênis, bolsa, relógio de moda, óculos de sol)?\nResponda: sim ou não"),
-    ]
+    question = (
+        f'Produto: "{ctx}"\n'
+        f'Categoria: A={opt_a}  B={opt_b}  C=outro\n'
+        f'Responda apenas: A, B ou C'
+    )
 
-    tag = "geral"
-    conf = 0.0
-    for code, question in _binary_questions:
-        raw = (_query(question) or "").strip()
-        logger.debug("LLM binary [%s] raw: %r", code, raw)
-        # "sim" deve aparecer antes de qualquer "não" na resposta
-        sim_pos = re.search(r'\b(sim|yes|correto)\b', raw, re.IGNORECASE)
-        nao_pos = re.search(r'\b(não|nao|no)\b', raw, re.IGNORECASE)
-        if sim_pos and (not nao_pos or sim_pos.start() < nao_pos.start()):
-            tag = code
-            conf = 0.82
-            break
+    raw = (_query(question) or "").strip()
+    logger.debug("LLM top2 [%s/%s] raw: %r", top2[0], top2[1], raw)
 
-    if tag == "geral":
+    # Parse: procura A ou B na resposta (C = outro = geral)
+    match = re.search(r'\b([ABCabc])\b', raw)
+    if match:
+        letter = match.group(1).upper()
+        if letter == "A":
+            tag = top2[0]
+        elif letter == "B":
+            tag = top2[1]
+        else:
+            return "geral", "", 0.0
+    else:
         return "geral", "", 0.0
 
-    # ── Subtag via keyword (determinístico e mais confiável que LLM pequeno) ──
     subtag = _subtag_from_keywords(tag, title)
-    if not subtag:
-        # Fallback: deixa o LLM tentar
-        subtags = CATEGORIES[tag][2]
-        if subtags:
-            q2 = (
-                f'Produto: "{title}". Categoria: {CATEGORIES[tag][0]}.\n'
-                f"Qual subcategoria: {', '.join(subtags)}?\n"
-                f"Responda APENAS com: {', '.join(subtags)}"
-            )
-            raw2 = _query(q2)
-            for s in (subtags or []):
-                if re.search(rf'\b{re.escape(s)}\b', raw2, re.IGNORECASE):
-                    subtag = s
-                    break
-        if not subtag and CATEGORIES[tag][2]:
-            subtag = CATEGORIES[tag][2][0]
+    if not subtag and CATEGORIES.get(tag, ("", "", []))[2]:
+        subtag = CATEGORIES[tag][2][0]
 
-    return tag, subtag, conf
+    return tag, subtag, 0.75
+
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -219,29 +229,44 @@ def _ask_llm(title: str, description: str = "") -> Tuple[str, str, float]:
 # ═══════════════════════════════════════════════════════════════════════════
 
 _KW: dict[str, list[str]] = {
-    "PET": ["ração","racao","gato","gatos","cachorro","cão","pet","animal",
-            "coleira","comedouro","areia","petisco","aquario","hamster",
-            "passaro","peixe","felino","canino","antipulgas","vermifugo"],
-    "E":   ["celular","smartphone","iphone","samsung","xiaomi","motorola",
-            "tablet","ipad","notebook","computador","laptop","desktop",
-            "macbook","headset","headphone","fone","speaker","caixa som",
-            "soundbar","televisão","tv","smart tv","oled","console",
+    "PET": ["ração","racao","gato","gatos","gata","cachorro","cão","cães","cao","caes",
+            "dog","cat","pet","animal","coleira","comedouro","areia","petisco",
+            "aquario","hamster","passaro","peixe","felino","canino",
+            "antipulgas","vermifugo","shampoo pet","brinquedo pet",
+            "golden","labrador","poodle","bulldog","labrador","shih tzu",
+            "premier","whiskas","pedigree","royal canin","hills"],
+    "E":   ["celular","smartphone","iphone","samsung","galaxy","xiaomi","redmi","poco",
+            "motorola","moto g","moto e","edge","tablet","ipad","notebook",
+            "computador","laptop","desktop","macbook","headset","headphone",
+            "fone","speaker","caixa som","soundbar","televisão","televisao",
+            "tv","smart tv","oled","qled","uhd","4k","polegadas","console",
             "playstation","xbox","switch","nintendo","videogame","ps5","ps4",
-            "camera","câmera","gopro","drone","smartwatch","smartband",
-            "carregador","cabo","ssd","pendrive","airfryer","fritadeira",
+            "camera","câmera","gopro","drone","smartwatch","smartband","alexa",
+            "echo dot","kindle","chromecast","carregador","cabo","ssd","nvme",
+            "pendrive","mouse","teclado","monitor","airfryer","fritadeira",
             "aspirador","ventilador","climatizador","microondas","geladeira",
-            "máquina lavar","secadora","refrigerador","ar condicionado","ar-condicionado"],
-    "CD":  ["sofá","sofa","poltrona","mesa","cadeira","cômoda","guarda-roupa",
-            "armário","prateleira","estante","aparador","cristaleira",
-            "quadro","espelho","cortina","almofada","jogo de cama","lençol",
-            "colcha","toalha","tapete","luminária","vaso","panela","frigideira",
-            "faca","prato","tigela","banheiro","chuveiro","mop","vassoura",
-            "decoração","sala","quarto","cozinha","lar"],
-    "ME":  ["vestido","saia","calça","blusa","camisa","camiseta","top",
-            "jaqueta","casaco","moletom","legging","short","bermuda","sapato",
-            "tênis","tenis","bota","chinelo","sandália","bolsa","mochila",
-            "carteira","relógio","óculos","pulseira","colar","brinco",
-            "moda","feminino","masculino","infantil"],
+            "máquina lavar","secadora","refrigerador","ar condicionado",
+            "ar-condicionado","split","inverter","chuveiro","lorenzetti","ducha",
+            "256gb","128gb","512gb","1tb","2tb","dual sim","5g",
+            "brastemp","electrolux","consul","whirlpool","panasonic","lg","sony",
+            "philips","bosch","frost free","inox inverter","eletrodoméstico",
+            "lava e seca","lava-louça","lavadora"],
+    "CD":  ["sofá","sofa","poltrona","mesa","cadeira","cômoda","comoda",
+            "guarda-roupa","guarda roupa","armário","armario","prateleira",
+            "estante","aparador","cristaleira","rack","painel tv","escrivaninha",
+            "bancada","quadro","espelho","cortina","almofada","jogo de cama",
+            "lençol","lencol","colcha","toalha","tapete","luminária","luminaria",
+            "vaso","panela","frigideira","faca","prato","tigela","mop","vassoura",
+            "decoração","decoracao","sala","quarto","cozinha","lar","casa",
+            "escritório","escritorio","home office"],
+    "ME":  ["vestido","saia","calça","calca","blusa","camisa","camiseta","top",
+            "jaqueta","casaco","moletom","moleton","legging","short","bermuda",
+            "sapato","tênis","tenis","bota","botina","chinelo","sandália","sandalia",
+            "scarpin","mocassim","loafer","bolsa","mochila","carteira",
+            "relógio","relogio","óculos","oculos","pulseira","colar","brinco",
+            "moda","roupa","feminino","feminina","masculino","masculina","infantil",
+            "calçado","calcado","jeans","skinny","slim","cropped",
+            "nike","adidas","mizuno","olympikus","fila","polo wear","reserva","hering"],
 }
 
 
@@ -271,9 +296,39 @@ def _fallback_tag(title: str) -> Tuple[str, str, float]:
     return best, subtag, conf
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Aplicar ao staging (JSON files)
-# ═══════════════════════════════════════════════════════════════════════════
+def _classify(title: str, description: str = "") -> Tuple[str, str, float, str]:
+    """
+    Classificação em duas camadas:
+
+    1. Regex/keywords (rápido, determinístico):
+       - Tenta _fallback_tag primeiro
+       - Se conf >= 0.62 → aceita direto, sem tocar o LLM
+         (conf 0.62 = pelo menos 2 keywords fortes no título)
+    2. LLM (lento, ~3s/produto):
+       - Só chamado quando keywords dão conf < 0.62 (título ambíguo)
+       - Se LLM também falhar → usa o resultado das keywords mesmo
+
+    Retorna (tag, subtag, conf, source) onde source = "keyword" | "llm" | "fallback"
+    """
+    # ── Camada 1: keywords ─────────────────────────────────────────────────
+    kw_tag, kw_subtag, kw_conf = _fallback_tag(title)
+    if kw_conf >= 0.72:
+        # Confiante o suficiente — não precisa de LLM
+        return kw_tag, kw_subtag, kw_conf, "keyword"
+
+    # ── Camada 2: LLM (só para títulos ambíguos) ───────────────────────────
+    llm_tag, llm_subtag, llm_conf = _ask_llm(title, description)
+    if llm_tag != "geral" and llm_conf >= 0.4:
+        return llm_tag, llm_subtag, llm_conf, "llm"
+
+    # ── Fallback: resultado de keywords, mesmo com conf baixa ─────────────
+    if kw_tag != "geral":
+        return kw_tag, kw_subtag, kw_conf, "fallback"
+
+    return "geral", "", 0.2, "fallback"
+
+
+
 
 def _move_staging_product(json_path: Path, tag: str, subtag: str, dry_run: bool) -> bool:
     """Move o arquivo para a pasta correta e atualiza o JSON."""
@@ -331,16 +386,12 @@ def classify_staging(dry_run: bool = False) -> dict:
 
         current_tag = (data.get("tag") or "").upper()
 
-        tag, subtag, conf = _ask_llm(title, desc)
+        tag, subtag, conf, source = _classify(title, desc)
 
-        # Se LLM não decidiu com confiança, usa fallback regex
-        source = "llm"
-        if tag == "geral" or conf < 0.4:
-            tag, subtag, conf = _fallback_tag(title)
-            source = "fallback"
-            stats["fallback"] += 1
-        else:
+        if source == "llm":
             stats["llm_ok"] += 1
+        else:
+            stats["fallback"] += 1
 
         # Verifica se já está correto
         expected_dir = TAG_FOLDERS.get(tag, "geral")
@@ -419,15 +470,12 @@ def classify_db(dry_run: bool = False, product_id: Optional[str] = None) -> dict
         desc = getattr(product, "description", "") or ""
         stats["total"] += 1
 
-        tag, subtag, conf = _ask_llm(title, desc)
+        tag, subtag, conf, source = _classify(title, desc)
 
-        source = "llm"
-        if tag == "geral" or conf < 0.4:
-            tag, subtag, conf = _fallback_tag(title)
-            source = "fallback"
-            stats["fallback"] += 1
-        else:
+        if source == "llm":
             stats["llm_ok"] += 1
+        else:
+            stats["fallback"] += 1
 
         icon = "🤖" if source == "llm" else "🔤"
         prefix = f"[{i:>3}/{len(products)}]"

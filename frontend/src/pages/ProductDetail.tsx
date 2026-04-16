@@ -38,6 +38,13 @@ export default function ProductDetail() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   useEffect(() => {
+    if (product) {
+      document.title = `${product.title} — DEF`
+      return () => { document.title = 'DEF — Catálogo' }
+    }
+  }, [product])
+
+  useEffect(() => {
     if (!id) {
       navigate('/')
       return
@@ -106,8 +113,36 @@ export default function ProductDetail() {
           <Link to="/" className="btn-secondary inline-block text-sm">
             ← VOLTAR AO CATÁLOGO
           </Link>
+
+          {/* Breadcrumb */}
+          {(product.category || product.subcategory) && (
+            <nav className="flex items-center gap-1 mt-3 text-xs font-mono text-gray-text" aria-label="Breadcrumb">
+              <Link to="/" className="hover:text-neon-green transition-colors">INÍCIO</Link>
+              {product.category && (
+                <>
+                  <span className="mx-1">›</span>
+                  <Link to={`/?tag=${product.category}`} className="hover:text-neon-green transition-colors uppercase">
+                    {product.category}
+                  </Link>
+                </>
+              )}
+              {product.subcategory && (
+                <>
+                  <span className="mx-1">›</span>
+                  <span className="text-gray-light capitalize">{product.subcategory}</span>
+                </>
+              )}
+            </nav>
+          )}
         </div>
       </div>
+
+      {/* INDISPONÍVEL banner */}
+      {!product.available && (
+        <div className="bg-neon-red text-black-deep font-mono font-bold text-sm tracking-widest py-3 text-center">
+          ⚠ PRODUTO INDISPONÍVEL — Consulte outras opções no catálogo
+        </div>
+      )}
 
       {/* Product Detail Section */}
       <section className="border-b border-gray-steel">
@@ -255,9 +290,14 @@ export default function ProductDetail() {
                     </div>
                   )}
 
-                  {/* Action Button */}
+                  {/* Redirect notice + Action Button */}
                   <div className="mt-auto">
-                    {product.link ? (
+                    {product.link && product.available && (
+                      <p className="text-xs font-mono text-gray-text mb-3">
+                        ↗ Você será redirecionado para {platform === 'ML' ? 'o Mercado Livre' : platform || 'o site externo'}
+                      </p>
+                    )}
+                    {product.link && product.available ? (
                       <a
                         href={product.link}
                         target="_blank"
@@ -268,7 +308,7 @@ export default function ProductDetail() {
                       </a>
                     ) : (
                       <button className="btn-primary w-full opacity-50 cursor-not-allowed" disabled>
-                        COMPRAR
+                        {product.available ? 'COMPRAR' : 'INDISPONÍVEL'}
                       </button>
                     )}
                   </div>

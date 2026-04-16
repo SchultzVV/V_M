@@ -784,7 +784,20 @@ prepare-and-publish:  ## ⭐ Pipeline completo: lê links → prepare → organi
 	echo "   Args: $$_ARGS"; echo ""; \
 	docker exec -it site python3 scripts/pipeline_publish.py $$_ARGS
 
-tag-classify:  ## 🏷️  LLM classifica tag+subtag dos JSONs em staging  [DRY=1]
+publish:  ## ⭐ Publica links_to_publish.json → prepare → LLM tags → stage → archive  (DRY=1, NO_PRICE=1, NO_TAG=1)
+	@$(MAKE) -s _ensure-site
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🚀 PUBLISH — lê links_to_publish.json, insere no site e classifica tags"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@_ARGS=""; \
+	if [ "$(DRY)" = "1" ] || [ "$(DRY_RUN)" = "1" ]; then _ARGS="$$_ARGS --dry-run"; fi; \
+	if [ "$(NO_PRICE)" = "1" ]; then _ARGS="$$_ARGS --no-price-update"; fi; \
+	if [ "$(NO_TAG)" = "1" ]; then _ARGS="$$_ARGS --no-tag-classify"; fi; \
+	echo "   Args: $$_ARGS"; echo ""; \
+	docker exec -it site python3 scripts/pipeline_publish.py $$_ARGS
+
+
 	@$(MAKE) -s _ensure-site
 	@docker exec -it site python3 agents/tag_classifier_agent.py $(if $(filter 1,$(DRY)),--dry-run,)
 

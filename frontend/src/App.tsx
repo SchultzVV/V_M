@@ -3,6 +3,7 @@ import Home from './pages/Home'
 import ProductDetail from './pages/ProductDetail'
 import AdminLogin from './pages/admin/Login'
 import AdminDashboard from './pages/admin/Dashboard'
+import NotFound from './pages/NotFound'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import AdminLayout from './components/AdminLayout'
@@ -22,6 +23,9 @@ function App() {
         <Route element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
         </Route>
+
+        {/* 404 */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
   )

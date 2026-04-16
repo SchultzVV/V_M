@@ -5,14 +5,15 @@ export interface Product {
   title: string
   price: number
   old_price?: number
-  images: string[] // Array de todas as imagens
-  image?: string // Primeira imagem (compatibilidade)
+  images: string[]
+  image?: string
   category?: string
   subcategory?: string
   link?: string
   description?: string
   available: boolean
   tags?: string[]
+  updated_at?: string
 }
 
 export interface ApiProduct {
@@ -27,6 +28,22 @@ export interface ApiProduct {
   description?: string
   disponivel: boolean
   tags?: string[]
+  updated_at?: string
+}
+
+export interface PagedResponse {
+  items: ApiProduct[]
+  total: number
+  page: number
+  pages: number
+  limit: number
+}
+
+export interface ProductsPage {
+  products: Product[]
+  total: number
+  page: number
+  pages: number
 }
 
 export interface ApiResponse<T> {
@@ -84,14 +101,15 @@ const transformProduct = (apiProduct: ApiProduct): Product => {
       title: apiProduct.title || 'Produto sem título',
       price: parsePrice(apiProduct.price),
       old_price: apiProduct.oldPrice ? parsePrice(apiProduct.oldPrice) : undefined,
-      images: imageUrls, // Array completo de imagens
-      image: imageUrls?.[0], // Primeira imagem (compatibilidade)
+      images: imageUrls,
+      image: imageUrls?.[0],
       category: apiProduct.category,
       subcategory: apiProduct.subcategory,
       link: apiProduct.link,
       description: apiProduct.description,
       available: apiProduct.disponivel,
-      tags: apiProduct.tags
+      tags: apiProduct.tags,
+      updated_at: apiProduct.updated_at,
     }
     
     console.log(`[transformProduct]   ✅ ${transformed.title} @ R$ ${transformed.price.toFixed(2)}`)
@@ -103,13 +121,14 @@ const transformProduct = (apiProduct: ApiProduct): Product => {
 }
 
 export const productService = {
-  async getAll(params?: { tag?: string; category?: string; limit?: number }): Promise<Product[]> {
+  async getAll(params?: { tag?: string; subtag?: string; search?: string; limit?: number }): Promise<Product[]> {
     try {
       console.log('🔄 [productService] Fetching /api/products...')
-      const response = await api.get<ApiProduct[]>('/api/products', { params })
-      console.log(`✅ [productService] Received ${response.data.length} raw products`)
-      
-      const transformed = response.data.map((product, index) => {
+      const response = await api.get<PagedResponse>('/api/products', { params: { ...params, limit: params?.limit ?? 100 } })
+      const items = response.data.items
+      console.log(`✅ [productService] Received ${items.length} raw products (total: ${response.data.total})`)
+
+      const transformed = items.map((product, index) => {
         try {
           return transformProduct(product)
         } catch (err) {
@@ -125,6 +144,21 @@ export const productService = {
         console.error('   Error message:', error.message)
         console.error('   Error cause:', (error as any).cause)
       }
+      throw error
+    }
+  },
+
+  async getPaged(params?: { tag?: string; subtag?: string; search?: string; page?: number; limit?: number }): Promise<ProductsPage> {
+    try {
+      const response = await api.get<PagedResponse>('/api/products', { params })
+      return {
+        products: response.data.items.map(transformProduct),
+        total: response.data.total,
+        page: response.data.page,
+        pages: response.data.pages,
+      }
+    } catch (error) {
+      console.error('❌ [productService] Error fetching paged products:', error)
       throw error
     }
   },
