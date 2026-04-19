@@ -229,3 +229,11 @@ stage_products.py
 - [OAuth Mercado Livre](docs/integrações/OAUTH_MERCADOLIVRE.md)
 - [Webhooks](docs/integrações/WEBHOOKS.md)
 - [Instagram API](docs/instagram/INSTAGRAM_API_OFICIAL.md)
+
+```bash
+make populate-mf                          # todas as tags (PET, E, CD, ME)
+make populate-mf TAG=PET                  # só PET
+make populate-mf TAG=PET SUBTAG=gatos     # só PET/gatos
+make populate-mf TAG=PET DRY=1            # dry-run PET
+make populate-mf LIMIT=3                  # 3 produtos por query
+```

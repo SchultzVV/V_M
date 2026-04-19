@@ -1,63 +1,114 @@
-from flask import Blueprint, request, jsonify, render_template
-import requests
 import os
+import re
+import json
+import logging
+from flask import Blueprint, request, jsonify, render_template
+from models.product import Product
+from openai import OpenAI
 
-ai_bp = Blueprint('ai_bp', __name__)
+logger = logging.getLogger(__name__)
 
-# Endpoints dos microserviços
-INGESTION_URL = 'http://ingestion_service:5003/ingest_from_url'
-RETRIEVAL_URL = 'http://retrieval_service:5004/query'
+ai_bp = Blueprint('ai_bp', __name__, url_prefix='/ai')
+
+_openai = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
+_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+
+# ─── Mapa de palavras-chave → tag do DB ─────────────────────────────────────
+_TAG_KEYWORDS: list[tuple[str, list[str]]] = [
+    ("E",   ["smartphone", "celular", "notebook", "computador", "tablet", "fone",
+              "tv", "televisão", "game", "câmera", "smartwatch", "eletrônico", "tech"]),
+    ("CD",  ["cadeira", "mesa", "sofá", "cama", "luminária", "tapete", "vaso",
+              "decoração", "casa", "cozinha", "banheiro", "sala", "quarto"]),
+    ("ME",  ["vestido", "camiseta", "calça", "tênis", "sapato", "bolsa", "relógio",
+              "moda", "roupa", "óculos", "jaqueta", "moletom"]),
+    ("PET", ["cachorro", "gato", "pet", "ração", "areia", "coleira", "brinquedo pet",
+              "animais", "veterinário"]),
+]
+
+def _detect_tag(question: str) -> str | None:
+    q = question.lower()
+    for tag, keywords in _TAG_KEYWORDS:
+        if any(kw in q for kw in keywords):
+            return tag
+    return None
+
+def _search_products(question: str, limit: int = 6) -> list[dict]:
+    """Busca produtos no DB por search e/ou tag inferida da pergunta."""
+    tag = _detect_tag(question)
+    q = Product.query
+    q = q.filter(Product.price.isnot(None), Product.price.op('~')('[1-9]'))
+
+    if tag:
+        q = q.filter(Product.tags.ilike(f'%"{tag}"%'))
+    else:
+        # sem tag detectada, faz full-text search pelo título
+        words = [w for w in re.split(r'\W+', question) if len(w) > 3]
+        for word in words[:3]:
+            q = q.filter(Product.title.ilike(f'%{word}%'))
+
+    products = q.order_by(Product.created_at.desc()).limit(limit).all()
+    return [p.to_dict() for p in products]
 
 
+def _build_prompt(question: str, products: list[dict]) -> str:
+    if not products:
+        catalog = "Nenhum produto disponível no momento."
+    else:
+        lines = []
+        for i, p in enumerate(products, 1):
+            price = p.get("price", "")
+            old   = p.get("oldPrice", "")
+            disc  = ""
+            if old and old != price:
+                disc = f" (era {old})"
+            lines.append(f"{i}. {p['title'][:80]} — {price}{disc}")
+        catalog = "\n".join(lines)
 
-# Futuras melhorias:
-# - Substituir requests por gRPC para comunicação mais performática
-# - Usar websocket para chat em tempo real
-# - Ingestão assíncrona com Celery ou FastAPI BackgroundTasks
-# - Frontend React/HTMX com suporte a polling
-# - Disponibilizar via ngrok para testes públicos
+    return f"""Você é o assistente da loja DEF — um catálogo de produtos com foco em promoções.
 
-@ai_bp.route('/ai')
+Catálogo atual ({len(products)} produtos encontrados):
+{catalog}
+
+Responda de forma direta, simpática e em português do Brasil.
+Se tiver produtos relevantes, mencione os 1-3 mais destacados pelo nome e preço.
+Se não tiver o produto pedido, diga claramente e sugira categorias similares.
+Não invente produtos que não estão na lista acima.
+
+Pergunta do usuário: {question}"""
+
+
+@ai_bp.route('/')
 def ai_page():
-    """Renderiza página de integração com IA."""
     return render_template('ai.html')
 
 
-def forward_to_ingestion_service(url: str):
-    """Encaminha URL para o microserviço de ingesão."""
-    resp = requests.post(INGESTION_URL, json={'url': url}, timeout=150)
-    resp.raise_for_status()
-    return resp.json()
-
-
-def forward_to_retrieval_service(question: str):
-    """Encaminha pergunta para o microserviço de consulta."""
-    resp = requests.post(RETRIEVAL_URL, json={'question': question}, timeout=150)
-    resp.raise_for_status()
-    return resp.json()
-
-
-@ai_bp.route('/ingest-url', methods=['POST'])
-def ingest_url():
-    data = request.get_json() or {}
-    url = data.get('url')
-    if not url:
-        return jsonify({'error': 'url é obrigatório'}), 400
-    try:
-        result = forward_to_ingestion_service(url)
-        return jsonify(result)
-    except requests.RequestException as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@ai_bp.route('/query', methods=['POST'])
-def query():
-    data = request.get_json() or {}
-    question = data.get('question')
+@ai_bp.route('/ask', methods=['POST'])
+def ask():
+    data = request.get_json(silent=True) or {}
+    question = (data.get('question') or '').strip()
     if not question:
         return jsonify({'error': 'question é obrigatório'}), 400
+
+    products = _search_products(question)
+    prompt   = _build_prompt(question, products)
+
     try:
-        result = forward_to_retrieval_service(question)
-        return jsonify(result)
-    except requests.RequestException as e:
-        return jsonify({'error': str(e)}), 500
+        completion = _openai.chat.completions.create(
+            model=_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300,
+            temperature=0.4,
+        )
+        answer = completion.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error("OpenAI error: %s", e)
+        if products:
+            names = ", ".join(p['title'][:40] for p in products[:3])
+            answer = f"Sim! Encontrei {len(products)} produto(s): {names}."
+        else:
+            answer = "Não encontrei produtos para essa busca no momento."
+
+    return jsonify({
+        'answer':   answer,
+        'products': products[:3],
+    })
