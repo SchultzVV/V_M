@@ -40,130 +40,15 @@
   </script>
   {% endif %}
   
-  <link rel="stylesheet" href="/static/style.css" />
-  <style>
-    .product-page {
-      max-width: 1200px;
-      margin: 40px auto;
-      padding: 20px;
-    }
-    
-    .product-container {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 40px;
-      margin-top: 20px;
-    }
-    
-    .product-images {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    
-    .main-image {
-      width: 100%;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-    }
-    
-    .thumbnail-images {
-      display: flex;
-      gap: 10px;
-      overflow-x: auto;
-    }
-    
-    .thumbnail {
-      width: 80px;
-      height: 80px;
-      object-fit: cover;
-      border-radius: 8px;
-      cursor: pointer;
-      border: 2px solid transparent;
-      transition: all 0.3s;
-    }
-    
-    .thumbnail:hover {
-      border-color: #667eea;
-    }
-    
-    .product-info h1 {
-      font-size: 32px;
-      margin-bottom: 20px;
-      color: #333;
-    }
-    
-    .price-container {
-      margin: 20px 0;
-    }
-    
-    .old-price {
-      text-decoration: line-through;
-      color: #999;
-      font-size: 18px;
-    }
-    
-    .current-price {
-      font-size: 36px;
-      font-weight: bold;
-      color: #2ecc71;
-      margin-left: 10px;
-    }
-    
-    .discount-badge {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-      color: white;
-      padding: 5px 15px;
-      border-radius: 20px;
-      display: inline-block;
-      margin-left: 10px;
-      font-size: 14px;
-    }
-    
-    .buy-button {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      padding: 20px 40px;
-      font-size: 20px;
-      font-weight: bold;
-      border-radius: 12px;
-      cursor: pointer;
-      width: 100%;
-      margin-top: 20px;
-      transition: all 0.3s;
-    }
-    
-    .buy-button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-    }
-    
-    .breadcrumb {
-      font-size: 14px;
-      color: #666;
-      margin-bottom: 20px;
-    }
-    
-    .breadcrumb a {
-      color: #667eea;
-      text-decoration: none;
-    }
-    
-    @media (max-width: 768px) {
-      .product-container {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="/static/def-design.css" />
 </head>
 <body>
   <div class="product-page">
     <!-- Breadcrumb Navigation -->
     <div class="breadcrumb">
-      <a href="/">Home</a> › 
-      <a href="/secao{{ product.category_id if product.category_id else '1' }}">Categoria</a> › 
-      <span>{{ product.title }}</span>
+      <a href="/">Home</a> /
+      <a href="/">Catálogo</a> /
+      <span>{{ product.title[:60] }}{% if product.title|length > 60 %}...{% endif %}</span>
     </div>
     
     <div class="product-container">
@@ -193,26 +78,24 @@
           {% if product.old_price and product.old_price > product.price %}
           <span class="old-price">R$ {{ "%.2f"|format(product.old_price) }}</span>
           <span class="current-price">R$ {{ "%.2f"|format(product.price) }}</span>
-          <span class="discount-badge">
-            -{{ "%.0f"|format(((product.old_price - product.price) / product.old_price) * 100) }}%
-          </span>
+          <span class="discount-badge">-{{ "%.0f"|format(((product.old_price - product.price) / product.old_price) * 100) }}%</span>
           {% else %}
           <span class="current-price">R$ {{ "%.2f"|format(product.price) }}</span>
           {% endif %}
         </div>
-        
-        <div style="margin: 20px 0;">
+
+        <div class="product-features">
           <p>✅ Em estoque</p>
           <p>🚚 Frete grátis para todo Brasil</p>
           <p>🔒 Compra 100% segura</p>
         </div>
         
-        <button class="buy-button" onclick="window.open('{{ product.link }}', '_blank')">
-          🛒 COMPRAR AGORA
-        </button>
+        <a href="{{ product.link }}" target="_blank" rel="noopener" class="buy-button">
+          Comprar Agora
+        </a>
         
-        <div style="margin-top: 30px; padding: 20px; background: #f9f9f9; border-radius: 12px;">
-          <h3>Descrição do Produto</h3>
+        <div class="product-description">
+          <h3>Descrição</h3>
           <p>{{ product.description if product.description else product.title }}</p>
         </div>
       </div>

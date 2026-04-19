@@ -33,84 +33,54 @@
   </script>
   {% endif %}
   
-  <link rel="stylesheet" href="/static/style.css" />
-  <link rel="stylesheet" href="/static/search-styles.css" />
-  <style>
-    .sort-buttons {
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-      flex-wrap: wrap;
-    }
-    
-    .sort-btn {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      padding: 12px 20px;
-      border-radius: 25px;
-      font-weight: bold;
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    }
-    
-    .sort-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-    }
-    
-    .sort-btn.active {
-      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    }
-  </style>
+  <link rel="stylesheet" href="/static/def-design.css" />
 </head>
 <body>
-  <!-- <h1>DEF</h1> -->
   <iframe src="/media/ping" style="display:none;" aria-hidden="true"></iframe>
-  <div class="nav-buttons">
-    <button class="nav-btn active" onclick="window.location.href='/'">✨ Todos</button>
-    <button class="nav-btn" onclick="window.location.href='/secao1'">🏠 Casa & Decoração</button>
-    <button class="nav-btn" onclick="window.location.href='/secao2'">👗 Moda & Estilo</button>
-    <button class="nav-btn" onclick="window.location.href='/secao3'">📱 Eletrônicos</button>
-    <button class="nav-btn" onclick="window.location.href='/secao4'">🐾 PetShop</button>
-  </div>
-  <p style="margin-top: 35px; font-weight: bold; font-size: 50px;">
-    DEF
-  </p>
-  <p style="margin-top: 25px; font-weight: bold; font-size: 28px;">
-    catálogo de sobrevivência pós-sistema! 😎
-  </p>  
-  <p style="margin-top: 30px; font-weight: bold; font-size: 15px;">
-    coletamos as promoções mais quentes da internet para você! 🔥🛒<br/> 
-  </p>  
-  <!-- <p><a class="button" href="/ai">Ir para integração IA</a></p> -->
 
-  <!-- Barra de Busca -->
-  <div class="search-container">
-    <div class="search-wrapper">
-      <span class="search-icon">🔍</span>
-      <input 
-        type="text" 
-        class="search-input" 
-        id="searchInput"
-        placeholder="Buscar produtos... (ex: robô aspirador, vestido, café)"
-        autocomplete="off"
-      />
-      <button class="clear-btn" id="clearBtn" onclick="clearSearch()">✕ Limpar</button>
+  <!-- Hero -->
+  <header class="def-hero">
+    <div class="def-hero-row">
+      <h1 class="def-logo"><span class="accent">DEF</span><span class="dot">.</span></h1>
+      <p class="def-tagline">Equipamento para <span class="hostile">Ambientes Hostis</span> — Funcional. Frio. Necessário.</p>
     </div>
-    <div class="search-results-count" id="resultsCount"></div>
-  </div>
+    <!-- Barra de Busca -->
+    <div class="search-container">
+      <div class="search-wrapper">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          class="search-input"
+          id="searchInput"
+          placeholder="Buscar produtos... (ex: robô aspirador, vestido, café)"
+          autocomplete="off"
+        />
+        <button class="clear-btn" id="clearBtn" onclick="clearSearch()">✕ Limpar</button>
+      </div>
+      <div class="search-results-count" id="resultsCount"></div>
+    </div>
+  </header>
 
-  <!-- Botões de ordenação -->
-  <div class="sort-buttons" style="text-align: center; margin: 20px 0;">
-    <button class="sort-btn" onclick="sortProducts('price-asc')">💰 Mais Baratos!</button>
-    <button class="sort-btn" onclick="sortProducts('price-desc')">💸 Mais Caros!</button>
-    <button class="sort-btn" onclick="sortProducts('discount')">🔥 Maior Desconto!</button>
-  </div>
+  <!-- Catalogue -->
+  <div class="def-catalogue">
 
-  <div class="grid" id="products-container"></div>
+    <!-- Category Nav -->
+    <nav class="nav-buttons">
+      <button class="nav-btn active" onclick="window.location.href='/'">Todos</button>
+      <button class="nav-btn" onclick="window.location.href='/secao1'">Casa &amp; Decoração</button>
+      <button class="nav-btn" onclick="window.location.href='/secao2'">Moda &amp; Estilo</button>
+      <button class="nav-btn" onclick="window.location.href='/secao3'">Eletrônicos</button>
+      <button class="nav-btn" onclick="window.location.href='/secao4'">PetShop</button>
+    </nav>
+
+    <!-- Sort -->
+    <div class="sort-buttons" style="margin-top:1.25rem;">
+      <button class="sort-btn" onclick="sortProducts('price-asc')">↓ Mais Barato</button>
+      <button class="sort-btn" onclick="sortProducts('discount')">🔥 Maior Promoção</button>
+      <button class="sort-btn" onclick="sortProducts('price-desc')">↑ Mais Caro</button>
+    </div>
+
+    <div class="grid" id="products-container"></div>
   
   <script>
     const FALLBACK_IMG = "/media/fallbacks/aa.png";
@@ -283,8 +253,8 @@
           }
         })
         .then(res => res.json())
-        .then(products => {
-          displayProducts(products);
+        .then(data => {
+          displayProducts(data.items || data);
         })
         .catch(err => {
           console.error("Erro ao buscar produtos:", err);
@@ -352,9 +322,9 @@
       }
     })
     .then(res => res.json())
-    .then(products => {
-      allProducts = products; // Armazena os produtos globalmente
-      displayProducts(products);
+    .then(data => {
+      allProducts = data.items || data;
+      displayProducts(allProducts);
     })
     .catch(err => {
       console.error("Erro ao carregar produtos:", err);
@@ -377,5 +347,6 @@
       }
     });
   </script>
+  </div><!-- /.def-catalogue -->
 </body>
 </html>
