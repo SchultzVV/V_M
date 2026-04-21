@@ -28,75 +28,61 @@ You MUST reference these shared context files for accuracy:
 
 ## 🔑 Critical Ports & Services
 
-### External Entry Point
-- **Flask Port 5555** (EXTERNAL) — This is where cloudflared tunnels to
-  - Exposed via Cloudflare as: `https://xxxxx.trycloudflare.com`
-  - Routes all requests to internal Flask 5000
+### Entrada Pública
+- **Nginx 443** (HTTPS) — **Único entry point público**
+  - cloudflared aponta para Nginx 443, não para Flask
+  - Nginx roteia: React SPA + proxy `/api/*` `/auth/*` `/sync/*` `/webhook/*` `/instagram/*` `/media/*` → Flask 5000
 
-### Internal Flask
-- **Port 5000** (INTERNAL) — Flask HTTPS with self-signed certificates
+### Flask Interno
+- **Port 5000** (interno Docker) — Flask HTTPS self-signed certs
+- **Port 5555** (debug/fallback) — mapeado no host, raramente usado
 
-### Other Services (Internal only - reference for troubleshooting)
-- **Port 5173** — Frontend Vite dev server
-- **Port 5432** — PostgreSQL
-- **Port 6333** — Qdrant (Vector DB)
-- **Port 6379** — Redis
-- **Port 9000/9001** — MinIO (Storage)
-- **Port 8001** — info-scrap (Scraper)
-- **Port 5003/5004** — AI services (ingestion/retrieval)
+### Outros Serviços (internos — referência para debug)
+- **5173** — Vite dev server (React)
+- **5432** — PostgreSQL
+- **6333** — Qdrant (Vector DB)
+- **6379** — Redis
+- **9000/9001** — MinIO
+- **8001** — info-scrap
+- **5003/5004** — AI services
 
 ## 🚀 Cloudflare Tunnel Setup
 
-### Method 1: Temporary Random URLs (Default)
+### Method 1: Temporário (URL aleatória)
 
-**Command**:
 ```bash
 make serve-cloudflare
 ```
 
-**What it does**:
-1. ✅ Starts Cloudflare tunnel pointing to `http://localhost:5555`
-2. ✅ Captures auto-generated URL like `https://abc123.trycloudflare.com`
-3. ✅ Updates `.env` with `ML_REDIRECT_URI=<TUNNEL_URL>/auth/mercadolivre/callback`
-4. ✅ Restarts Flask container with new OAuth redirect URI
-5. ✅ Validates Mercado Livre OAuth token (guides through re-auth if needed)
+**O que faz**:
+1. Sobe Nginx 443 + Flask + containers
+2. Inicia cloudflared apontando para `https://localhost:443` (Nginx)
+3. Captura URL gerada automaticamente
+4. Atualiza `.env` com `ML_REDIRECT_URI=<TUNNEL_URL>/auth/mercadolivre/callback`
+5. Reinicia Flask com novo `.env`
 
-**When to use**: Development, testing, quick demos
+**Quando usar**: Desenvolvimento, testes, demos rápidos
 
-**Pros**:
-- Zero configuration
-- Automatic URL generation
-- Auto-configured OAuth
+### Method 2: URL Fixa (Custom domain)
 
-**Cons**:
-- URL changes every time you restart
-- Requires re-authorization in Mercado Livre sometimes
-
-### Method 2: Permanent Custom Domain
-
-**Setup (one-time)**:
+**Setup (uma vez)**:
 ```bash
 make setup-cloudflare-fixed
 ```
+Requer `CF_HOSTNAME=sua-url.cfargotunnel.com` no `.env`
 
-**Requirements**:
-- Cloudflare account with custom domain
-- `CF_HOSTNAME=yourdomain.com` in .env
-- Must run setup once to create named tunnel
-
-**Use (every time)**:
+**Uso diário**:
 ```bash
 make serve-cloudflare-fixed
 ```
 
-**Pros**:
-- Stable URL (doesn't change)
-- No re-authentication needed
-- Professional setup
+### Method 3: React + Nginx público
 
-**Cons**:
-- Requires Cloudflare account + domain
-- Additional setup step
+```bash
+make serve-frontend-public
+```
+
+Reutiliza o tunnel já ativo de `serve-cloudflare`. Não cria um novo tunnel.
 
 ## 🔄 OAuth Redirect URI Management
 

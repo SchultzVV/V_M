@@ -22,13 +22,14 @@ Reference these before any work:
 
 | Service | Port | Notes |
 |---------|------|-------|
-| Flask internal | 5000 | Docker network only |
-| Flask external | 5555 | Host-mapped, Cloudflare tunnel |
+| **Nginx (entry)** | **443** | **Entrada pública — React SPA + proxy API** |
+| Flask interno | 5000 | Docker network, acessado pelo Nginx |
+| Flask debug | 5555 | Host-mapped, fallback direto |
 | PostgreSQL | 5432 | `produtos_db`, user/password |
 | Redis | 6379 | Cache + task queue |
-| MinIO API | 9000 | Image storage (never expose to browser directly) |
+| MinIO API | 9000 | Image storage (NUNCA expor ao browser diretamente) |
 | MinIO Console | 9001 | Admin UI |
-| Qdrant | 6333 | Vector DB for RAG |
+| Qdrant | 6333 | Vector DB para RAG |
 | info-scrap | 8001 | OCR + scraping |
 | ingestion_service | 5003 | AI doc ingestion |
 | retrieval_service | 5004 | RAG retrieval |
@@ -56,16 +57,43 @@ Reference these before any work:
 
 **YOU MUST match these exact shapes.** They come from `frontend/src/services/`.
 
-### GET /api/products → `ApiProduct[]`
+### GET /api/products → resposta paginada `{items, total, page, pages, limit}`
 
-Each item in the array must be:
+**⚠️ MUDANÇA CRÍTICA**: A API retorna um OBJETO, não um array direto.
+
+```json
+{
+  "items":  [ /* array de Product */ ],
+  "total":  42,
+  "page":   1,
+  "pages":  1,
+  "limit":  50
+}
+```
+
+**Parâmetros suportados:**
+- `tag` — filtra por tag (`CD`, `ME`, `E`, `PET`, `all`)
+- `subtag` — filtra por subcategoria exata (`banheiro`, `gatos`, etc.)
+- `search` — busca no título, accent-insensitive via `unaccent()` PostgreSQL + NFD strip Python
+- `page` — página (default 1)
+- `limit` — itens por página (default 50, max 100)
+
+**Implementado em:** `routes/product_routes.py::api_products()`
+
+**Em qualquer código que consome esta rota:**
+```js
+const data = await res.json();
+const products = data.items || data;  // ← compatibilidade com legado
+```
+
+Cada item no array deve ser:
 ```json
 {
   "id": "uuid-string",
   "title": "Nome do Produto",
   "price": "R$ 100,00",
   "oldPrice": "R$ 129.00",
-  "images": ["/media/mercadolivre/pasta/image.jpg?token=secreto123"],
+  "images": ["/media/mercadolivre/pasta/image.jpg"],
   "subcategory": "banheiro",
   "link": "https://mercadolivre.com.br/...",
   "disponivel": true,
@@ -76,17 +104,13 @@ Each item in the array must be:
 }
 ```
 
-**Implemented in:** `Product.to_dict()` in `services/site/models/product.py`
+**Implementado em:** `Product.to_dict()` em `services/site/models/product.py`
 
-**Key rules:**
-- `price` and `oldPrice` → **string** in `"R$ X,XX"` format (frontend parses via `parsePrice()`)
-- `images` → **array of strings**, each a `/media/{bucket}/{path}?token={TOKEN}` relative path
-- `disponivel` → **boolean** (never null — frontend uses it to show availability badge)
-- `tags` → **array of strings**, always includes `"geral"` as first element
-
-**⚠️ Missing fields** (optional in frontend, but add if possible):
-- `category` — frontend stores it on `Product.category` but `to_dict()` doesn't emit it
-- `description` — frontend stores it on `Product.description` but `to_dict()` doesn't emit it
+**Regras:**
+- `price` e `oldPrice` → **string** formato `"R$ X,XX"`
+- `images` → **array de strings**, cada uma um path relativo `/media/{bucket}/{path}`
+- `disponivel` → **boolean** (nunca null)
+- `tags` → **array de strings**, sempre inclui `"geral"` como primeiro elemento
 
 ### POST /auth/admin/login → `AuthResponse`
 

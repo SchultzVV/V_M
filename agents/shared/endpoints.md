@@ -2,16 +2,20 @@
 
 ## Product Management
 
-### Browse & Details
-- `GET /` — Homepage with all products
-- `GET /secao1` — Category 1 products
-- `GET /secao2` — Category 2 products
-- `GET /secao3` — Category 3 products
-- `GET /secao4` — Category 4 products
-- `GET /produto/<product_id>` — Product detail page
+### Browse & Details (Jinja2 HTML — serves the live site)
+- `GET /` — Homepage: todos os produtos, agrupados por tag (CD, ME, E, PET) com section-dividers
+- `GET /secao1` — Casa & Decoração (TAG=CD), com subcategorias e section-dividers por subcategoria
+- `GET /secao2` — Moda & Estilo (TAG=ME), com subcategorias
+- `GET /secao3` — Eletrônicos (TAG=E), com subcategorias
+- `GET /secao4` — PetShop (TAG=PET), com subcategorias
+- `GET /produto/<product_id>` — Product detail page (SEO + Schema.org)
 
 ### Product API
-- `GET /api/products` — List all products (JSON)
+- `GET /api/products` — Lista produtos com paginação e filtros (JSON)
+  - Query params: `tag`, `subtag`, `search`, `page` (default 1), `limit` (default 50, max 100)
+  - `search` é accent-insensitive via PostgreSQL `unaccent()` + Python NFD strip
+  - Resposta: `{items: Product[], total: int, page: int, pages: int, limit: int}`
+  - ⚠️ Retorna OBJETO, não array — use `data.items || data` para compatibilidade
 - `GET /api/products/<product_id>` — Get single product (JSON)
 - `GET /api/list_ids` — List all product IDs
 - `POST /add_product` — Add new product (form submission)

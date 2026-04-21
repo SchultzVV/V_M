@@ -1,10 +1,68 @@
 # Service Ports
 
+## Entrada Pública
+
+> **Porta pública**: **443** (Nginx HTTPS) — é por aqui que todo o tráfego entra.
+> O cloudflared aponta para Nginx 443, não para Flask 5555.
+
 ## Flask Backend
 
-- **Internal**: 5000 (Docker network)
-- **External**: 5555 (Host machine, cloudflared tunnels here)
-- **Connection**: HTTPS with self-signed certificates
+- **Interno**: 5000 (Docker network — acessado pelo Nginx via `https://site:5000`)
+- **Externo (debug)**: 5555 (mapeado no host, fallback apenas)
+- **SSL**: Certificados self-signed (`/app/cert.pem`, `/app/key.pem`)
+
+## Nginx Reverse Proxy
+
+- **443** (HTTPS) — entry point principal: React SPA + proxy da API
+- **80** (HTTP) — redireciona para 443
+- Config: `nginx/nginx-react.conf`
+- Healthcheck: `GET /health` → 200 OK (não envolve Flask)
+
+## Frontend
+
+### Development
+- **Vite Dev Server**: 5173 (`make frontend-dev`)
+  - Proxy de `/api/*`, `/auth/*`, `/webhook/*` → `https://localhost:443` (Nginx)
+  - Hot reload habilitado
+
+### Production / Túinel
+- Servido via Nginx 443 (arquivos estáticos em `/app/dist/`)
+- Tunnel endpoint: `https://xxxx.trycloudflare.com` (temporário) ou `https://CF_HOSTNAME` (fixo)
+
+## Databases & Cache
+
+- **PostgreSQL**: 5432 (`produtos_db`, user/password)
+- **Redis**: 6379 (cache de API + pub/sub)
+- **Qdrant (Vector DB)**: 6333 (RAG — 4 coleções, init: `make init-qdrant`)
+
+## File Storage
+
+- **MinIO API**: 9000 (S3-compatible — NUNCA expor ao browser diretamente)
+- **MinIO Console**: 9001 (UI admin, minio/minio123)
+
+## External Services
+
+- **info-scrap**: 8001 (OCR + scraping de produtos)
+- **ingestion_service**: 5003 (ingestão de docs no vector DB)
+- **retrieval_service**: 5004 (RAG retrieval)
+
+## Port Summary
+
+| Service | Port | Propósito | Protocolo |
+|---------|------|-----------|-----------|
+| **Nginx (entry point)** | **443** | **React SPA + proxy API** | **HTTPS** |
+| Nginx redirect | 80 | HTTP → HTTPS | HTTP |
+| Flask (interno) | 5000 | API (via Nginx) | HTTPS |
+| Flask (debug) | 5555 | Acesso direto debug | HTTPS |
+| Vite Dev | 5173 | Frontend dev | HTTP |
+| PostgreSQL | 5432 | Banco relacional | TCP |
+| Redis | 6379 | Cache + queue | TCP |
+| Qdrant | 6333 | Vector DB | HTTP |
+| MinIO API | 9000 | Object storage | HTTP/S3 |
+| MinIO Console | 9001 | Admin UI | HTTP |
+| info-scrap | 8001 | OCR + scraping | HTTP |
+| ingestion_service | 5003 | AI ingestão | HTTP |
+| retrieval_service | 5004 | AI retrieval | HTTP |
 
 ## Frontend
 

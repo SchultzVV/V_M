@@ -4,7 +4,8 @@
 
 ### Start/Stop
 - `make up` — Start development environment (build + detach)
-- `make down` — Stop and remove all containers + volumes
+- `make down` — Stop and remove all containers (preserves volumes/db)
+- `make down-purge` — ⚠️ DESTRÓI VOLUMES — apaga banco, minio e redis permanentemente
 - `make logs` — Tail Flask logs in real-time
 - `make shell` — Bash shell into site container
 - `make psql` — PostgreSQL CLI in postgres container
@@ -21,9 +22,177 @@
 ### Setup & Build
 - `make frontend-install` — Install npm dependencies
 - `make frontend-dev` — Start dev server (localhost:5173 with HTTPS proxy to 443/Nginx)
-- `make frontend-build` — Production build
+- `make frontend-build` — Production build (React SPA → `frontend/dist/`)
 - `make frontend-build-prod` — Build React for production with Nginx
 - `make frontend-clean` — Remove node_modules and dist
+
+### Local Full-Stack Test
+- `make frontup` ⭐ — Sobe site COMPLETO para testes locais: build React + Nginx + Backend
+
+---
+
+## Cloudflare Tunnel (🌐 Main public exposure)
+
+### Main Tunnel Commands
+- `make serve-cloudflare` ⭐ — Backend + Nginx 443 + Cloudflare tunnel + auto-OAuth ML
+- `make serve-cloudflare-fixed` ⭐ — Túnel com URL FIXA (requer `CF_HOSTNAME` no .env)
+- `make serve-frontend-public` ⭐ — React + Nginx 443 + reutiliza tunnel já ativo
+- `make stop-cloudflare` — Para túnel (preserva containers)
+- `make stop-frontend-public` — Para Nginx/React (preserva tunnel)
+- `make stop-all` — Para tudo: containers + tunnel
+- `make tunnel-info` — Mostra URL do túnel ativo (sem alterar nada)
+
+### Setup de Túnel Permanente
+- `make install-cloudflared` — Instala cloudflared no host
+- `make setup-cloudflare-fixed` — Cria túnel nomeado permanente (executar 1x)
+
+### Alternative Tunnel
+- `make serve-ngrok` — Tunnel via ngrok (requer NGROK_SUBDOMAIN no .env)
+- `make stop-ngrok` — Para ngrok
+
+### 🔑 Conceitos chave
+- **Entrada única**: Nginx 443 → React SPA + proxy `/api/*`, `/auth/*`, `/sync/*`, etc. → Flask 5000
+- **Túnel compartilhado**: `serve-frontend-public` reutiliza o mesmo tunnel de `serve-cloudflare`
+- **DNS resolver via Docker**: Nginx re-resolve IP do Flask em até 10s após restart — sem 502 persistente
+- **Health check**: `GET /health` retorna 200 (Nginx direto, sem Flask)
+
+---
+
+## Data Pipeline — Produto por URL
+
+- `make prepare-ml URL=https://...` ⭐ — Prepara produto ML: API + OCR de preço
+- `make prepare-ml` — Lote via `list_to_verify.json`
+- `make prepare-shopee URL=https://...` — Prepara produto Shopee: Playwright + OCR
+- `make prepare-amazon URL=https://...` — Prepara produto Amazon: Playwright + OCR
+- `make prepare-all` — Lote de produtos via `list_to_prepare.json`
+
+---
+
+## Data Pipeline — Fluxo Automatizado
+
+### Pipeline Completo (mais usado)
+- `make populate-mf` ⭐ — Busca mais vendidos ML → cheapest → prepare → stage
+  - `TAG=PET` `SUBTAG=gatos` `LIMIT=5` `DRY=1`
+  - Exemplo: `make populate-mf TAG=CD SUBTAG=banheiro LIMIT=3`
+
+- `make publish` ⭐ — Lê `links_to_publish.json` → prepare → LLM tags → stage → archive
+  - `DRY=1` `NO_PRICE=1` `NO_TAG=1`
+
+- `make prepare-and-publish` ⭐ — Lê links → prepare → organize → stage → update preços
+  - `DRY=1` `FILE=caminho` `NO_PRICE=1` `NO_STAGE=1`
+
+### Price Oracle (LLM-assisted)
+- `make price-oracle` — Coleta fontes → LLM decide → publica
+  - `FILE=links.json` ou `LINK=https://...` ou `ML_ID=MLB123` `[DRY=1]` `[NO_PUBLISH=1]`
+
+---
+
+## Organização & Publicação
+
+- `make organize-tags` ⭐ — Reorganiza tags por título (interativo, pergunta baixa confiança)
+- `make organize-tags-auto` — Auto-tag silencioso (não pergunta)
+- `make tag-classify-db` — LLM classifica tag+subtag dos produtos no banco `[DRY=1] [ID=uuid]`
+- `make stage` ⭐ — Publica staging no DB + MinIO
+- `make restage` — Re-publica TODOS os JSONs do staging (ignora .processed)
+- `make check-stage` — Verifica imagens no staging antes de publicar
+- `make staging-fix-perms` — Corrige permissões dos arquivos staging
+
+---
+
+## Atualização de Preços & Links
+
+- `make update-ml-prices` ⭐ — Busca vendedor mais barato para todos os produtos ML
+  - `DRY=1` simula, `ID=MLB...` filtra por produto
+- `make reprice-all` — Revisa todos os produtos: atualiza preços + remove itens zerados
+  - `[DRY=1] [ZERO_ONLY=1] [BATCH=N]`
+- `make verify-product-cheaper` ⭐ — Verifica se link ML é o menor preço do catálogo
+  - `FILE=...` ou `URL=...`
+- `make verify-prices` — Verifica preços zerados via OCR + Tesseract
+- `make api-update URL=...` — Atualiza preço/disponibilidade de produto ML
+- `make shopee-update URL=...` — Atualiza preço/disponibilidade Shopee
+- `make fix-bad-links` — Corrige links ML que apontam para item_id errado `[DRY=1]`
+
+### Re-scrape
+- `make reprepare-ml` ⭐ — Refaz prepare (API+OCR+imgs) de todos os produtos, mantém tags
+- `make reprepare-associate-ml` ⭐ — Reprepare COM link de afiliado (OCR mais preciso)
+
+---
+
+## Instagram Automation
+
+- `make instagram-post` ⭐ — Posta produto no Instagram (feed + story automáticos)
+- `make instagram-test` — Simula post sem publicar
+- `make prepare-post-image` ⭐ — Gera imagem 1080x1080 `FILE=path.json` ou `--all`
+- `make instagram-status` — Status do sistema Instagram (tokens, permissões)
+- `make instagram-history` — Histórico de posts (últimos 10)
+- `make stage-and-post` — Publica no site E posta no Instagram em sequência
+
+---
+
+## AI / RAG / Vector DB
+
+- `make init-qdrant` — Cria as 4 coleções Qdrant do projeto (idempotente)
+
+---
+
+## Testes & Validação
+
+- `make test` — Todos os testes
+- `make test-unit` — Testes unitários
+- `make test-integration` — Testes de integração
+- `make test-info-scrap` — Testa OCR/scraping
+- `make test-affiliate` — Testa gerador de links de afiliado ML
+- `make test-price-validator` — Testa módulo price_validator completo
+- `make test-api` — Testa chamada à API ML com token atual
+- `make check-tokens` — Mostra tokens OAuth salvos no container
+- `make links` — Exibe todos os links importantes
+
+---
+
+## Banco de Dados / Migrações
+
+- `make migrate-tags` — Adiciona coluna tags
+- `make migrate-webhook` — Adiciona campos de webhook
+- `make migrate-subcategory` — Adiciona coluna subcategory
+
+---
+
+## Produção (GHCR)
+
+- `make build-prd-site` — Build imagem de produção
+- `make push-ghcr` — Build + push para GitHub Container Registry
+- `make prd-up` — Sobe produção local
+- `make prd-up-ghcr` — Sobe produção usando imagem GHCR
+- `make prd-down` — Para produção
+- `make prd-logs` — Logs em produção
+
+---
+
+## Manutenção
+
+- `make staging-dedup` — Remove JSONs duplicados do staging (mantém o mais novo)
+- `make clear-minio` — Remove TODAS as imagens do MinIO (com confirmação)
+- `make clear-minio-force` — Remove TODAS as imagens do MinIO (sem confirmação)
+- `make prune` — Remove containers, volumes e imagens não utilizados
+- `make clean-images` — Remove TODAS as imagens Docker
+
+---
+
+## Quick Reference
+
+| Tarefa | Comando |
+|--------|---------|
+| Subir dev | `make up` |
+| Frontend local | `make frontend-dev` |
+| Full-stack local | `make frontup` |
+| **Expor público** | `make serve-cloudflare` |
+| **URL fixa** | `make serve-cloudflare-fixed` |
+| **Preparar produto** | `make prepare-ml URL=...` |
+| **Pipeline completo** | `make populate-mf TAG=... SUBTAG=...` |
+| **Publicar staging** | `make stage` |
+| **Organizar tags** | `make organize-tags` |
+| **Postar Instagram** | `make instagram-post` |
+| **Atualizar preços** | `make update-ml-prices` |
 
 ---
 

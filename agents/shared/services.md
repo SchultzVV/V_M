@@ -1,13 +1,115 @@
 # Docker Services
 
+## Arquitetura de Entrada
+
+> **Entrada única**: Nginx 443 (HTTPS) é o entry point de TODO o tráfego público.
+> Flask 5000 é acessado APENAS internamente (Docker network).
+> Flask 5555 existe apenas como fallback/debug direto.
+
+```
+Cloudflare Tunnel
+    ↓
+Nginx 443 (HTTPS)
+    ├─ /* → React SPA (frontend/dist/) ou Jinja2 templates
+    └─ /api/*, /auth/*, /sync/*, /webhook/*, /instagram/* → Flask https://site:5000
+```
+
 ## Core Services (docker-compose.yaml)
 
 ### site
-- **Type**: Flask application (Python)
-- **Port**: 5555 (external) → 5000 (internal)
+- **Tipo**: Flask (Python), Jinja2 templates
+- **Port**: 5555 (external) → 5000 (internal) — usar APENAS para debug
 - **Container**: site
-- **Role**: Main backend API, handles all product/sync/auth/webhook endpoints
-- **Depends on**: db, minio, redis
+- **Papel**: Backend API + serve templates Jinja2 HTML (index.html, secao1-4.html)
+- **Blueprints**: product_bp, auth_bp, sync_bp, webhook_bp, instagram_bp, price_validator_bp, media_bp, ai_bp
+- **Depends on**: db, minio, redis, info-scrap
+
+### db
+- **Tipo**: PostgreSQL 15
+- **Port**: 5432
+- **Database**: produtos_db
+- **Credentials**: user/password
+- **Papel**: Banco relacional para produtos, metadata, tags, subcategorias
+
+### minio
+- **Tipo**: MinIO (S3-compatible)
+- **Ports**: 9000 (API), 9001 (Console)
+- **Credentials**: minio/minio123
+- **Papel**: Armazenamento de imagens de produtos (bucket: `produtos`, path: `/imagens/{slug}/`)
+- **Acesso ao browser**: NUNCA expor diretamente — sempre via `/media/{bucket}/{path}` (Nginx proxy)
+
+### redis
+- **Tipo**: Redis 7
+- **Port**: 6379
+- **Papel**: Cache de listagens da API, pub/sub de eventos
+
+### info-scrap
+- **Tipo**: External (ghcr.io/schultzvv/info_scrap)
+- **Port**: 8001
+- **Papel**: OCR de preços, extensão de imagens, scraping de produtos
+
+---
+
+## Dev Services (docker-compose.dev.yaml overlay)
+
+### nginx-react
+- **Tipo**: Nginx reverse proxy
+- **Ports**: 443 (HTTPS), 80 → 443 (redirect)
+- **Papel**: Entry point público — serve React SPA + proxia API para Flask
+- **Regras de roteamento**:
+  - `GET /health` → 200 OK imediato (sem Flask, usado pelo Docker healthcheck)
+  - `/api/*`, `/auth/*`, `/sync/*`, `/webhook/*`, `/instagram/*`, `/media/*`, `/minio_proxy/*` → Flask `https://site:5000`
+  - `/*` → React SPA de `/app/dist/` (fallback para `index.html` para SPA routing)
+- **DNS**: `resolver 127.0.0.11 valid=10s` — re-resolve IP do Flask em até 10s após restart (evita 502)
+- **SSL**: Certs self-signed de `./certs/` (localhost.crt / localhost.key)
+- **Config**: `nginx/nginx-react.conf`
+- **Dockerfile**: `nginx/Dockerfile.nginx`
+
+> **Gotcha 502**: Resolvido via `set $flask_backend "site:5000"` + TTL 10s no DNS resolver.
+> Não restarte Nginx após rebuild do Flask — ele se recupera automaticamente.
+
+### vector_db
+- **Tipo**: Qdrant
+- **Port**: 6333
+- **Papel**: Vector DB para RAG/busca semântica (4 coleções — init: `make init-qdrant`)
+
+### ingestion_service
+- **Tipo**: External (ghcr.io/schultzvv/hsmart-ingestion_service)
+- **Port**: 5003
+- **Papel**: Pipeline de ingestão de documentos para vector DB
+
+### retrieval_service
+- **Tipo**: External (ghcr.io/schultzvv/hsmart-retrieval_service)
+- **Port**: 5004
+- **Papel**: RAG retrieval para queries de IA
+
+---
+
+## Production Services (docker-compose.prd.yaml)
+
+Setup mínimo:
+- site (Flask)
+- db (PostgreSQL)
+- minio (storage)
+- Sem IA, sem Redis, sem info-scrap
+
+## React SPA (docker-compose.react.yaml)
+
+- nginx (React SPA serving)
+Usar para deploy do frontend separado do Flask.
+
+---
+
+## Service Dependencies
+
+```
+site (Flask)
+├─ depends_on: db, minio, redis, info-scrap
+└─ em dev: também uso ingestion_service, retrieval_service
+
+nginx-react
+└─ depends_on: site
+```
 
 ### db
 - **Type**: PostgreSQL 15

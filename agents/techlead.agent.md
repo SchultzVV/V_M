@@ -63,49 +63,36 @@ You have **complete understanding** of:
 
 ### Architecture
 ```
-Frontend (React 18 + TS + Vite)
-    ↓ (proxy /api → localhost:5000)
-Backend (Flask + 8 blueprints)
-    ├── product_bp → GET/POST products
-    ├── auth_bp → OAuth Mercado Livre
-    ├── sync_bp → Marketplace sync
-    ├── webhook_bp → Event listeners
-    ├── instagram_bp → Social posting
-    ├── price_validator_bp → Price logic
-    ├── media_bp → File serving
-    └── ai_bp → RAG queries
-         ↓ (depends on)
-Data Layer
-    ├── PostgreSQL 5432 (products, orders, metadata)
-    ├── Redis 6379 (cache, task queue)
-    ├── MinIO 9000/9001 (images, video)
-    ├── Qdrant 6333 (vector DB for RAG)
+Dois Frontends:
+  1. Flask Jinja2 (live site) — services/site/templates/ + def-design.css
+  2. React SPA (frontend/) — Vite + Tailwind + Zustand → build em frontend/dist/
+
+                    ↓ (entry point público)
+         Nginx 443 (HTTPS, Docker container nginx-react)
+         ├── /* → React SPA (frontend/dist/) OU Jinja2 templates via Flask
+         └── /api/*, /auth/*, /sync/*, /webhook/*, /instagram/*, /media/* → Flask https://site:5000
+
+Backend (Flask + 8 blueprints, services/site/routes/)
+    ├── product_bp → GET/POST/DELETE products + Jinja2 pages
+    ├── auth_bp    → OAuth Mercado Livre + admin JWT
+    ├── sync_bp    → Sincronização de marketplaces
+    ├── webhook_bp → Event listeners (ML, Shopee, Amazon)
+    ├── instagram_bp → Postagem automática
+    ├── price_validator_bp → Validação de preços
+    ├── media_bp   → File serving + MinIO proxy
+    └── ai_bp      → RAG queries
+         ↓ (data layer)
+    ├── PostgreSQL 5432 — produtos_db (products, tags, subcategory)
+    ├── Redis 6379 — cache de listagens, pub/sub
+    ├── MinIO 9000/9001 — imagens de produtos (acesso via /media/*)
+    ├── Qdrant 6333 — vector DB para RAG (4 coleções)
     └── External: info-scrap 8001, ingestion 5003, retrieval 5004
-         ↓ (exposed via)
-Cloudflare Tunnel Architecture
-    ├── Container Flask Service
-    │   └── Internal: 172.18.0.x:5000 (Docker network)
-    │
-    ├── cloudflared Process
-    │   └── Connects to: http://172.18.0.x:5000 (container IP)
-    │   └── Exposes to: Port 5555 (host machine)
-    │   └── Provides: Public HTTPS URL (e.g., https://opponents-stan-pacific-quad.trycloudflare.com)
-    │
-    ├── Connection Flow
-    │   └── Public Request → Cloudflare → cloudflared → Container:5000 → Flask
-    │   └── SSL/TLS: Cloudflare managing certificates automatically
-    │
-    ├── Development Mode (make serve-cloudflare)
-    │   └── All services in Docker containers (network: 172.18.0.0/16)
-    │   └── Flask listens on container 5000, exposed via tunnel
-    │   └── ML_REDIRECT_URI auto-configured to tunnel URL
-    │   └── Temporary public URL (changes on restart)
-    │
-    └── Important Notes
-        ├── Internal ports (5000, 5432, 6379, 6333, 9000) NOT exposed externally
-        ├── Only port 5555 and tunnel URL reach public internet
-        ├── Container ↔ Container communication uses internal Docker network
-        └── No external traffic reaches Flask 5000 directly
+         ↓ (exposto via)
+Cloudflare Tunnel → Nginx 443 → Flask 5000
+
+API /api/products: retorna {items: [], total, page, pages, limit}
+Search: accent-insensitive via PostgreSQL unaccent() + Python NFD strip
+Section-dividers: sticky por tag (index.html) ou subtag (secao1-4.html)
 ```
 
 ### Single Source of Truth
@@ -809,44 +796,38 @@ make serve-cloudflare      # Public tunnel
 make serve-frontend-public # React + tunnel
 ```
 
-**Product pipeline** (orchestrate in sequence):
+**Product pipeline completa** (ML → site):
 ```bash
-make prepare-ml            # Prepare product (backend task)
-make organize-tags         # Organize tags (backend task)
-make stage                 # Publish (backend + MinIO)
-make instagram-post        # Share (backend task)
+make populate-mf           # Busca melhores do ML → staging (ml_populator_agent)
+make price-oracle          # Atualiza preços (cheapest seller via OCR)
+make tag-classify-db       # Classifica tags dos produtos no DB
+make prepare-and-publish   # prepare-ml + stage em sequência
+make publish               # stage + instagram-post em sequência
+make reprice-all           # Reprice todos os produtos staged
+make init-qdrant           # Inicializa Qdrant com coleções default
 ```
 
-**Testing** (validate after changes):
-```bash
-make test-api              # Test backend
-npm run test               # Test frontend
-make tunnel-info           # Verify tunnel
+**Fluxo recomendado para novo produto:**
+```
+populate-mf → price-oracle → tag-classify-db → prepare-and-publish
 ```
 
-### Tunnel-Specific Make Commands
-
+**Serviços locais / debug:**
 ```bash
-# PRIMARY: Start everything with tunnel (development)
-make serve-cloudflare        # Flask + tunnel + shows temporary URL
-
-# CHECK tunnel health
-make tunnel-info             # Verify cloudflared running + show current URL
-
-# STOP everything (including tunnel)
-make stop-all                # Kills containers + cloudflared
-
-# LOCAL DEVELOPMENT (no tunnel)
-make frontend-dev            # React 5173, proxy to localhost:5000
-make serve-backend           # Flask on 5000 directly
+make frontup               # React + Flask juntos (local dev)
+make serve-cloudflare      # Flask + Cloudflare tunnel público
+make tunnel-info           # Mostra URL atual do tunnel
+make fix-bad-links         # Corrige links quebrados no DB
+make stop-all              # Para containers + cloudflared
 ```
 
-**Decision Tree for Make targets**:
-1. "I need to test OAuth or webhooks" → `make serve-cloudflare`
-2. "I need to debug API locally" → `make serve-backend`
-3. "I need frontend + backend together locally" → `make frontend-dev` + `make serve-backend`
-4. "I crashed the tunnel" → `make stop-all && make serve-cloudflare`
-5. "Is tunnel working?" → `make tunnel-info`
+**Decision Tree para Make targets**:
+1. "Preciso popular novos produtos do ML" → `make populate-mf`
+2. "Preciso testar OAuth ou webhooks" → `make serve-cloudflare`
+3. "Preciso debug de API local" → `make serve-backend` (Flask 5000)
+4. "Preciso frontend + backend juntos" → `make frontup`
+5. "Tunnel caiu" → `make stop-all && make serve-cloudflare`
+6. "Status do tunnel?" → `make tunnel-info`
 
 ---
 

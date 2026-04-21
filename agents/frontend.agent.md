@@ -58,12 +58,35 @@ The proxy layer handles the rest.
 - CORS headers handled by Nginx or Flask
 - **Never modify `Access-Control-Allow-Origin`** — proxy/Nginx handles it
 
-**Testing via Tunnel**:
-- When testing via `https://opponents-stan-pacific-quad.trycloudflare.com/`
-- Frontend still uses `/api` (proxy to Flask on same tunnel)
-- CORS works automatically
+## 🖥️ Dois Frontends — Entenda a diferença
 
-### Production Build
+> **Importante**: o sistema tem TWO frontends distintos. Você pode trabalhar em ambos.
+
+### 1. Flask Jinja2 Templates (site ativo / live)
+- Localização: `services/site/templates/` (index.html, secao1-4.html, etc.)
+- CSS: `services/site/static/def-design.css` (design system DEF em CSS puro)
+- JS: vanilla JS inline + `services/site/static/search.js`
+- É o site que está online — **é o que os usuários veem**
+- Funcionalidades implementadas:
+  - `filterBySubcategory()` com section-dividers agrupados (sticky durante scroll)
+  - `displayProducts()` com agrupamento por tag/subtag e section-dividers
+  - Busca accent-insensitive (ex: "racao" encontra "Ração")
+  - Ordenação por preço / desconto
+  - Carousel de imagens nos cards
+  - `data.items || data` — compatibilidade com API paginada
+
+### 2. React SPA (`frontend/`)
+- Localização: `frontend/src/`
+- Stack: React 18 + TypeScript + Vite + Tailwind + Zustand
+- Servido via Nginx 443 (`frontend/dist/`)
+- Para desenvolvimento: `make frontend-dev` → `localhost:5173`
+- Para produção: `make frontend-build` + `make serve-frontend-public`
+
+**Quando trabalhar em qual:**
+- UX/features novas visíveis no site → edita os templates Jinja2
+- Admin panel, painel de controle, app React complexo → edita `frontend/`
+
+---
 - **Build Tool**: Vite 5.0.8
 - **React**: 18.2
 - **TypeScript**: 5.3
