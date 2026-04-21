@@ -68,13 +68,13 @@ def detect_marketplace(url: str) -> str:
 # Execução dos scripts
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_prepare(url: str, marketplace: str) -> bool:
+def run_prepare(url: str, marketplace: str, subcategory: str = "") -> bool:
     """Roda o prepare script com FORCE_CATEGORY=auto (sem interação)."""
     script = SCRIPTS_DIR / PREPARE_SCRIPTS[marketplace]
     env = {
         **os.environ,
         "FORCE_CATEGORY": "auto",
-        "FORCE_SUBCATEGORY": "",
+        "FORCE_SUBCATEGORY": subcategory,
     }
     result = subprocess.run(
         [sys.executable, str(script), url],
@@ -176,6 +176,11 @@ def main():
         action="store_true",
         help="Pula a classificação LLM de tags (etapa 7)",
     )
+    parser.add_argument(
+        "--subcategory",
+        default="",
+        help="Força subcategoria (subtag) para todos os produtos preparados neste lote.",
+    )
     args = parser.parse_args()
 
     # ── Carregar links ──────────────────────────────────────────────────────
@@ -225,7 +230,7 @@ def main():
                 ml_prepared.append(url)
             continue
 
-        ok = run_prepare(url, marketplace)
+        ok = run_prepare(url, marketplace, subcategory=args.subcategory)
         if ok:
             results["ok"].append(url)
             if marketplace == "ml":

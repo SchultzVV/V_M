@@ -262,15 +262,40 @@ def _find_cheapest_for_id(external_id: str):
     return cheapest, catalog_id, len(all_listings)
 
 
-def _resolve_permalink(cheapest, catalog_id: str) -> str:
-    """Garante que cheapest.permalink está preenchido."""
-    if not cheapest.permalink:
-        item_data = get_item(cheapest.item_id)
-        if item_data:
-            cheapest.permalink = item_data.get("permalink", "") or ""
-    if not cheapest.permalink:
-        cheapest.permalink = f"https://www.mercadolivre.com.br/p/{catalog_id}"
-    return cheapest.permalink
+def _resolve_permalink(cheapest, catalog_id: str, external_id: str = "") -> tuple:
+    """
+    Garante que cheapest.permalink está preenchido.
+
+    Retorna (url, is_reliable):
+      is_reliable=True  → permalink real obtido pela API (full slug URL)
+      is_reliable=False → fallback construído; não deve sobrescrever link existente
+
+    Prioridade:
+      1. permalink já preenchido no listing                       → confiável
+      2. permalink retornado por /items/{item_id}                 → confiável
+      3. item_id existe mas permalink é null → /p/{item_id}       → semi-confiável
+      4. fallback: /p/{external_id}   (catalog page do produto)   → semi-confiável
+         NUNCA usa catalog_id do listing — pode não ter página no site ML.
+    """
+    if cheapest.permalink:
+        return cheapest.permalink, True
+
+    item_data = get_item(cheapest.item_id)
+    if item_data:
+        permalink = item_data.get("permalink") or ""
+        if permalink:
+            cheapest.permalink = permalink
+            return permalink, True
+        else:
+            # Item existe mas permalink é null; usa item_id diretamente.
+            cheapest.permalink = f"https://www.mercadolivre.com.br/p/{cheapest.item_id}"
+            return cheapest.permalink, True
+
+    # get_item falhou — não temos permalink real.
+    # Usa external_id (produto original que o usuário estava visitando) como fallback.
+    fallback_id = external_id or cheapest.item_id
+    cheapest.permalink = f"https://www.mercadolivre.com.br/p/{fallback_id}"
+    return cheapest.permalink, False
 
 
 # ─── Busca ML por keyword ─────────────────────────────────────────────────────
@@ -419,7 +444,7 @@ def _update_existing(product: Product, session, dry_run: bool) -> str:
     if cheapest is None:
         return "no_data"
 
-    permalink = _resolve_permalink(cheapest, catalog_id)
+    permalink, is_reliable = _resolve_permalink(cheapest, catalog_id, product.external_id)
     affiliate = generate_affiliate_link(permalink) if permalink else ""
 
     # Guarda de título: recusa update se produto diverge muito
@@ -439,7 +464,10 @@ def _update_existing(product: Product, session, dry_run: bool) -> str:
     if not dry_run:
         product.old_price = product.price
         product.price = _fmt(cheapest.real_price)
-        product.link = affiliate or permalink
+        # Só atualiza o link se temos um permalink confiável (real da API).
+        # Fallbacks construídos (/p/MLB...) podem não ter página no ML.
+        if is_reliable:
+            product.link = affiliate or permalink
         product.updated_at = datetime.utcnow()
         session.commit()
 
@@ -461,7 +489,10 @@ def _get_cheapest_url(external_id: str, fallback_url: str) -> str:
         return fallback_url
 
     print(f"         💸 {total} vendedor(es) → mais barato: {_fmt(cheapest.real_price)}")
-    permalink = _resolve_permalink(cheapest, catalog_id)
+    permalink, is_reliable = _resolve_permalink(cheapest, catalog_id, external_id)
+    if not is_reliable:
+        # Sem permalink real da API — usa fallback_url (página de catálogo original).
+        return generate_affiliate_link(fallback_url) or fallback_url
     affiliate = generate_affiliate_link(permalink) if permalink else ""
     return affiliate or permalink or fallback_url
 
@@ -490,11 +521,12 @@ def _append_to_links_file(new_urls: list[str]) -> int:
 
 # ─── Pipeline (prepare → organize-tags → stage) ───────────────────────────────
 
-def _run_pipeline(dry_run: bool) -> bool:
+def _run_pipeline(dry_run: bool, subtag: str = "") -> bool:
     """
     Chama pipeline_publish.py com:
       --no-price-update  (preço já foi obtido pelo agente)
       --no-tag-classify  (evita LLM lento; organize_tags --auto já categoriza)
+      --subcategory      (subtag atual → FORCE_SUBCATEGORY no prepare)
     """
     cmd = [
         sys.executable,
@@ -502,6 +534,8 @@ def _run_pipeline(dry_run: bool) -> bool:
         "--no-price-update",
         "--no-tag-classify",
     ]
+    if subtag:
+        cmd += ["--subcategory", subtag]
     if dry_run:
         cmd.append("--dry-run")
     print(f"\n   ▶▶ pipeline: {' '.join(Path(c).name if c.endswith('.py') else c for c in cmd)}")
@@ -583,7 +617,7 @@ def process_subtag(
         if not dry_run:
             added = _append_to_links_file(new_urls)
             print(f"\n   📤 {added} URL(s) → links_to_publish.json  |  rodando pipeline…")
-            ok = _run_pipeline(dry_run=False)
+            ok = _run_pipeline(dry_run=False, subtag=subtag)
             if not ok:
                 print("   ⚠️  Pipeline retornou erro — verifique os logs do container")
         else:

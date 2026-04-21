@@ -145,13 +145,24 @@ def _check_and_update(product: Product, session, dry_run: bool) -> dict:
         return report
 
     # Resolve permalink (endpoint /products/{id}/items não retorna permalink)
+    permalink_reliable = False
     if not cheapest.permalink:
         item_data = get_item(cheapest.item_id)
         if item_data:
             cheapest.permalink = item_data.get("permalink", "") or ""
+            if cheapest.permalink:
+                permalink_reliable = True
+            else:
+                cheapest.permalink = f"https://www.mercadolivre.com.br/p/{cheapest.item_id}"
+                permalink_reliable = True
+    else:
+        permalink_reliable = True
+
     if not cheapest.permalink:
-        # Fallback: página de catálogo — sempre acessível, mostra as opções mais baratas
-        cheapest.permalink = f"https://www.mercadolivre.com.br/p/{catalog_id}"
+        # Fallback: usa external_id (catalog page do produto original).
+        # NUNCA usa catalog_id do listing — pode não ter página no site ML.
+        cheapest.permalink = f"https://www.mercadolivre.com.br/p/{product.external_id}"
+        permalink_reliable = False
 
     report["cheapest_price"]  = cheapest.real_price
     report["cheapest_link"]   = cheapest.permalink
@@ -188,9 +199,12 @@ def _check_and_update(product: Product, session, dry_run: bool) -> dict:
     # Encontrou mais barato → atualiza
     report["status"] = "updated"
     if not dry_run:
-        product.old_price  = product.price                          # guarda preço atual como "de"
-        product.price      = _fmt(cheapest.real_price)              # novo preço
-        product.link       = affiliate or cheapest.permalink        # link de afiliado
+        product.old_price  = product.price
+        product.price      = _fmt(cheapest.real_price)
+        # Só atualiza link se permalink é confiável (real da API).
+        # Fallbacks construídos (/p/MLB...) podem não ter página no ML.
+        if permalink_reliable:
+            product.link = affiliate or cheapest.permalink
         product.updated_at = datetime.utcnow()
         session.commit()
 

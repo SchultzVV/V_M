@@ -752,7 +752,22 @@ update-ml-prices:  ## ⭐ ML: busca o vendedor mais barato p/ cada produto (DRY=
 		docker exec -it site python3 scripts/update_ml_prices.py; \
 	fi
 
-update-prices-ml-right:  ## ⭐ ML: atualiza preço+promo+info via API+DOM texto (sem screenshot/OCR) (DRY=1, ID=MLB..., NO_BROWSER=1)
+fix-bad-links:  ## 🔗 Corrige links de produtos ML que apontam para item_id errado (DRY=1 só reporta)
+	@$(MAKE) -s _ensure-site
+	@docker cp services/site/scripts/fix_bad_links.py site:/app/scripts/fix_bad_links.py
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔗 FIX BAD LINKS — corrige links de produtos ML"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@if [ "$(DRY)" = "1" ]; then \
+		echo "   Modo: DRY-RUN (sem alterar banco)"; echo ""; \
+		docker exec -it site python3 scripts/fix_bad_links.py --dry; \
+	else \
+		echo "   Modo: CORRIGINDO no banco"; echo ""; \
+		docker exec -it site python3 scripts/fix_bad_links.py; \
+	fi
+
+  ## ⭐ ML: atualiza preço+promo+info via API+DOM texto (sem screenshot/OCR) (DRY=1, ID=MLB..., NO_BROWSER=1)
 	@$(MAKE) -s _ensure-site
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -844,7 +859,7 @@ populate-mf:  ## 🛒 Popula o site via ML: busca mais vendidos por tag/subtag �
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@_ARGS=""; \
 	if [ "$(DRY)" = "1" ] || [ "$(DRY_RUN)" = "1" ]; then _ARGS="$$_ARGS --dry-run"; fi; \
-	if [ -n "$(TAG)" ]; then _ARGS="$$_ARGS --tag $(TAG)"; fi; \
+	if [ -n "$(TAG)" ] && [ "$(TAG)" != "ALL" ]; then _ARGS="$$_ARGS --tag $(TAG)"; fi; \
 	if [ -n "$(SUBTAG)" ]; then _ARGS="$$_ARGS --subtag $(SUBTAG)"; fi; \
 	if [ -n "$(LIMIT)" ]; then _ARGS="$$_ARGS --limit $(LIMIT)"; fi; \
 	echo "   Args: $$_ARGS"; echo ""; \
@@ -1089,7 +1104,7 @@ help:  ## Mostra este menu
 	@awk 'BEGIN{FS=":.*?## "}/^(prepare-ml|prepare-shopee|prepare-amazon|prepare-all):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📤 STAGE / ATUALIZAÇÃO"
-	@awk 'BEGIN{FS=":.*?## "}/^(stage|restage|api-update|shopee-update|check-stage|verify-prices|verify-product-cheaper|update-ml-prices|reprepare-ml|reprepare-associate-ml|organize-tags|organize-tags-auto|publish|populate-mf):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*?## "}/^(stage|restage|api-update|shopee-update|check-stage|verify-prices|verify-product-cheaper|update-ml-prices|fix-bad-links|reprepare-ml|reprepare-associate-ml|organize-tags|organize-tags-auto|publish|populate-mf):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📸 INSTAGRAM"
 	@awk 'BEGIN{FS=":.*?## "}/^(prepare-post-image|instagram-post|instagram-test|instagram-status|instagram-history|stage-and-post):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)

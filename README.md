@@ -237,3 +237,49 @@ make populate-mf TAG=PET SUBTAG=gatos     # só PET/gatos
 make populate-mf TAG=PET DRY=1            # dry-run PET
 make populate-mf LIMIT=3                  # 3 produtos por query
 ```
+
+```bash
+make populate-mf TAG=E SUBTAG=audio LIMIT=3
+make populate-mf TAG=E SUBTAG=tv LIMIT=3
+make populate-mf TAG=E SUBTAG=games LIMIT=3
+make populate-mf TAG=E SUBTAG=cameras LIMIT=3
+make populate-mf TAG=E SUBTAG=smartwatch LIMIT=3
+make populate-mf TAG=E SUBTAG=acessorios LIMIT=3
+make populate-mf TAG=E SUBTAG=computadores LIMIT=3
+make populate-mf TAG=PET SUBTAG=gatos LIMIT=3
+make populate-mf TAG=PET SUBTAG=racao LIMIT=3
+make populate-mf TAG=PET SUBTAG=caes LIMIT=3
+make populate-mf TAG=PET SUBTAG=higiene LIMIT=3
+make populate-mf TAG=PET SUBTAG=brinquedos LIMIT=3
+make populate-mf TAG=PET SUBTAG=acessorios LIMIT=3
+make populate-mf TAG=PET SUBTAG=saude LIMIT=3
+
+# TAG=E
+make populate-mf TAG=E SUBTAG=smartphones LIMIT=3
+make populate-mf TAG=E SUBTAG=audio LIMIT=3
+make populate-mf TAG=E SUBTAG=computadores LIMIT=3
+make populate-mf TAG=E SUBTAG=tv LIMIT=3
+make populate-mf TAG=E SUBTAG=games LIMIT=3
+make populate-mf TAG=E SUBTAG=cameras LIMIT=3
+make populate-mf TAG=E SUBTAG=smartwatch LIMIT=3
+make populate-mf TAG=E SUBTAG=acessorios LIMIT=3
+
+# TAG=CD
+make populate-mf TAG=CD SUBTAG=banheiro LIMIT=3
+make populate-mf TAG=CD SUBTAG=sala LIMIT=3
+make populate-mf TAG=CD SUBTAG=quarto LIMIT=3
+make populate-mf TAG=CD SUBTAG=cozinha LIMIT=3
+make populate-mf TAG=CD SUBTAG=garagem LIMIT=3
+make populate-mf TAG=CD SUBTAG=corredor LIMIT=3
+make populate-mf TAG=CD SUBTAG=sacada LIMIT=3
+make populate-mf TAG=CD SUBTAG=area-servico LIMIT=3
+
+# TAG=ME
+make populate-mf TAG=ME SUBTAG=feminino LIMIT=3
+make populate-mf TAG=ME SUBTAG=masculino LIMIT=3
+make populate-mf TAG=ME SUBTAG=calcados LIMIT=3
+make populate-mf TAG=ME SUBTAG=acessorios LIMIT=3
+make populate-mf TAG=ME SUBTAG=bolsas LIMIT=3
+make populate-mf TAG=ME SUBTAG=relogios LIMIT=3
+make populate-mf TAG=ME SUBTAG=infantil LIMIT=3
+```
