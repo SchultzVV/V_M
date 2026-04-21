@@ -210,7 +210,7 @@
         .then(data => displayProducts(data.items || data))
         .catch(err => console.error("Erro ao buscar produtos:", err));
       } else {
-        displayProducts(allProducts);
+        filterBySubcategory(currentSubcategory, document.querySelector('.subcat-btn.active'));
       }
     }
 
@@ -220,37 +220,64 @@
       currentSearchTerm = '';
       const clearBtn = document.getElementById('clearBtn');
       if (clearBtn) clearBtn.classList.remove('visible');
-      displayProducts(allProducts);
+      filterBySubcategory(currentSubcategory, document.querySelector('.subcat-btn.active'));
       if (searchInput) searchInput.focus();
+    }
+
+    const SUBCAT_META = {
+      'caes':      { icon: '🐶', label: 'Cães' },
+      'gatos':     { icon: '🐱', label: 'Gatos' },
+      'racao':     { icon: '🍖', label: 'Ração' },
+      'brinquedos':{ icon: '🧸', label: 'Brinquedos' },
+      'higiene':   { icon: '🛁', label: 'Higiene' },
+      'acessorios':{ icon: '🦴', label: 'Acessórios' },
+      'saude':     { icon: '💉', label: 'Saúde' },
+    };
+    const SUBCAT_ORDER = ['caes','gatos','racao','brinquedos','higiene','acessorios','saude'];
+
+    function makeSectionDivider(icon, label, count) {
+      const div = document.createElement('div');
+      div.className = 'section-divider';
+      div.innerHTML = `<span class="section-divider-icon">${icon}</span><span class="section-divider-label">${label}</span><span class="section-divider-count">${count} produto${count !== 1 ? 's' : ''}</span>`;
+      return div;
     }
 
     function filterBySubcategory(subcategory, clickedButton) {
       currentSubcategory = subcategory;
-      
-      // Remove active class de todos os botões de subcategoria
       document.querySelectorAll('.subcat-btn').forEach(btn => btn.classList.remove('active'));
-      
-      // Adiciona active class ao botão clicado
       if (clickedButton) clickedButton.classList.add('active');
-      
-      // Filtra os produtos pela subcategoria
-      let filteredProducts = allProducts;
-      if (subcategory !== 'todos') {
-        filteredProducts = allProducts.filter(product =>
-          (product.subcategory || '').toLowerCase() === subcategory.toLowerCase()
-        );
-      }
-      
-      // Renderiza os produtos filtrados
       const container = document.getElementById('products-container');
       container.innerHTML = '';
-      if (filteredProducts.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #666; font-size: 18px; margin-top: 40px;">Nenhum produto encontrado nesta categoria 😢</p>';
-      } else {
-        filteredProducts.forEach(product => {
-          const card = createProductCard(product);
-          container.appendChild(card);
+
+      if (subcategory === 'todos') {
+        let hasAny = false;
+        SUBCAT_ORDER.forEach(sub => {
+          const group = allProducts.filter(p => (p.subcategory || '').toLowerCase() === sub);
+          if (group.length === 0) return;
+          hasAny = true;
+          const meta = SUBCAT_META[sub] || { icon: '📦', label: sub };
+          container.appendChild(makeSectionDivider(meta.icon, meta.label, group.length));
+          group.forEach(p => container.appendChild(createProductCard(p)));
         });
+        const known = new Set(SUBCAT_ORDER);
+        const others = allProducts.filter(p => !known.has((p.subcategory || '').toLowerCase()));
+        if (others.length > 0) {
+          container.appendChild(makeSectionDivider('📦', 'Outros', others.length));
+          others.forEach(p => container.appendChild(createProductCard(p)));
+          hasAny = true;
+        }
+        if (!hasAny) container.innerHTML = '<p style="text-align: center; color: #666; font-size: 18px; margin-top: 40px;">Nenhum produto encontrado nesta categoria 😢</p>';
+      } else {
+        const filteredProducts = allProducts.filter(p =>
+          (p.subcategory || '').toLowerCase() === subcategory.toLowerCase()
+        );
+        if (filteredProducts.length === 0) {
+          container.innerHTML = '<p style="text-align: center; color: #666; font-size: 18px; margin-top: 40px;">Nenhum produto encontrado nesta categoria 😢</p>';
+        } else {
+          const meta = SUBCAT_META[subcategory] || { icon: '📦', label: subcategory };
+          container.appendChild(makeSectionDivider(meta.icon, meta.label, filteredProducts.length));
+          filteredProducts.forEach(p => container.appendChild(createProductCard(p)));
+        }
       }
     }
 
@@ -307,7 +334,7 @@
       .then(res => res.json())
       .then(data => {
         allProducts = data.items || data;
-        displayProducts(allProducts);
+        filterBySubcategory('todos', document.querySelector('.subcat-btn.active'));
       })
       .catch(err => console.error('Erro ao carregar produtos:', err));
     

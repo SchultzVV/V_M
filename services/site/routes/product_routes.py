@@ -3,12 +3,22 @@
 import os
 import json
 import shutil
+import unicodedata
 import requests
 from flask import Blueprint, request, jsonify, render_template, Response
 from werkzeug.utils import secure_filename
+from sqlalchemy import func
 from models.product import Product
 from services.product_service import save_product, get_all_products, get_products_by_tag
 from services.seo_service import seo_service
+
+
+def _strip_accents(s: str) -> str:
+    """Remove diacritics so 'racao' matches 'ração'."""
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', s)
+        if unicodedata.category(c) != 'Mn'
+    )
 
 product_bp = Blueprint("product_bp", __name__)
 
@@ -148,7 +158,9 @@ def api_products():
         q = q.filter(Product.price.op('~')('[1-9]'))
 
         if search:
-            q = q.filter(Product.title.ilike(f'%{search}%'))
+            q = q.filter(
+                func.unaccent(Product.title).ilike(f'%{_strip_accents(search)}%')
+            )
 
         if tag and tag.lower() != 'all':
             # tags stored as JSON text: ["geral","CD","ML"] — ilike for case safety

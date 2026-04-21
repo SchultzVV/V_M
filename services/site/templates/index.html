@@ -233,10 +233,38 @@
     function displayProducts(products) {
       const container = document.getElementById("products-container");
       container.innerHTML = '';
-      products.forEach(product => {
-        const card = createProductCard(product);
-        container.appendChild(card);
-      });
+
+      const TAG_META = {
+        'CD':  { icon: '🏠', label: 'Casa & Decoração' },
+        'ME':  { icon: '✨', label: 'Moda & Estilo' },
+        'E':   { icon: '⚡', label: 'Eletrônicos' },
+        'PET': { icon: '🐾', label: 'PetShop' },
+      };
+      const TAG_ORDER = ['CD', 'ME', 'E', 'PET'];
+
+      function makeSectionDivider(icon, label, count) {
+        const div = document.createElement('div');
+        div.className = 'section-divider';
+        div.innerHTML = `<span class="section-divider-icon">${icon}</span><span class="section-divider-label">${label}</span><span class="section-divider-count">${count} produto${count !== 1 ? 's' : ''}</span>`;
+        return div;
+      }
+
+      if (!currentSearchTerm) {
+        TAG_ORDER.forEach(tag => {
+          const group = products.filter(p => {
+            try {
+              const t = Array.isArray(p.tags) ? p.tags : JSON.parse(p.tags || '[]');
+              return t.includes(tag);
+            } catch { return false; }
+          });
+          if (group.length === 0) return;
+          const meta = TAG_META[tag] || { icon: '📦', label: tag };
+          container.appendChild(makeSectionDivider(meta.icon, meta.label, group.length));
+          group.forEach(p => container.appendChild(createProductCard(p)));
+        });
+      } else {
+        products.forEach(product => container.appendChild(createProductCard(product)));
+      }
       updateResultsCount(products.length, allProducts.length, currentSearchTerm);
     }
 

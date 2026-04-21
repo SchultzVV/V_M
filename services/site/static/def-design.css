@@ -640,6 +640,44 @@ a { color: inherit; text-decoration: none; }
   line-height: 1.7;
 }
 
+/* ── Section Divider (sticky tag/subcat header inside the grid) ── */
+.section-divider {
+  grid-column: 1 / -1;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--black-deep);
+  border-top: 1px solid var(--gray-steel);
+  border-bottom: 1px solid var(--neon-green-dim);
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+}
+
+.section-divider-icon {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.section-divider-label {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--neon-green);
+}
+
+.section-divider-count {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--gray-text);
+  margin-left: auto;
+  letter-spacing: 0.05em;
+}
+
 /* ── Responsive ── */
 @media (max-width: 1024px) {
   .grid {

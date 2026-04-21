@@ -90,6 +90,8 @@ app.register_blueprint(price_validator_bp)
 
 with app.app_context():
     db.create_all()  # ✅ Cria a tabela 'products' se não existir
+    db.session.execute(db.text("CREATE EXTENSION IF NOT EXISTS unaccent"))
+    db.session.commit()
 
 
 if __name__ == "__main__":
