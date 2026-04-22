@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <!-- Meta Tags SEO -->
+  <title>DEF — Loja de Promoções</title>
+  <meta name="description" content="As melhores promoções da internet. Eletrônicos, Casa, Moda, PetShop — tudo em um só lugar." />
+  <meta name="keywords" content="promoções, ofertas, descontos, eletrônicos, casa, moda, pet" />
+  
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="DEF — Loja de Promoções" />
+  <meta property="og:description" content="As melhores promoções da internet" />
+  <meta property="og:image" content="/static/default-image.jpg" />
+  <meta property="og:url" content="https://seusite.com" />
+  <meta property="og:site_name" content="DEF" />
+  
+  <link rel="stylesheet" href="/static/def-design.css" />
+  
+  <style>
+    /* Hero home específico */
+    .home-hero {
+      margin-bottom: 2rem;
+    }
+
+    /* Container de seções da homepage */
+    .home-sections {
+      display: flex;
+      flex-direction: column;
+      gap: 4rem;
+      margin-bottom: 6rem;
+    }
+
+    /* Cada seção de tag */
+    .home-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .home-section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.75rem 1rem;
+      background: var(--black-deep);
+      border-bottom: 2px solid var(--neon-green);
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    .home-section-icon {
+      font-size: 1.25rem;
+    }
+
+    .home-section-title {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--neon-green);
+      margin: 0;
+      flex: 1;
+    }
+
+    .home-section-link {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--gray-text);
+      text-decoration: none;
+      white-space: nowrap;
+      transition: color 0.2s;
+    }
+
+    .home-section-link:hover {
+      color: var(--neon-green);
+    }
+
+    .home-section-header {
+      justify-content: space-between;
+    }
+
+    /* Grid de 3 produtos por seção */
+    .home-products-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      grid-auto-rows: auto;
+    }
+
+    /* Card de produto com tamanho fixo */
+    .home-products-grid .def-card {
+      display: flex;
+      flex-direction: column;
+      max-width: 200px;
+    }
+
+    /* Imagem com altura fixa e cobertura */
+    .home-products-grid .def-image-container {
+      width: 100%;
+      height: 160px;
+      overflow: hidden;
+      border-radius: 4px;
+      background: var(--black-deep);
+    }
+
+    .home-products-grid .def-product-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+
+    /* Título compacto */
+    .home-products-grid .def-product-title {
+      font-size: 0.75rem;
+      line-height: 1.2;
+      max-height: 2.4em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      margin: 0.5rem 0 0.3rem 0;
+    }
+
+    /* Preço compacto */
+    .home-products-grid .def-price-row {
+      font-size: 0.7rem;
+      gap: 0.25rem;
+      margin: 0.3rem 0;
+    }
+
+    .home-products-grid .def-btn-primary {
+      font-size: 0.65rem;
+      padding: 0.4rem 0.6rem;
+    }
+
+    @media (max-width: 768px) {
+      .home-products-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .home-products-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Empty state */
+    .home-section-empty {
+      padding: 2rem 1rem;
+      text-align: center;
+      color: var(--gray-text);
+      font-size: 0.85rem;
+      border: 1px dashed var(--gray-steel);
+      border-radius: 4px;
+    }
+
+    /* Menu final de navegação */
+    .home-nav-final {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-top: 8rem;
+      padding: 3rem 1.5rem;
+      background: linear-gradient(180deg, rgba(10, 10, 10, 0.5) 0%, rgba(10, 10, 10, 0.9) 100%);
+      border-top: 2px solid var(--neon-green-dim);
+      border-radius: 8px 8px 0 0;
+    }
+
+    .home-nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem 1rem;
+      background: var(--black-deep);
+      border: 1px solid var(--gray-steel);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      text-decoration: none;
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .home-nav-item:hover {
+      background: var(--neon-green);
+      color: var(--black-deep);
+      border-color: var(--neon-green);
+      box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
+      transform: translateY(-3px);
+    }
+
+    .home-nav-icon {
+      margin-bottom: 0.5rem;
+      font-size: 1.5rem;
+    }
+
+    .home-nav-label {
+      text-align: center;
+    }
+
+    /* Link "Ver Catálogo Completo" */
+    .home-catalog-link {
+      display: inline-block;
+      margin-top: 2rem;
+      padding: 1rem 1.5rem;
+      background: var(--neon-green);
+      color: var(--black-deep);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      text-decoration: none;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      align-self: center;
+    }
+
+    .home-catalog-link:hover {
+      box-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+<body>
+  <iframe src="/media/ping" style="display:none;" aria-hidden="true"></iframe>
+
+  <!-- Hero -->
+  <header class="def-hero home-hero">
+    <div class="def-hero-row">
+      <h1 class="def-logo"><span class="accent">DEF</span><span class="dot">.</span></h1>
+      <p class="def-tagline">Equipamento para <span class="hostile">Ambientes Hostis</span> — Funcional. Frio. Necessário.</p>
+    </div>
+    <p style="text-align: center; color: var(--gray-text); font-size: 0.9rem; margin-top: 1rem;">
+      Selecione uma categoria abaixo para explorar produtos especiais
+    </p>
+  </header>
+
+  <!-- Menu de Navegação (Topo) -->
+  <div class="home-nav-final" style="margin: 0 0 4rem 0; border-radius: 0;">
+    <a href="/secao1" class="home-nav-item">
+      <div class="home-nav-icon">🏠</div>
+      <div class="home-nav-label">Casa &<br/>Decoração</div>
+    </a>
+    <a href="/secao2" class="home-nav-item">
+      <div class="home-nav-icon">✨</div>
+      <div class="home-nav-label">Moda &<br/>Estilo</div>
+    </a>
+    <a href="/secao3" class="home-nav-item">
+      <div class="home-nav-icon">⚡</div>
+      <div class="home-nav-label">Eletrô-<br/>nicos</div>
+    </a>
+    <a href="/secao4" class="home-nav-item">
+      <div class="home-nav-icon">🐾</div>
+      <div class="home-nav-label">Pet-<br/>Shop</div>
+    </a>
+    <a href="/catalogo" class="home-nav-item">
+      <div class="home-nav-icon">📋</div>
+      <div class="home-nav-label">Catálogo<br/>Completo</div>
+    </a>
+  </div>
+
+  <!-- Seções de produtos por tag -->
+  <div class="def-catalogue">
+    <div class="home-sections" id="homeSections">
+      <!-- Será populado pelo JavaScript -->
+    </div>
+
+    <!-- Menu de navegação final -->
+    <div class="home-nav-final">
+      <a href="/secao1" class="home-nav-item">
+        <div class="home-nav-icon">🏠</div>
+        <div class="home-nav-label">Casa &<br/>Decoração</div>
+      </a>
+      <a href="/secao2" class="home-nav-item">
+        <div class="home-nav-icon">✨</div>
+        <div class="home-nav-label">Moda &<br/>Estilo</div>
+      </a>
+      <a href="/secao3" class="home-nav-item">
+        <div class="home-nav-icon">⚡</div>
+        <div class="home-nav-label">Eletrô-<br/>nicos</div>
+      </a>
+      <a href="/secao4" class="home-nav-item">
+        <div class="home-nav-icon">🐾</div>
+        <div class="home-nav-label">Pet-<br/>Shop</div>
+      </a>
+      <a href="/catalogo" class="home-nav-item">
+        <div class="home-nav-icon">📋</div>
+        <div class="home-nav-label">Catálogo<br/>Completo</div>
+      </a>
+    </div>
+
+    <a href="/catalogo" class="home-catalog-link">↓ Ver Todos os Produtos</a>
+  </div>
+
+  <script>
+    // Metadados das tags
+    const TAG_META = {
+      'CD': { icon: '🏠', label: 'Casa & Decoração', url: '/secao1' },
+      'ME': { icon: '✨', label: 'Moda & Estilo',    url: '/secao2' },
+      'E':  { icon: '⚡', label: 'Eletrônicos',      url: '/secao3' },
+      'PET':{ icon: '🐾', label: 'PetShop',          url: '/secao4' }
+    };
+
+    const TAG_ORDER = ['CD', 'ME', 'E', 'PET'];
+
+    async function loadHomepage() {
+      try {
+        const response = await fetch('/api/homepage');
+        if (!response.ok) throw new Error('Erro ao carregar dados');
+
+        const data = await response.json();
+        renderHomepage(data);
+      } catch (error) {
+        console.error('Erro:', error);
+        document.getElementById('homeSections').innerHTML = `
+          <div class="home-section-empty">
+            Desculpe, não conseguimos carregar os produtos no momento.
+          </div>
+        `;
+      }
+    }
+
+    function renderHomepage(data) {
+      const container = document.getElementById('homeSections');
+      container.innerHTML = '';
+
+      TAG_ORDER.forEach(tag => {
+        const products = data[tag] || [];
+        const meta = TAG_META[tag];
+
+        const section = document.createElement('div');
+        section.className = 'home-section';
+
+        // Header da seção
+        const header = document.createElement('div');
+        header.className = 'home-section-header';
+        header.style.cursor = 'pointer';
+        header.onclick = () => window.location.href = meta.url;
+        header.innerHTML = `
+          <span class="home-section-icon">${meta.icon}</span>
+          <h2 class="home-section-title">${meta.label}</h2>
+          <a href="${meta.url}" class="home-section-link" onclick="event.stopPropagation()">ver tudo →</a>
+        `;
+        section.appendChild(header);
+
+        // Grid de produtos
+        const grid = document.createElement('div');
+        grid.className = 'home-products-grid';
+
+        if (products.length === 0) {
+          grid.innerHTML = '<div class="home-section-empty">Nenhum produto disponível nesta categoria</div>';
+        } else {
+          products.forEach(product => {
+            const card = createProductCard(product);
+            grid.appendChild(card);
+          });
+        }
+
+        section.appendChild(grid);
+        container.appendChild(section);
+      });
+    }
+
+    function createProductCard(product) {
+      const card = document.createElement('div');
+      card.className = 'def-card';
+      card.onclick = () => window.location.href = `/produto/${product.id}`;
+
+      const images = product.images || [];
+      const mainImage = images.length > 0 ? images[0] : '/static/placeholder.jpg';
+
+      // Converte preço para número:
+      // BR format: "R$ 11.699,10" → 11699.10 (dot=thousands, comma=decimal)
+      // US format: "R$ 74.00"     → 74.00    (dot=decimal, no comma)
+      const parsePrice = (priceStr) => {
+        if (!priceStr) return 0;
+        const s = String(priceStr).replace(/R\$\s*/g, '').trim();
+        if (s.includes(',')) {
+          // BR: remove thousands dots, replace comma with dot
+          return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+        }
+        // US: dot is decimal — parse directly
+        return parseFloat(s) || 0;
+      };
+
+      const oldPrice = parsePrice(product.oldPrice);
+      const currentPrice = parsePrice(product.price);
+      let discount = 0;
+      if (oldPrice > 0 && oldPrice > currentPrice) {
+        discount = Math.round(((oldPrice - currentPrice) / oldPrice) * 100);
+      }
+
+      card.innerHTML = `
+        <div class="def-image-container">
+          <img src="${mainImage}" alt="${product.title}" class="def-product-image" />
+          ${discount > 0 ? `<div class="def-discount-badge">-${discount}%</div>` : ''}
+        </div>
+        <div class="def-card-body">
+          <h3 class="def-product-title">${product.title}</h3>
+          <div class="def-price-row">
+            <span class="def-price-current">R$ ${currentPrice.toFixed(2).replace('.', ',')}</span>
+            ${discount > 0 ? `<span class="def-price-old">R$ ${oldPrice.toFixed(2).replace('.', ',')}</span>` : ''}
+          </div>
+          <a href="${product.link}" target="_blank" class="def-btn-primary">Comprar</a>
+        </div>
+      `;
+
+      return card;
+    }
+
+    // Carregar ao inicializar
+    document.addEventListener('DOMContentLoaded', loadHomepage);
+  </script>
+</body>
+</html>

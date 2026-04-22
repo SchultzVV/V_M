@@ -163,6 +163,20 @@ export const productService = {
     }
   },
 
+  async getHomepage(): Promise<Record<string, Product[]>> {
+    try {
+      const response = await api.get<Record<string, ApiProduct[]>>('/api/homepage')
+      const result: Record<string, Product[]> = {}
+      for (const [tag, items] of Object.entries(response.data)) {
+        result[tag] = items.map(transformProduct)
+      }
+      return result
+    } catch (error) {
+      console.error('❌ [productService] Error fetching homepage data:', error)
+      throw error
+    }
+  },
+
   async getById(id: string): Promise<Product> {
     try {
       const response = await api.get<ApiProduct>(`/api/products/${id}`)

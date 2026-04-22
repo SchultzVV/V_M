@@ -75,7 +75,10 @@ export default function ProductCard({ product }: ProductCardProps) {
   }, [images.length])
 
   return (
-    <div className="card-def group overflow-hidden h-full flex flex-col hover:shadow-neon-red transition-shadow duration-300">
+    <div
+      className="card-def group overflow-hidden h-full flex flex-col hover:shadow-neon-red transition-shadow duration-300 cursor-pointer"
+      onClick={() => navigate(`/produto/${product.id}`)}
+    >
       {/* Image Section - TOP */}
       <div className="relative overflow-hidden bg-gray-steel">
         <img
@@ -205,29 +208,23 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
       </div>
 
-      {/* CTA - Two Action Buttons */}
-      <div className="p-4 border-t border-gray-steel flex gap-2">
+      {/* CTA */}
+      <div className="p-4 border-t border-gray-steel">
         {product.link ? (
           <a
             href={product.link}
             target="_blank"
             rel="noopener noreferrer"
-            className={`btn-primary flex-1 text-sm text-center ${!product.available ? 'opacity-60' : ''}`}
+            className={`btn-primary w-full text-sm text-center block ${!product.available ? 'opacity-60' : ''}`}
             onClick={(e) => e.stopPropagation()}
           >
             {product.available ? 'COMPRAR' : 'VER PRODUTO'}
           </a>
         ) : (
-          <button className="btn-primary flex-1 text-sm opacity-50 cursor-not-allowed" disabled>
+          <button className="btn-primary w-full text-sm opacity-50 cursor-not-allowed" disabled>
             {product.available ? 'COMPRAR' : 'ESGOTADO'}
           </button>
         )}
-        <button
-          className="btn-secondary flex-1 text-sm"
-          onClick={() => navigate(`/produto/${product.id}`)}
-        >
-          DETALHES
-        </button>
       </div>
     </div>
   )

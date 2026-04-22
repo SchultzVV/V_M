@@ -157,15 +157,21 @@ SEARCH_QUERIES: dict[str, dict[str, list[str]]] = {
             "tapete sala decorativo moderno",
         ],
         "quarto": [
-            "organizador gaveta dobrável",
-            "suporte lateral cama cabeceira",
+            "luminária de cabeceira led",
+            "travesseiro cervical ortopédico",
+            "roupa de cama queen size",
+            "cabeceira cama casal",
+            "colcha casal matelassê",
         ],
         "cozinha": [
             "organizador cozinha modular",
             "suporte temperos parede inox",
         ],
         "garagem": [
-            "kit ferramentas doméstico completo",
+            "kit ferramentas completo 100 peças",
+            "chave combinada estojo",
+            "caixa de ferramentas plástico",
+            "furadeira parafusadeira",
         ],
         "corredor": [
             "sapateira organizador corredor",
@@ -174,7 +180,10 @@ SEARCH_QUERIES: dict[str, dict[str, list[str]]] = {
             "vaso autoirrigável plantas",
         ],
         "area-servico": [
-            "varal de chão dobrável",
+            "varal de parede retrátil aço",
+            "tábua de passar roupa",
+            "cesto roupas sujas com tampa",
+            "escada doméstica alumínio",
         ],
     },
     "ME": {

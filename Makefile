@@ -865,6 +865,20 @@ populate-mf:  ## 🛒 Popula o site via ML: busca mais vendidos por tag/subtag �
 	echo "   Args: $$_ARGS"; echo ""; \
 	docker exec -it site python3 agents/ml_populator_agent.py $$_ARGS
 
+check-n-populate:  ## 🔍 Audita subtags vazias e popula as que estão abaixo do mínimo  [TAG=CD] [LIMIT=5] [MIN=1] [DRY=1]
+	@$(MAKE) -s _ensure-site
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "🔍 CHECK-N-POPULATE — audita subtags e popula as vazias"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@_ARGS=""; \
+	if [ "$(DRY)" = "1" ] || [ "$(DRY_RUN)" = "1" ]; then _ARGS="$$_ARGS --dry-run"; fi; \
+	if [ -n "$(TAG)" ] && [ "$(TAG)" != "ALL" ]; then _ARGS="$$_ARGS --tag $(TAG)"; fi; \
+	if [ -n "$(LIMIT)" ]; then _ARGS="$$_ARGS --limit $(LIMIT)"; fi; \
+	if [ -n "$(MIN)" ]; then _ARGS="$$_ARGS --min $(MIN)"; fi; \
+	echo "   Args: $$_ARGS"; echo ""; \
+	python3 scripts/check_and_populate.py $$_ARGS
+
 tag-classify-db:  ## 🏷️  LLM classifica tag+subtag dos produtos no banco (sem tag ou tag=geral)  [DRY=1] [ID=uuid]
 	@$(MAKE) -s _ensure-site
 	@docker exec -it site python3 agents/tag_classifier_agent.py --db \
@@ -1104,7 +1118,7 @@ help:  ## Mostra este menu
 	@awk 'BEGIN{FS=":.*?## "}/^(prepare-ml|prepare-shopee|prepare-amazon|prepare-all):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📤 STAGE / ATUALIZAÇÃO"
-	@awk 'BEGIN{FS=":.*?## "}/^(stage|restage|api-update|shopee-update|check-stage|verify-prices|verify-product-cheaper|update-ml-prices|fix-bad-links|reprepare-ml|reprepare-associate-ml|organize-tags|organize-tags-auto|publish|populate-mf):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*?## "}/^(stage|restage|api-update|shopee-update|check-stage|verify-prices|verify-product-cheaper|update-ml-prices|fix-bad-links|reprepare-ml|reprepare-associate-ml|organize-tags|organize-tags-auto|publish|populate-mf|check-n-populate):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "📸 INSTAGRAM"
 	@awk 'BEGIN{FS=":.*?## "}/^(prepare-post-image|instagram-post|instagram-test|instagram-status|instagram-history|stage-and-post):.*##/{printf "  \033[36m%-26s\033[0m %s\n",$$1,$$2}' $(MAKEFILE_LIST)

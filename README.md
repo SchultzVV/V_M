@@ -283,3 +283,14 @@ make populate-mf TAG=ME SUBTAG=bolsas LIMIT=3
 make populate-mf TAG=ME SUBTAG=relogios LIMIT=3
 make populate-mf TAG=ME SUBTAG=infantil LIMIT=3
 ```
+---
+
+### esses comandos sao para checar e popular tags e subtags vazias
+python3 scripts/check_and_populate.py --tag CD --limit 10
+
+```bash
+make check-n-populate                    # audita tudo, popula os vazios (LIMIT=5)
+make check-n-populate TAG=CD LIMIT=10    # só CD, 10 produtos por subtag
+make check-n-populate TAG=ME MIN=3       # ME, threshold mínimo = 3
+make check-n-populate DRY=1             # só relatório, sem executar
+```

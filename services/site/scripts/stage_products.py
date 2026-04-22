@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import json
 import requests
@@ -160,6 +161,12 @@ for json_path in json_files:
         # Validar que tem os campos obrigatórios de um produto
         if "platform" not in data or "title" not in data or "price" not in data:
             print(f"[SKIP] {rel_path}: arquivo não é um produto válido (faltam campos)")
+            continue
+
+        # Fallback: pula produtos sem estoque ou preço inválido (R$ 0.00)
+        raw_price = data.get("price", "")
+        if not re.search(r"[1-9]", raw_price):
+            print(f"[SKIP] {rel_path}: preço inválido ({raw_price!r}) — sem estoque ou fora de catálogo")
             continue
 
         platform = data["platform"]

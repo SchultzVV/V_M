@@ -1,4 +1,5 @@
 import { useSearchParams } from 'react-router-dom'
+import { TAG_CONFIG } from '../data/subtags'
 
 interface Category {
   label: string
@@ -7,10 +8,10 @@ interface Category {
 
 const CATEGORIES: Category[] = [
   { label: 'TODOS', value: '' },
-  { label: 'PET', value: 'PET' },
-  { label: 'ELETRÔNICOS', value: 'E' },
-  { label: 'CASA', value: 'CD' },
-  { label: 'MODA', value: 'ME' },
+  { label: TAG_CONFIG.PET.label, value: 'PET' },
+  { label: TAG_CONFIG.E.label, value: 'E' },
+  { label: TAG_CONFIG.CD.label, value: 'CD' },
+  { label: TAG_CONFIG.ME.label, value: 'ME' },
 ]
 
 export default function CategoryNav() {

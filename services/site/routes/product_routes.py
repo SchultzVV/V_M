@@ -24,13 +24,19 @@ product_bp = Blueprint("product_bp", __name__)
 
 
 @product_bp.route("/")
+def home():
+    # Landing page — mostrar apenas home.html
+    return render_template("home.html")
+
+
+@product_bp.route("/catalogo")
 def index():
-    # Exibe todos os produtos na página principal
+    # Exibe todos os produtos no catálogo completo
     products = get_all_products()
     
     # Gerar meta tags otimizadas
     meta_tags = seo_service.generate_meta_tags(
-        title="Promoções e Ofertas Incríveis",
+        title="Catálogo Completo — Promoções e Ofertas",
         description="Catálogo de sobrevivência pós-sistema! As melhores promoções da internet em um só lugar. Eletrônicos, Casa, Moda e muito mais!",
         keywords=["promoções", "ofertas", "descontos", "loja online", "eletrônicos", "casa", "moda"]
     )
@@ -136,6 +142,35 @@ def auto_categorize_product(title):
         tags.append("E")
     
     return tags
+
+
+@product_bp.route("/api/homepage")
+def api_homepage():
+    """Retorna 3 produtos de cada tag (CD, ME, E, PET) para a página inicial"""
+    try:
+        tags = ["CD", "ME", "E", "PET"]
+        result = {}
+        
+        for tag in tags:
+            q = Product.query
+            # Filtra por preço válido
+            q = q.filter(Product.price.isnot(None))
+            q = q.filter(Product.price.op('~')('[1-9]'))
+            # Filtra por tag
+            q = q.filter(Product.tags.ilike(f'%"{tag}"%'))
+            
+            # Pega 3 produtos mais recentes
+            products = (
+                q.order_by(Product.created_at.desc())
+                 .limit(3)
+                 .all()
+            )
+            
+            result[tag] = [p.to_dict() for p in products]
+        
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": f"Erro ao obter dados da homepage: {str(e)}"}), 500
 
 
 @product_bp.route("/api/products")
