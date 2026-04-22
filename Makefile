@@ -134,6 +134,35 @@ frontup:  ## ⭐ Sobe site completo para testes locais (build React + Nginx + Ba
 	@echo ""
 
 
+refresh:  ## ⚡ Rebuild React + reinicia containers — mantém o mesmo tunnel ativo
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo "⚡ REFRESH — Build React + Restart (tunnel preservado)"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+	@CF_URL=$$(grep -m1 'https://' /tmp/cf_active_url.txt 2>/dev/null); \
+	if [ -z "$$CF_URL" ]; then \
+		echo "⚠️  Nenhum tunnel ativo detectado em /tmp/cf_active_url.txt"; \
+		echo "   Rode primeiro: make serve-frontend-public"; \
+		exit 1; \
+	fi; \
+	echo "🔗 Tunnel ativo: $$CF_URL"
+	@echo ""
+	@echo "Step 1️⃣  Limpando build anterior..."
+	@rm -rf frontend/dist/assets frontend/dist/*.js frontend/dist/*.css frontend/dist/index.html 2>/dev/null; mkdir -p frontend/dist
+	@echo "Step 2️⃣  Building React (fresh)..."
+	@cd frontend && npm run build > /dev/null 2>&1 || (echo "❌ Build falhou"; exit 1)
+	@echo "✅ Build completo"
+	@echo ""
+	@echo "Step 3️⃣  Reiniciando containers (site + nginx)..."
+	@docker restart site nginx-react > /dev/null 2>&1 && echo "✅ Containers reiniciados" || echo "⚠️  Falha ao reiniciar containers"
+	@echo ""
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@CF_URL=$$(grep -m1 'https://' /tmp/cf_active_url.txt 2>/dev/null); \
+	echo "✅ REFRESH COMPLETO: $$CF_URL"
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@echo ""
+
 # ============================================================
 # 🌐  EXPOSE — Túneis HTTPS públicos
 # ============================================================

@@ -20,13 +20,33 @@
 
 ## Frontend
 
+### ⚠️ Dois Frontends — Sempre confirmar qual antes de agir
+
+Este projeto tem **dois frontends** distintos no mesmo servidor:
+
+#### Frontend A — Flask/Jinja2 (Legado)
+- **Localização**: `services/site/templates/*.html` + `services/site/static/`
+- **Tecnologia**: HTML + Jinja2 + CSS puro + JS vanilla
+- **Container**: `site` (Flask, porta 5000 interna)
+- **Build**: ❌ Não requer build — `docker restart site` aplica mudanças
+- **Ativo quando**: `make serve-cloudflare` foi o último comando de tunnel
+- **Identificador**: `cat /tmp/cf_active_url.txt` → segunda linha = `backend`
+
+#### Frontend B — React SPA (Atual)
+- **Localização**: `frontend/src/` (TypeScript + React + Tailwind)
+- **Container**: `nginx-react` (Nginx servindo `frontend/dist/`)
+- **Build**: ✅ Obrigatório — `cd frontend && npm run build` antes de restart
+- **Refresh rápido**: `make refresh` (build + restart, tunnel preservado)
+- **Ativo quando**: `make serve-frontend-public` ou `make refresh` foi executado
+- **Identificador**: `cat /tmp/cf_active_url.txt` → segunda linha = `frontend`
+
 ### Development
 - **Vite Dev Server**: 5173 (`make frontend-dev`)
   - Proxy de `/api/*`, `/auth/*`, `/webhook/*` → `https://localhost:443` (Nginx)
   - Hot reload habilitado
 
-### Production / Túinel
-- Servido via Nginx 443 (arquivos estáticos em `/app/dist/`)
+### Production / Túnel
+- Servido via Nginx 443 (arquivos estáticos em `/app/dist/` — React, ou templates Flask)
 - Tunnel endpoint: `https://xxxx.trycloudflare.com` (temporário) ou `https://CF_HOSTNAME` (fixo)
 
 ## Databases & Cache

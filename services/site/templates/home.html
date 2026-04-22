@@ -85,72 +85,171 @@
       justify-content: space-between;
     }
 
-    /* Grid de 3 produtos por seção */
-    .home-products-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 1rem;
-      grid-auto-rows: auto;
+    /* ── SLIDER DE PRODUTOS ──────────────────────────────────────── */
+    .home-slider-outer {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
     }
 
-    /* Card de produto com tamanho fixo */
-    .home-products-grid .def-card {
+    .home-slider-viewport {
+      flex: 1;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .home-slider-track {
+      display: flex;
+      gap: 1rem;
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .home-slide-card {
+      flex: 0 0 calc(33.333% - 0.68rem);
+      min-width: 0;
+      background: var(--black-deep);
+      border: 1px solid var(--gray-steel);
+      cursor: pointer;
       display: flex;
       flex-direction: column;
-      max-width: 200px;
+      transition: border-color 0.2s;
     }
 
-    /* Imagem com altura fixa e cobertura */
-    .home-products-grid .def-image-container {
+    .home-slide-card:hover { border-color: var(--neon-green); }
+
+    .home-slide-img-wrap {
+      position: relative;
       width: 100%;
-      height: 160px;
+      padding-top: 65%;
       overflow: hidden;
-      border-radius: 4px;
-      background: var(--black-deep);
+      background: #111;
     }
 
-    .home-products-grid .def-product-image {
+    .home-slide-img-wrap img {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
-      object-position: center;
+      transition: transform 0.3s;
     }
 
-    /* Título compacto */
-    .home-products-grid .def-product-title {
-      font-size: 0.75rem;
-      line-height: 1.2;
-      max-height: 2.4em;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    .home-slide-card:hover .home-slide-img-wrap img { transform: scale(1.04); }
+
+    .home-slide-badge {
+      position: absolute;
+      top: 8px; right: 8px;
+      background: var(--neon-red, #ff2244);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+    }
+
+    .home-slide-body {
+      padding: 0.75rem 1rem 1rem;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      gap: 0.3rem;
+    }
+
+    .home-slide-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.3;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
-      margin: 0.5rem 0 0.3rem 0;
+      overflow: hidden;
+      margin: 0;
     }
 
-    /* Preço compacto */
-    .home-products-grid .def-price-row {
-      font-size: 0.7rem;
-      gap: 0.25rem;
-      margin: 0.3rem 0;
+    .home-slide-price {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--neon-green);
+      border-left: 2px solid var(--neon-green);
+      padding-left: 0.5rem;
+      margin-top: 0.25rem;
     }
 
-    .home-products-grid .def-btn-primary {
+    .home-slide-old {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--gray-text);
+      text-decoration: line-through;
+      padding-left: 0.65rem;
+    }
+
+    .home-slide-disc {
+      font-family: var(--font-mono);
       font-size: 0.65rem;
-      padding: 0.4rem 0.6rem;
+      font-weight: 700;
+      background: var(--neon-red, #ff2244);
+      color: #fff;
+      padding: 1px 6px;
+      display: inline-block;
     }
 
-    @media (max-width: 768px) {
-      .home-products-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
+    .home-slide-btn {
+      display: block;
+      margin-top: auto;
+      width: 100%;
+      padding: 0.55rem 0.5rem;
+      background: var(--neon-green);
+      color: var(--black-deep);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      text-align: center;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s, box-shadow 0.2s;
     }
 
-    @media (max-width: 480px) {
-      .home-products-grid {
-        grid-template-columns: 1fr;
-      }
+    .home-slide-btn:hover {
+      background: #fff;
+      box-shadow: 0 0 12px rgba(0,255,65,0.4);
+    }
+
+    .home-slider-arrow {
+      flex-shrink: 0;
+      width: 38px;
+      background: rgba(0,0,0,0.75);
+      border: 1px solid var(--gray-steel);
+      color: var(--neon-green);
+      font-size: 1.6rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, color 0.2s;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .home-slider-arrow:hover {
+      background: var(--neon-green);
+      color: var(--black-deep);
+    }
+
+    .home-slider-counter {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--gray-text);
+      text-align: right;
+      margin-top: 0.4rem;
+      letter-spacing: 0.1em;
+      min-height: 1em;
     }
 
     /* Empty state */
@@ -161,6 +260,14 @@
       font-size: 0.85rem;
       border: 1px dashed var(--gray-steel);
       border-radius: 4px;
+    }
+
+    @media (max-width: 640px) {
+      .home-slide-card { flex: 0 0 calc(50% - 0.5rem); }
+    }
+    @media (max-width: 400px) {
+      .home-slide-card { flex: 0 0 100%; }
+      .home-slider-arrow { width: 30px; font-size: 1.2rem; }
     }
 
     /* Menu final de navegação */
@@ -310,122 +417,193 @@
   </div>
 
   <script>
-    // Metadados das tags
+    // ── Metadados das tags ─────────────────────────────────────────
     const TAG_META = {
       'CD': { icon: '🏠', label: 'Casa & Decoração', url: '/secao1' },
       'ME': { icon: '✨', label: 'Moda & Estilo',    url: '/secao2' },
       'E':  { icon: '⚡', label: 'Eletrônicos',      url: '/secao3' },
       'PET':{ icon: '🐾', label: 'PetShop',          url: '/secao4' }
     };
-
     const TAG_ORDER = ['CD', 'ME', 'E', 'PET'];
 
+    // Estado dos sliders
+    const sliderState = {};
+    let autoRotateTimer = null;
+    let rotationPaused = false;
+    const ROTATE_INTERVAL = 90000; // 90s
+
+    // ── Carregar dados da API ──────────────────────────────────────
     async function loadHomepage() {
       try {
         const response = await fetch('/api/homepage');
         if (!response.ok) throw new Error('Erro ao carregar dados');
-
         const data = await response.json();
         renderHomepage(data);
       } catch (error) {
         console.error('Erro:', error);
-        document.getElementById('homeSections').innerHTML = `
-          <div class="home-section-empty">
-            Desculpe, não conseguimos carregar os produtos no momento.
-          </div>
-        `;
+        document.getElementById('homeSections').innerHTML =
+          '<div class="home-section-empty">Desculpe, não conseguimos carregar os produtos no momento.</div>';
       }
     }
 
+    // ── Renderizar todas as seções ─────────────────────────────────
     function renderHomepage(data) {
       const container = document.getElementById('homeSections');
       container.innerHTML = '';
 
       TAG_ORDER.forEach(tag => {
-        const products = data[tag] || [];
-        const meta = TAG_META[tag];
+        const products  = data[tag] || [];
+        const meta      = TAG_META[tag];
+        const totalPages = Math.max(1, Math.ceil(products.length / 3));
+        sliderState[tag] = { page: 0, products, totalPages };
 
         const section = document.createElement('div');
         section.className = 'home-section';
-
-        // Header da seção
-        const header = document.createElement('div');
-        header.className = 'home-section-header';
-        header.style.cursor = 'pointer';
-        header.onclick = () => window.location.href = meta.url;
-        header.innerHTML = `
-          <span class="home-section-icon">${meta.icon}</span>
-          <h2 class="home-section-title">${meta.label}</h2>
-          <a href="${meta.url}" class="home-section-link" onclick="event.stopPropagation()">ver tudo →</a>
+        section.innerHTML = `
+          <div class="home-section-header" style="cursor:pointer"
+               onclick="window.location.href='${meta.url}'">
+            <span class="home-section-icon">${meta.icon}</span>
+            <h2 class="home-section-title">${meta.label}</h2>
+            <a href="${meta.url}" class="home-section-link"
+               onclick="event.stopPropagation()">ver tudo →</a>
+          </div>
+          <div class="home-slider-outer">
+            <button class="home-slider-arrow" id="prev-${tag}"
+                    onclick="slideSection('${tag}',-1)">&#8249;</button>
+            <div class="home-slider-viewport">
+              <div class="home-slider-track" id="track-${tag}"></div>
+            </div>
+            <button class="home-slider-arrow" id="next-${tag}"
+                    onclick="slideSection('${tag}',1)">&#8250;</button>
+          </div>
+          <div class="home-slider-counter" id="counter-${tag}"></div>
         `;
-        section.appendChild(header);
-
-        // Grid de produtos
-        const grid = document.createElement('div');
-        grid.className = 'home-products-grid';
-
-        if (products.length === 0) {
-          grid.innerHTML = '<div class="home-section-empty">Nenhum produto disponível nesta categoria</div>';
-        } else {
-          products.forEach(product => {
-            const card = createProductCard(product);
-            grid.appendChild(card);
-          });
-        }
-
-        section.appendChild(grid);
         container.appendChild(section);
+        renderSliderPage(tag, 0, false);
       });
+
+      startAutoRotate();
+
+      // Pausar rotação quando o mouse estiver sobre qualquer seção
+      container.addEventListener('mouseenter', () => { rotationPaused = true; });
+      container.addEventListener('mouseleave', () => { rotationPaused = false; });
     }
 
-    function createProductCard(product) {
-      const card = document.createElement('div');
-      card.className = 'def-card';
-      card.onclick = () => window.location.href = `/produto/${product.id}`;
+    // ── Renderizar uma página do slider ───────────────────────────
+    function renderSliderPage(tag, page, animate) {
+      const state = sliderState[tag];
+      if (!state) return;
+      const track   = document.getElementById('track-' + tag);
+      const counter = document.getElementById('counter-' + tag);
+      if (!track) return;
 
-      const images = product.images || [];
-      const mainImage = images.length > 0 ? images[0] : '/static/placeholder.jpg';
-
-      // Converte preço para número:
-      // BR format: "R$ 11.699,10" → 11699.10 (dot=thousands, comma=decimal)
-      // US format: "R$ 74.00"     → 74.00    (dot=decimal, no comma)
-      const parsePrice = (priceStr) => {
-        if (!priceStr) return 0;
-        const s = String(priceStr).replace(/R\$\s*/g, '').trim();
-        if (s.includes(',')) {
-          // BR: remove thousands dots, replace comma with dot
-          return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
-        }
-        // US: dot is decimal — parse directly
-        return parseFloat(s) || 0;
+      const doRender = () => {
+        const slice = state.products.slice(page * 3, page * 3 + 3);
+        track.innerHTML = slice.length
+          ? slice.map(createSlideCard).join('')
+          : '<p class="home-section-empty">Sem produtos nesta categoria.</p>';
+        state.page = page;
+        if (counter)
+          counter.textContent = state.totalPages > 1
+            ? (page + 1) + ' / ' + state.totalPages : '';
+        const prev = document.getElementById('prev-' + tag);
+        const next = document.getElementById('next-' + tag);
+        const single = state.totalPages <= 1;
+        if (prev) prev.style.opacity = (single || page === 0) ? '0.25' : '1';
+        if (next) next.style.opacity = (single || page === state.totalPages - 1) ? '0.25' : '1';
       };
 
-      const oldPrice = parsePrice(product.oldPrice);
-      const currentPrice = parsePrice(product.price);
-      let discount = 0;
-      if (oldPrice > 0 && oldPrice > currentPrice) {
-        discount = Math.round(((oldPrice - currentPrice) / oldPrice) * 100);
+      if (animate) {
+        track.style.transition = 'none';
+        track.style.opacity = '0';
+        track.style.transform = 'translateX(12px)';
+        setTimeout(() => {
+          doRender();
+          track.style.transform = 'translateX(-12px)';
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            track.style.transition = 'opacity 0.35s, transform 0.35s';
+            track.style.opacity    = '1';
+            track.style.transform  = 'translateX(0)';
+          }));
+        }, 200);
+      } else {
+        doRender();
+        track.style.opacity   = '1';
+        track.style.transform = 'translateX(0)';
       }
-
-      card.innerHTML = `
-        <div class="def-image-container">
-          <img src="${mainImage}" alt="${product.title}" class="def-product-image" />
-          ${discount > 0 ? `<div class="def-discount-badge">-${discount}%</div>` : ''}
-        </div>
-        <div class="def-card-body">
-          <h3 class="def-product-title">${product.title}</h3>
-          <div class="def-price-row">
-            <span class="def-price-current">R$ ${currentPrice.toFixed(2).replace('.', ',')}</span>
-            ${discount > 0 ? `<span class="def-price-old">R$ ${oldPrice.toFixed(2).replace('.', ',')}</span>` : ''}
-          </div>
-          <a href="${product.link}" target="_blank" class="def-btn-primary">Comprar</a>
-        </div>
-      `;
-
-      return card;
     }
 
-    // Carregar ao inicializar
+    function slideSection(tag, dir) {
+      const s = sliderState[tag];
+      if (!s) return;
+      const next = ((s.page + dir) % s.totalPages + s.totalPages) % s.totalPages;
+      renderSliderPage(tag, next, true);
+    }
+
+    function startAutoRotate() {
+      if (autoRotateTimer) clearInterval(autoRotateTimer);
+      autoRotateTimer = setInterval(() => {
+        if (rotationPaused) return;
+        TAG_ORDER.forEach(tag => {
+          const s = sliderState[tag];
+          if (s && s.totalPages > 1)
+            renderSliderPage(tag, (s.page + 1) % s.totalPages, true);
+        });
+      }, ROTATE_INTERVAL);
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────
+    function parsePrice(v) {
+      if (!v && v !== 0) return 0;
+      if (typeof v === 'number') return v;
+      const s = String(v).replace(/R\$\s*/g, '').trim();
+      if (s.includes(',')) return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+      return parseFloat(s) || 0;
+    }
+
+    function escHtml(s) {
+      return String(s || '')
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Card do slider ─────────────────────────────────────────────
+    function createSlideCard(product) {
+      const images = product.images || [];
+      const img    = images[0] || product.image || '/static/placeholder.jpg';
+      const oldP   = parsePrice(product.old_price || product.oldPrice);
+      const curP   = parsePrice(product.price);
+      const disc   = (oldP > 0 && oldP > curP)
+        ? Math.round((oldP - curP) / oldP * 100) : 0;
+      const priceDisplay = curP > 0
+        ? 'R$ ' + curP.toFixed(2).replace('.', ',')
+        : escHtml(product.price || '—');
+
+      // Botão: link externo se disponível, senão página interna
+      const btnHref   = product.link ? escHtml(product.link) : '/produto/' + product.id;
+      const btnTarget = product.link ? ' target="_blank" rel="noopener noreferrer"' : '';
+      const btnLabel  = product.link ? 'COMPRAR' : 'VER PRODUTO';
+
+      return `
+        <div class="home-slide-card"
+             onclick="window.location.href='/produto/${product.id}'">
+          <div class="home-slide-img-wrap">
+            <img src="${escHtml(img)}" alt="${escHtml(product.title)}"
+                 loading="lazy" onerror="this.src='/static/placeholder.jpg'">
+            ${disc > 0 ? '<div class="home-slide-badge">-' + disc + '%</div>' : ''}
+          </div>
+          <div class="home-slide-body">
+            <h3 class="home-slide-title">${escHtml(product.title)}</h3>
+            <div class="home-slide-price">${priceDisplay}</div>
+            ${disc > 0 ? `
+              <div class="home-slide-old">R$ ${oldP.toFixed(2).replace('.', ',')}</div>
+              <span class="home-slide-disc">-${disc}% OFF</span>` : ''}
+            <a href="${btnHref}"${btnTarget} class="home-slide-btn"
+               onclick="event.stopPropagation()">${btnLabel}</a>
+          </div>
+        </div>`;
+    }
+
     document.addEventListener('DOMContentLoaded', loadHomepage);
   </script>
 </body>

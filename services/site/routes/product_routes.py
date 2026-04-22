@@ -159,10 +159,10 @@ def api_homepage():
             # Filtra por tag
             q = q.filter(Product.tags.ilike(f'%"{tag}"%'))
             
-            # Pega 3 produtos mais recentes
+            # Pega 9 produtos mais recentes (3 páginas de rotação)
             products = (
                 q.order_by(Product.created_at.desc())
-                 .limit(3)
+                 .limit(9)
                  .all()
             )
             
@@ -317,7 +317,19 @@ def product_detail(product_id):
     
     # Converter product para dict
     product_dict = product.to_dict()
-    
+
+    # Garantir que preços sejam float para o template Jinja2
+    def _to_float(v):
+        if v is None: return 0.0
+        if isinstance(v, (int, float)): return float(v)
+        s = str(v).replace('R$','').replace('.','').replace(',','.').strip()
+        try: return float(s)
+        except ValueError: return 0.0
+
+    product_dict['price'] = _to_float(product_dict.get('price'))
+    if product_dict.get('old_price'):
+        product_dict['old_price'] = _to_float(product_dict.get('old_price'))
+
     # Gerar schema.org do produto
     product_schema = seo_service.generate_product_schema(product_dict)
     

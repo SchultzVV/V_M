@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import ProductGrid from '../components/ProductGrid'
-import ProductCard from '../components/ProductCard'
 import CatalogNav from '../components/CatalogNav'
 import SearchBar from '../components/SearchBar'
 import Pagination from '../components/Pagination'
+import LandingProductCard from '../components/LandingProductCard'
 import { Product, productService } from '../services/productService'
 import { TAG_CONFIG } from '../data/subtags'
 
@@ -42,6 +42,8 @@ export default function Home() {
   const [homepageData, setHomepageData] = useState<Record<string, Product[]>>({})
   const [isLoadingHome, setIsLoadingHome] = useState(true)
   const [homeError, setHomeError] = useState<string | null>(null)
+  const [sliceIdx, setSliceIdx] = useState<Record<string, number>>({})
+  const rotationPaused = useRef(false)
 
   const tag = searchParams.get('tag') ?? ''
   const search = searchParams.get('search') ?? ''
@@ -65,6 +67,45 @@ export default function Home() {
       .finally(() => { if (!cancelled) setIsLoadingHome(false) })
     return () => { cancelled = true }
   }, [isLanding])
+
+  // Reset rotation when data reloads
+  useEffect(() => {
+    setSliceIdx({})
+  }, [homepageData])
+
+  // Rotate products every 90s — pauses when mouse is over the landing section
+  useEffect(() => {
+    if (!isLanding || isLoadingHome || homeError) return
+    const interval = setInterval(() => {
+      if (rotationPaused.current) return
+      setSliceIdx(prev => {
+        const next = { ...prev }
+        for (const tagKey of TAG_ORDER) {
+          const items = homepageData[tagKey] ?? []
+          const pageCount = Math.ceil(items.length / 3)
+          if (pageCount > 1) {
+            next[tagKey] = ((prev[tagKey] ?? 0) + 1) % pageCount
+          }
+        }
+        return next
+      })
+    }, 90000)
+    return () => clearInterval(interval)
+  }, [isLanding, isLoadingHome, homeError, homepageData])
+
+  function goLeft(tagKey: string) {
+    const items = homepageData[tagKey] ?? []
+    const pageCount = Math.ceil(items.length / 3)
+    if (pageCount <= 1) return
+    setSliceIdx(prev => ({ ...prev, [tagKey]: ((prev[tagKey] ?? 0) - 1 + pageCount) % pageCount }))
+  }
+
+  function goRight(tagKey: string) {
+    const items = homepageData[tagKey] ?? []
+    const pageCount = Math.ceil(items.length / 3)
+    if (pageCount <= 1) return
+    setSliceIdx(prev => ({ ...prev, [tagKey]: ((prev[tagKey] ?? 0) + 1) % pageCount }))
+  }
 
   // Catalog: load full filtered list
   useEffect(() => {
@@ -139,7 +180,11 @@ export default function Home() {
 
           {isLanding ? (
             /* ─── Landing view: 3 products per category ─── */
-            <div className="flex flex-col gap-12 pb-16">
+            <div
+              className="flex flex-col gap-12 pb-16"
+              onMouseEnter={() => { rotationPaused.current = true }}
+              onMouseLeave={() => { rotationPaused.current = false }}
+            >
               {TAG_ORDER.map(tagKey => {
                 const config = TAG_CONFIG[tagKey]
                 const items = homepageData[tagKey] ?? []
@@ -161,28 +206,69 @@ export default function Home() {
                       </button>
                     </div>
 
-                    {/* 3-product grid */}
+                    {/* Horizontal slider */}
                     {isLoadingHome ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="flex gap-4">
                         {[1, 2, 3].map(i => (
-                          <div key={i} className="card-def animate-pulse">
-                            <div className="bg-gray-steel h-48 mb-4" />
-                            <div className="h-4 bg-gray-steel rounded mx-4 mb-2" />
-                            <div className="h-4 bg-gray-steel rounded mx-4 w-2/3 mb-4" />
-                          </div>
+                          <div key={i} className="flex-1 h-[180px] bg-gray-steel animate-pulse" />
                         ))}
                       </div>
                     ) : homeError ? (
                       <p className="font-mono text-sm text-gray-text">{homeError}</p>
                     ) : items.length === 0 ? (
                       <p className="font-mono text-sm text-gray-text">Nenhum produto nesta categoria ainda.</p>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        {items.map(product => (
-                          <ProductCard key={product.id} product={product} />
-                        ))}
-                      </div>
-                    )}
+                    ) : (() => {
+                      const pageCount = Math.ceil(items.length / 3)
+                      const currentPage = sliceIdx[tagKey] ?? 0
+                      return (
+                        <div className="relative">
+                          {/* Left arrow */}
+                          {pageCount > 1 && (
+                            <button
+                              onClick={() => goLeft(tagKey)}
+                              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-black/80 hover:bg-neon-green hover:text-black text-neon-green px-3 py-4 transition-all font-mono font-bold text-xl leading-none select-none"
+                              aria-label="Anterior"
+                            >
+                              ‹
+                            </button>
+                          )}
+
+                          {/* Sliding track */}
+                          <div className="overflow-hidden">
+                            <div
+                              className="flex transition-transform duration-500 ease-in-out"
+                              style={{ transform: `translateX(-${currentPage * 100}%)` }}
+                            >
+                              {Array.from({ length: pageCount }, (_, pageIdx) => (
+                                <div key={pageIdx} className="w-full flex-shrink-0 flex gap-4">
+                                  {items.slice(pageIdx * 3, (pageIdx + 1) * 3).map(product => (
+                                    <LandingProductCard key={product.id} product={product} />
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Right arrow */}
+                          {pageCount > 1 && (
+                            <button
+                              onClick={() => goRight(tagKey)}
+                              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-black/80 hover:bg-neon-green hover:text-black text-neon-green px-3 py-4 transition-all font-mono font-bold text-xl leading-none select-none"
+                              aria-label="Próximo"
+                            >
+                              ›
+                            </button>
+                          )}
+
+                          {/* Page counter */}
+                          {pageCount > 1 && (
+                            <div className="text-center font-mono text-[10px] text-gray-text mt-2 tracking-widest">
+                              {currentPage + 1} / {pageCount}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
 
                     {/* Subtag quick-filter chips */}
                     <div className="flex flex-wrap gap-1.5 mt-4">

@@ -221,8 +221,11 @@ export default function ProductCard({ product }: ProductCardProps) {
             {product.available ? 'COMPRAR' : 'VER PRODUTO'}
           </a>
         ) : (
-          <button className="btn-primary w-full text-sm opacity-50 cursor-not-allowed" disabled>
-            {product.available ? 'COMPRAR' : 'ESGOTADO'}
+          <button
+            className="btn-primary w-full text-sm"
+            onClick={(e) => { e.stopPropagation(); navigate(`/produto/${product.id}`) }}
+          >
+            {product.available ? 'COMPRAR' : 'VER PRODUTO'}
           </button>
         )}
       </div>

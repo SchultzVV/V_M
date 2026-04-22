@@ -1,10 +1,30 @@
+# ── Variáveis de ambiente ────────────────────────────────────────
 .env
 .env.*
-vector_db/
-__pycache__
-/services/site/__pycache__/
+!.env.example
+!.env.*.example
 
-# Arquivos gerados pelo Docker (root) — screenshots, crops OCR, uploads
+# ── Dependências ─────────────────────────────────────────────────
+node_modules/
+
+# ── Python ───────────────────────────────────────────────────────
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# ── Jupyter ──────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Uploads / imagens geradas em runtime ─────────────────────────
+uploads/
+fallback_img.png
 services/site/fotos/
 services/site/uploads/
 services/site/staging/
@@ -12,20 +32,25 @@ services/site/insta_staging/
 services/site/list_to_prepare_and_stage/
 services/site/publish_ready/
 
-# Gerados em runtime — logs, temp files
+# ── Vector DB ────────────────────────────────────────────────────
+vector_db/
+
+# ── Logs e arquivos temporários ──────────────────────────────────
 /tmp/cloudflare_tunnel.log
 /tmp/cloudflare_tunnel_react.log
-*.pyc
-*.pyo
-*.pyd
-
-# SSL certificates & logs
-/certs/
 /logs/
+*.log
 
-# Certificados locais (apenas para dev)
+# ── SSL certificates ─────────────────────────────────────────────
+/certs/
 services/site/cert.pem
 services/site/key.pem
+cert.pem
+key.pem
 
-# Imagens avulsas de teste
+# ── Build artifacts ──────────────────────────────────────────────
+dist/
+build/
+
+# ── Imagens avulsas de teste ─────────────────────────────────────
 services/site/image_example.png

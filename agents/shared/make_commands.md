@@ -19,7 +19,11 @@
 
 ## Frontend Development
 
-### Setup & Build
+### ⚠️ Dois Frontends — Confirme qual antes de agir
+- **Flask/Jinja2 (legado)**: `services/site/templates/` — sem build, só `docker restart site`
+- **React SPA (atual)**: `frontend/src/` — precisa de build antes do restart
+
+### Setup & Build (React)
 - `make frontend-install` — Install npm dependencies
 - `make frontend-dev` — Start dev server (localhost:5173 with HTTPS proxy to 443/Nginx)
 - `make frontend-build` — Production build (React SPA → `frontend/dist/`)
@@ -28,6 +32,11 @@
 
 ### Local Full-Stack Test
 - `make frontup` ⭐ — Sobe site COMPLETO para testes locais: build React + Nginx + Backend
+
+### Refresh (mantém tunnel ativo)
+- `make refresh` ⚡ — Build React + restart site + nginx-react, SEM derrubar tunnel
+  - Só funciona se um tunnel já estiver ativo (`/tmp/cf_active_url.txt` presente)
+  - Aplica mudanças de **ambos** os frontends num único comando
 
 ---
 

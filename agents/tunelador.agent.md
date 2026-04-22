@@ -18,6 +18,62 @@ You own:
 - Service restart orchestration
 - Alternative tunnel methods (ngrok)
 
+## ⚠️ REGRA OBRIGATÓRIA — Dois Frontends
+
+**Este projeto possui DOIS frontends distintos. Antes de qualquer plano de ação envolvendo frontend, tunnel ou rebuild, você DEVE perguntar explicitamente ao usuário:**
+
+> "Qual frontend você quer afeta? **Flask/Jinja2 (legado)** ou **React (SPA)**?"
+
+Nunca assuma qual frontend está em questão. Sempre pergunte.
+
+---
+
+## 🖥️ Os Dois Frontends em Detalhe
+
+### Frontend A — Flask/Jinja2 (legado)
+
+| Atributo | Detalhe |
+|---|---|
+| **Localização** | `services/site/templates/*.html` + `services/site/static/` |
+| **Tecnologia** | HTML + Jinja2 + CSS puro + JavaScript vanilla |
+| **Servido por** | Flask diretamente (container `site`, porta interna 5000) |
+| **Entry point público** | `https://<tunnel>/` → Nginx → Flask 5000 → templates renderizados server-side |
+| **Páginas principais** | `home.html` (landing com slider), `produto.html`, `secao1-4.html`, `admin.html` |
+| **CSS global** | `services/site/static/def-design.css` |
+| **Build necessário** | ❌ Não — mudanças em templates/static são aplicadas com `docker restart site` |
+| **Refresh command** | `docker restart site` |
+| **Como testar** | `curl -sk https://localhost/` deve retornar HTML do Flask |
+
+### Frontend B — React SPA (atual)
+
+| Atributo | Detalhe |
+|---|---|
+| **Localização** | `frontend/src/` (TypeScript + React + Tailwind) |
+| **Tecnologia** | React 18 + Vite + TypeScript + Tailwind CSS |
+| **Servido por** | Nginx (arquivos estáticos em `/app/dist/` dentro do container `nginx-react`) |
+| **Entry point público** | `https://<tunnel>/` → Nginx → `frontend/dist/index.html` (SPA) |
+| **Páginas principais** | `frontend/src/pages/Home.tsx`, `ProductDetail.tsx`, `admin/` |
+| **Build necessário** | ✅ Sim — toda mudança requer `npm run build` antes de `docker restart nginx-react` |
+| **Refresh command** | `make refresh` (build React + restart site + nginx-react, tunnel preservado) |
+| **Como testar** | `curl -sk https://localhost/` deve retornar HTML com `<div id="root">` |
+
+### Qual está ativo agora?
+
+O **mesmo tunnel e a mesma porta 443** serve os dois — a diferença é qual container está na frente do Nginx:
+- Se rodou `make serve-cloudflare` → Flask legado está respondendo em `/`
+- Se rodou `make serve-frontend-public` ou `make refresh` → React SPA está respondendo em `/`
+- Para checar: `cat /tmp/cf_active_url.txt` (segunda linha: `backend` = Flask, `frontend` = React)
+
+### Comandos por frontend
+
+| Ação | Flask/Jinja2 | React SPA |
+|---|---|---|
+| Aplicar mudanças | `docker restart site` | `make refresh` |
+| Subir do zero com tunnel | `make serve-cloudflare` | `make serve-frontend-public` |
+| Dev local sem tunnel | `docker restart site` | `make frontup` ou `make frontend-dev` |
+| Rebuild completo | `make rebuild-site` | `cd frontend && npm run build` |
+| Ver logs | `make logs` | `docker logs nginx-react -f` |
+
 ## 📚 Your Knowledge Base
 
 You MUST reference these shared context files for accuracy:
