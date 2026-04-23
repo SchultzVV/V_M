@@ -5,6 +5,7 @@ import CatalogNav from '../components/CatalogNav'
 import SearchBar from '../components/SearchBar'
 import Pagination from '../components/Pagination'
 import LandingProductCard from '../components/LandingProductCard'
+import TagHeroGrid from '../components/TagHeroGrid'
 import { Product, productService } from '../services/productService'
 import { TAG_CONFIG } from '../data/subtags'
 
@@ -175,16 +176,16 @@ export default function Home() {
       {/* Main */}
       <section>
         <div className="container-def pt-6">
-          {/* CatalogNav: 1-click to any category or subtag */}
-          <CatalogNav />
-
           {isLanding ? (
-            /* ─── Landing view: 3 products per category ─── */
-            <div
-              className="flex flex-col gap-12 pb-16"
-              onMouseEnter={() => { rotationPaused.current = true }}
-              onMouseLeave={() => { rotationPaused.current = false }}
-            >
+            <>
+              <TagHeroGrid />
+              <div className="border-t border-gray-steel/30 my-8" />
+              {/* ─── Landing view: 3 products per category ─── */}
+              <div
+                className="flex flex-col gap-12 pb-16"
+                onMouseEnter={() => { rotationPaused.current = true }}
+                onMouseLeave={() => { rotationPaused.current = false }}
+              >
               {TAG_ORDER.map(tagKey => {
                 const config = TAG_CONFIG[tagKey]
                 const items = homepageData[tagKey] ?? []
@@ -286,9 +287,11 @@ export default function Home() {
                 )
               })}
             </div>
+            </>
           ) : (
             /* ─── Catalog view: full filtered grid ─── */
             <>
+              <CatalogNav />
               {/* Count row */}
               <div className="flex flex-wrap items-center gap-4 mb-4">
                 <p className="font-mono text-sm text-gray-text">
