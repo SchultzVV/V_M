@@ -21,7 +21,11 @@ TAG        ?= latest
 GHCR_USER   = $(GITHUB_USERNAME)
 GHCR_TOKEN  = $(GITHUB_TOKEN)
 IMAGE_NAME  = ghcr.io/$(GHCR_USER)/site:$(TAG)
-COMPOSE     = docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml --env-file .env
+COMPOSE       = docker compose -f docker-compose.yaml -f docker-compose.dev.yaml --env-file .env
+COMPOSE_REACT = docker compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml --env-file .env
+COMPOSE_PRD   = docker compose -f docker-compose.yaml -f docker-compose.prd.yaml --env-file .env.prd
+# Build React via container (não requer npm no host)
+REACT_BUILD   = docker run --rm -v $(PWD)/frontend:/app -w /app node:20-alpine sh -c "npm install --silent && npm run build"
 
 .DEFAULT_GOAL := help
 
@@ -89,15 +93,15 @@ psql:  ## Terminal psql no container postgres
 
 frontend-install:  ## Instala dependências do frontend
 	@echo "📦 Installing npm packages..."
-	@cd frontend && npm install
+	@docker run --rm -v $(PWD)/frontend:/app -w /app node:20-alpine npm install
 
 frontend-dev:  ## Inicia dev server frontend (localhost:5173)
 	@echo "🚀 Starting frontend dev server..."
-	@cd frontend && npm run dev
+	@docker run --rm -it -v $(PWD)/frontend:/app -w /app -p 5173:5173 node:20-alpine sh -c "npm install --silent && npm run dev -- --host"
 
 frontend-build:  ## Build production frontend
 	@echo "🏗️  Building frontend for production..."
-	@cd frontend && npm run build
+	@$(REACT_BUILD)
 	@echo "✅ Build completo em ./frontend/dist/"
 
 frontend-clean:  ## Remove node_modules e dist (limpa cache)
@@ -106,7 +110,7 @@ frontend-clean:  ## Remove node_modules e dist (limpa cache)
 
 frontend-build-prod:  ## Build React para produção com Nginx (alias melhorado)
 	@echo "🏗️  Building React frontend for production..."
-	@cd frontend && npm run build
+	@$(REACT_BUILD)
 	@echo "✅ Build completo: ./frontend/dist/"
 	@echo "   $(shell du -sh frontend/dist)"
 	@echo "   Pronto para servir com Nginx!"
@@ -119,11 +123,11 @@ frontup:  ## ⭐ Sobe site completo para testes locais (build React + Nginx + Ba
 	@echo ""
 	@echo "🏗️  Buildando React..."
 	@rm -rf frontend/dist/assets frontend/dist/*.js frontend/dist/*.css frontend/dist/index.html 2>/dev/null; mkdir -p frontend/dist
-	@cd frontend && npm run build > /dev/null 2>&1 || (echo "❌ Build falhou"; exit 1)
+	@$(REACT_BUILD) || { echo "❌ Build falhou"; exit 1; }
 	@echo "✅ Build completo"
 	@echo ""
 	@echo "🐳 Subindo containers..."
-	@docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml --env-file .env up -d --force-recreate nginx
+	@$(COMPOSE_REACT) up -d --force-recreate nginx
 	@echo ""
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo "✅ Site: https://localhost"
@@ -151,7 +155,7 @@ refresh:  ## ⚡ Rebuild React + reinicia containers — mantém o mesmo tunnel 
 	@echo "Step 1️⃣  Limpando build anterior..."
 	@rm -rf frontend/dist/assets frontend/dist/*.js frontend/dist/*.css frontend/dist/index.html 2>/dev/null; mkdir -p frontend/dist
 	@echo "Step 2️⃣  Building React (fresh)..."
-	@cd frontend && npm run build > /dev/null 2>&1 || (echo "❌ Build falhou"; exit 1)
+	@$(REACT_BUILD) || { echo "❌ Build falhou"; exit 1; }
 	@echo "✅ Build completo"
 	@echo ""
 	@echo "Step 3️⃣  Reiniciando containers (site + nginx)..."
@@ -184,7 +188,7 @@ serve-cloudflare:  ## ⭐ Túnel Cloudflare (Flask): Backend HTTP + tunnel + aut
 	sleep 2; \
 	echo "✅ Backend Flask em https://localhost:5555"; \
 	echo ""
-	@bash scripts/ensure_products.sh
+	@bash scripts/ensure_products.sh || echo "⚠️  DB check ignorado (não crítico)"
 	@echo "Step 2️⃣  Iniciando túnel Cloudflare..."; \
 	bash scripts/tunnel-manager.sh /tmp/cloudflare_tunnel.log "https://127.0.0.1:5555" 20 > /tmp/cf_url.txt; \
 	CF_URL=$$(cat /tmp/cf_url.txt); \
@@ -260,16 +264,16 @@ serve-frontend-public:  ## ⭐ Frontend React (build agressivo + Nginx + reutili
 	@echo "✅ Limpeza completa"
 	@echo ""
 	@echo "Step 2️⃣  Building React frontend (fresh build)..."; \
-	cd frontend && npm run build > /dev/null 2>&1 || (echo "❌ Build falhou"; exit 1); \
+	$(REACT_BUILD) || { echo "❌ Build falhou"; exit 1; }; \
 	echo "✅ React build completo (fresh)"; \
 	echo ""
 	@echo "Step 3️⃣  Subindo containers (Backend + Nginx — sem serviços LLM)..."; \
-	docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml --env-file .env up -d --no-deps db minio redis site nginx; \
+	$(COMPOSE_REACT) up -d --no-deps db minio redis site nginx; \
 	sleep 2; \
 	echo "✅ Flask API em https://localhost:5555"; \
 	echo "✅ Site (Nginx/Frontend) em https://localhost"; \
 	echo ""
-	@bash scripts/ensure_products.sh
+	@bash scripts/ensure_products.sh || echo "⚠️  DB check ignorado (não crítico)"
 	@echo "Step 4️⃣  Iniciando túnel Cloudflare..."; \
 	bash scripts/tunnel-manager.sh /tmp/cloudflare_tunnel.log "https://127.0.0.1:443" 20 > /tmp/cf_url.txt; \
 	CF_URL=$$(grep -oP 'https://[a-z0-9\-]+\.trycloudflare\.com' /tmp/cf_url.txt | head -1); \
@@ -335,7 +339,7 @@ serve-frontend-public:  ## ⭐ Frontend React (build agressivo + Nginx + reutili
 stop-frontend-public:  ## Parar Frontend React (Nginx apenas — preserva tunnel compartilhado)
 	@echo "🛑 Parando Nginx + containers..."
 	@echo "⚠️  Nota: Tunnel Cloudflare permanece ativo para outros serviços"
-	@docker-compose -f docker-compose.yaml -f docker-compose.dev.yaml -f docker-compose.react.yaml --env-file .env down 2>&1 | grep -E "Removing|Stopping|done" || echo "✅ Containers parados"
+	@$(COMPOSE_REACT) down 2>&1 | grep -E "Removing|Stopping|done" || echo "✅ Containers parados"
 	@echo "✅ React frontend encerrado"
 	@echo "💡 Se quiser parar o tunnel: make stop-cloudflare"
 
@@ -1029,13 +1033,13 @@ migrate-subcategory:  ## Migração: adiciona coluna subcategory nos produtos
 # ============================================================
 
 prd-up:  ## Sobe ambiente de produção
-	docker-compose -f docker-compose.yaml -f docker-compose.prd.yaml --env-file .env.prd up -d
+	$(COMPOSE_PRD) up -d
 
 prd-down:  ## Para ambiente de produção
-	docker-compose -f docker-compose.yaml -f docker-compose.prd.yaml --env-file .env.prd down -v
+	$(COMPOSE_PRD) down -v
 
 prd-logs:  ## Logs do site em produção
-	docker-compose -f docker-compose.yaml -f docker-compose.prd.yaml --env-file .env.prd logs -f site
+	$(COMPOSE_PRD) logs -f site
 
 build-prd-site:  ## Build da imagem de produção do site
 	docker build -t $(IMAGE_NAME) ./services/site
@@ -1046,9 +1050,9 @@ push-ghcr:  ## Build + push da imagem para GitHub Container Registry
 	docker push $(IMAGE_NAME)
 
 prd-up-ghcr:  ## Sobe produção usando imagem do GHCR
-	docker-compose -f docker-compose.yaml -f docker-compose.prd.yaml --env-file .env.prd down || true
+	$(COMPOSE_PRD) down || true
 	docker pull $(IMAGE_NAME)
-	docker-compose -f docker-compose.yaml -f docker-compose.prd.yaml --env-file .env.prd up -d
+	$(COMPOSE_PRD) up -d
 
 
 # ============================================================

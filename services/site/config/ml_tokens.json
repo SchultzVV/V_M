@@ -1,9 +1,9 @@
 {
-  "access_token": "APP_USR-3186869212482819-042312-1f3f168f822c1c115a5d2d3fec2b92d5-205650450",
+  "access_token": "APP_USR-3186869212482819-051619-0a29dcca186c8d317563c490efffcc3e-205650450",
   "token_type": "Bearer",
   "expires_in": 21600,
-  "scope": "offline_access read urn:global:admin:info:/read-only urn:global:admin:info:/read-write urn:global:admin:oauth:/read-only urn:global:admin:oauth:/read-write urn:global:admin:users:/read-only urn:global:admin:users:/read-write urn:ml:all:comunication:/read-only urn:ml:all:publish-sync:/read-only urn:ml:mktp:ads:/read-only urn:ml:mktp:comunication:/read-only urn:ml:mktp:invoices:/read-only urn:ml:mktp:metrics:/read-only urn:ml:mktp:offers:/read-only urn:ml:mktp:orders-shipments:/read-only urn:ml:mktp:publish-sync:/read-only urn:ml:vis:comunication:/read-only urn:ml:vis:publish-sync:/read-only write",
+  "scope": "offline_access read urn:global:admin:info:/read-write urn:global:admin:oauth:/read-write urn:global:admin:users:/read-write urn:ml:all:comunication:/read-only urn:ml:all:publish-sync:/read-only urn:ml:mktp:ads:/read-only urn:ml:mktp:comunication:/read-only urn:ml:mktp:invoices:/read-only urn:ml:mktp:metrics:/read-only urn:ml:mktp:offers:/read-only urn:ml:mktp:orders-shipments:/read-only urn:ml:mktp:publish-sync:/read-only urn:ml:vis:comunication:/read-only urn:ml:vis:publish-sync:/read-only write",
   "user_id": 205650450,
-  "refresh_token": "TG-69ea4ad7d1adf100014da6f7-205650450",
-  "expires_at": "2026-04-23T22:37:43.685556"
+  "refresh_token": "TG-6a090375a092f500016b1977-205650450",
+  "expires_at": "2026-05-17T05:53:25.847086"
 }

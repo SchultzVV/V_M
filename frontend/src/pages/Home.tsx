@@ -10,7 +10,7 @@ import { Product, productService } from '../services/productService'
 import { TAG_CONFIG } from '../data/subtags'
 
 const PAGE_SIZE = 20
-const TAG_ORDER = ['CD', 'ME', 'E', 'PET'] as const
+const TAG_ORDER = ['CD', 'ME', 'E', 'PET', 'ES'] as const
 
 type SortMode = 'none' | 'price_asc' | 'price_desc' | 'discount'
 

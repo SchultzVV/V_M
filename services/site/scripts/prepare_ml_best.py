@@ -636,6 +636,7 @@ def generate_staging_json(product_data: dict, images_dir: str, original_url: str
         "CD":   "casa-decoracao",
         "ME":   "moda-estilo",
         "PET":  "petshop",
+        "ES":   "esportes",
         "geral": "geral",
     }
     tag_folder = tag_folders.get(tag.upper(), "geral")

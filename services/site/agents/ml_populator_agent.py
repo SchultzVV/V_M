@@ -216,6 +216,49 @@ SEARCH_QUERIES: dict[str, dict[str, list[str]]] = {
             "vestido infantil casual",
         ],
     },
+    "ES": {
+        "futebol": [
+            "chuteira campo adulto",
+            "bola de futebol society oficial",
+            "caneleira futebol adulto",
+        ],
+        "corrida": [
+            "tênis de corrida masculino leve",
+            "tênis corrida feminino",
+            "meia cano médio corrida",
+        ],
+        "academia": [
+            "haltere borracha par 10kg",
+            "kettlebell 12kg",
+            "corda de pular speed crossfit",
+            "colchonete academia 10mm",
+        ],
+        "natacao": [
+            "óculos de natação profissional",
+            "touca de natação silicone",
+            "prancha de natação iniciante",
+        ],
+        "ciclismo": [
+            "capacete bike ciclismo urbano",
+            "luva ciclismo dedo cortado",
+            "bicicleta urbana aro 29",
+        ],
+        "tenis": [
+            "raquete tênis adulto iniciante",
+            "bola de tênis pack 3 unidades",
+            "raquete beach tennis profissional",
+        ],
+        "esportes-radicais": [
+            "capacete skate proteção",
+            "patins inline adulto",
+            "kit proteção joelheira cotoveleira",
+        ],
+        "acessorios": [
+            "garrafa térmica esportiva 1l",
+            "mochila esportiva academia 30l",
+            "suporte celular bike guidão",
+        ],
+    },
 }
 
 

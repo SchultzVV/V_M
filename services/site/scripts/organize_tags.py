@@ -159,6 +159,31 @@ def detect_category_with_confidence(title: str) -> Tuple[str, float]:
             # Especiais
             "festa", "casamento", "social", "formal", "praia", "piscina", "surf"
         ],
+        "ES": [
+            # Futebol
+            "futebol", "chuteira", "bola de futebol", "caneleira", "goleiro",
+            # Corrida e caminhada
+            "corrida", "tênis de corrida", "tenis de corrida", "maratona", "trilha",
+            # Academia e musculação
+            "academia", "musculação", "musculacao", "haltere", "kettlebell", "anilha",
+            "barra musculação", "banco supino", "colchonete", "corda pular",
+            # Ciclismo
+            "bicicleta", "bike", "ciclismo", "capacete bike", "luva ciclismo",
+            # Natação
+            "natação", "natacao", "óculos natação", "touca natacao", "prancha natação",
+            # Raquetes
+            "raquete", "tênis esportivo", "tenis esportivo", "beach tennis", "badminton",
+            # Outros esportes
+            "volei", "vôlei", "basquete", "handebol", "skate", "patins", "surf",
+            # Bem-estar
+            "yoga", "pilates", "crossfit", "funcional",
+            # Suplementos
+            "whey protein", "creatina", "suplemento esportivo", "proteína", "pré-treino",
+            # Vestuário esportivo
+            "roupa esportiva", "bermuda esportiva", "legging esportiva", "camiseta treino",
+            # Padrões genéricos
+            "esporte", "fitness", "treino", "esportivo", "esportiva",
+        ],
     }
 
     # Contar matches por categoria

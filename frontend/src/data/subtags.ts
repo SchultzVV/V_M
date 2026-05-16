@@ -64,4 +64,18 @@ export const TAG_CONFIG: Record<string, TagConfig> = {
       { label: 'Infantil', value: 'infantil' },
     ],
   },
+  ES: {
+    label: 'ESPORTES',
+    value: 'ES',
+    subtags: [
+      { label: 'Futebol', value: 'futebol' },
+      { label: 'Corrida', value: 'corrida' },
+      { label: 'Academia', value: 'academia' },
+      { label: 'Natação', value: 'natacao' },
+      { label: 'Ciclismo', value: 'ciclismo' },
+      { label: 'Tênis', value: 'tenis' },
+      { label: 'Esportes Radicais', value: 'esportes-radicais' },
+      { label: 'Acessórios', value: 'acessorios' },
+    ],
+  },
 }

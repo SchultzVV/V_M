@@ -23,11 +23,12 @@ CATEGORIES: dict[str, tuple[str, str, list[str]]] = {
     "E":    ("Eletrônicos",     "eletronicos",    ["smartphones", "computadores", "audio", "tv", "games", "cameras", "smartwatch", "acessorios"]),
     "CD":   ("Casa & Decoração","casa-decoracao", ["banheiro", "sala", "quarto", "cozinha", "corredor", "garagem", "sacada", "area-servico"]),
     "ME":   ("Moda & Estilo",   "moda-estilo",    ["feminino", "masculino", "infantil", "calcados", "acessorios", "bolsas", "relogios"]),
+    "ES":   ("Esportes",        "esportes",       ["futebol", "corrida", "academia", "natacao", "ciclismo", "tenis", "esportes-radicais", "acessorios"]),
     "geral":("Categoria Geral", "geral",          []),
 }
 
 # Ordem de exibição nos menus
-CATEGORY_ORDER = ["PET", "E", "CD", "ME", "geral"]
+CATEGORY_ORDER = ["PET", "E", "CD", "ME", "ES", "geral"]
 
 # Atalho: tag → nome da pasta no staging
 TAG_FOLDERS: dict[str, str] = {tag: info[1] for tag, info in CATEGORIES.items()}
@@ -70,6 +71,16 @@ def detect_product_category(title: str) -> str:
     for kw in moda_kw:
         if kw in t:
             return "ME"
+
+    esportes_kw = ["futebol", "chuteira", "bola de futebol", "corrida", "academia",
+                   "musculação", "musculacao", "haltere", "kettlebell", "bicicleta", "bike",
+                   "natação", "natacao", "raquete", "volei", "basquete", "handebol",
+                   "skate", "patins", "yoga", "pilates", "crossfit", "whey protein",
+                   "creatina", "suplemento esportivo", "roupa esportiva", "tênis esportivo",
+                   "tenis esportivo", "bermuda esportiva", "legging esportiva", "fitness"]
+    for kw in esportes_kw:
+        if kw in t:
+            return "ES"
     return "geral"
 
 

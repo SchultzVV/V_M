@@ -26,6 +26,7 @@ TAGS_SUBTAGS: dict[str, list[str]] = {
     "ME":  ["feminino", "masculino", "calcados", "acessorios", "bolsas", "relogios", "infantil"],
     "E":   ["smartphones", "audio", "computadores", "tv", "games", "cameras", "smartwatch", "acessorios"],
     "PET": ["gatos", "caes", "racao", "higiene", "brinquedos", "acessorios", "saude"],
+    "ES":  ["futebol", "corrida", "academia", "natacao", "ciclismo", "tenis", "esportes-radicais", "acessorios"],
 }
 
 CONTAINER = "site"

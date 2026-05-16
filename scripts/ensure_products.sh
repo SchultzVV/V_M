@@ -2,7 +2,7 @@
 # ensure_products.sh — Verifica se o banco tem produtos; se vazio, popula do staging.
 # Uso: bash scripts/ensure_products.sh [container_name]
 
-set -euo pipefail
+set -uo pipefail
 
 CONTAINER="${1:-site}"
 MAX_WAIT=60
@@ -50,7 +50,7 @@ try:
         print(result.scalar())
 except Exception:
     print(0)
-" 2>/dev/null | tail -1 | tr -d '[:space:]')
+" 2>/dev/null | tail -1 | tr -d '[:space:]') || true
 
 # Valida que COUNT é número
 if ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
@@ -75,7 +75,7 @@ try:
         print(result.scalar())
 except Exception:
     print(0)
-" 2>/dev/null | tail -1 | tr -d '[:space:]')
+" 2>/dev/null | tail -1 | tr -d '[:space:]') || true
     echo "   ✅ Stage concluído: ${NEW_COUNT} produto(s) carregado(s) no banco"
 else
     echo "   ✅ DB já tem ${COUNT} produto(s) — nenhuma ação necessária"
