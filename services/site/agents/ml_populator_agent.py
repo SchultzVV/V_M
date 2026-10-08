@@ -710,7 +710,7 @@ def main():
         "--tag",
         default=None,
         choices=list(SEARCH_QUERIES.keys()),
-        help="Filtra por tag (PET, E, CD, ME). Padrão: todas.",
+        help="Filtra por tag (PET, E, CD, ME, ES). Padrão: todas.",
     )
     parser.add_argument(
         "--subtag",

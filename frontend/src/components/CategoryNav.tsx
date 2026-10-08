@@ -12,6 +12,7 @@ const CATEGORIES: Category[] = [
   { label: TAG_CONFIG.E.label, value: 'E' },
   { label: TAG_CONFIG.CD.label, value: 'CD' },
   { label: TAG_CONFIG.ME.label, value: 'ME' },
+  { label: TAG_CONFIG.ES.label, value: 'ES' },
 ]
 
 export default function CategoryNav() {

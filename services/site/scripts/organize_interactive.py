@@ -25,7 +25,8 @@ def show_menu():
     print("   2. E - Eletrônicos")
     print("   3. CD - Casa & Decoração")
     print("   4. ME - Moda & Estilo")
-    print("   5. geral - Categoria Geral")
+    print("   5. ES - Esportes")
+    print("   6. geral - Categoria Geral")
     print("="*70)
 
 def get_category_from_user(suggested_tag=None):
@@ -35,11 +36,13 @@ def get_category_from_user(suggested_tag=None):
         "2": "E",
         "3": "CD",
         "4": "ME",
-        "5": "geral",
+        "5": "ES",
+        "6": "geral",
         "PET": "PET",
         "E": "E",
         "CD": "CD",
         "ME": "ME",
+        "ES": "ES",
         "geral": "geral",
     }
     
@@ -61,7 +64,7 @@ def get_category_from_user(suggested_tag=None):
             if choice in mapping:
                 return mapping[choice]
             else:
-                print("❌ Opção inválida. Digite 1-5 ou o nome da tag (PET, E, CD, ME, geral)")
+                print("❌ Opção inválida. Digite 1-6 ou o nome da tag (PET, E, CD, ME, ES, geral)")
         except KeyboardInterrupt:
             print("\n\n⚠️  Operação cancelada pelo usuário")
             sys.exit(0)

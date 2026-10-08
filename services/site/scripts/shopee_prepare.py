@@ -1033,6 +1033,7 @@ def main():
     print("   2. CD  - Casa & Decoração")
     print("   3. ME  - Moda & Estilo")
     print("   4. PET - Pet Shop")
+    print("   5. ES  - Esportes")
     
     # Mapear entrada para tag
     tag_map = {
@@ -1040,19 +1041,21 @@ def main():
         "2": "CD",
         "3": "ME",
         "4": "PET",
+        "5": "ES",
         "E": "E",
         "CD": "CD",
         "ME": "ME",
-        "PET": "PET"
+        "PET": "PET",
+        "ES": "ES"
     }
     
     # Pedir categoria
     while True:
-        tag_input = input("\n🏷️  Digite a categoria (1/2/3/4 ou E/CD/ME/PET): ").strip().upper()
+        tag_input = input("\n🏷️  Digite a categoria (1/2/3/4/5 ou E/CD/ME/PET/ES): ").strip().upper()
         tag = tag_map.get(tag_input)
         if tag:
             break
-        print("   ❌ Categoria inválida! Use: 1, 2, 3, 4 ou E, CD, ME, PET")
+        print("   ❌ Categoria inválida! Use: 1, 2, 3, 4, 5 ou E, CD, ME, PET, ES")
     
     print(f"\n✅ Categoria selecionada: {tag}")
     
@@ -1061,7 +1064,8 @@ def main():
         "CD": "area-servico, quarto, banheiro, cozinha, sala, organizacao",
         "E": "eletrodomesticos, informatica, celulares, audio, games",
         "ME": "roupas, calcados, acessorios, bolsas, joias",
-        "PET": "caes, gatos, aquarios, passaros, roedores"
+        "PET": "caes, gatos, aquarios, passaros, roedores",
+        "ES": "futebol, corrida, academia, natacao, ciclismo, tenis, esportes-radicais, acessorios"
     }
     
     print(f"\n💡 Subcategorias sugeridas para {tag}:")

@@ -670,7 +670,7 @@ prepare-all:  ## Prepara lote de produtos (list_to_prepare.json)
 	cat services/site/list_to_prepare_and_stage/list_to_prepare.json | jq -r '.links[].url' | \
 	while read PURL; do \
 		echo "" && echo "🔗 $$PURL"; \
-		read -p "🏷️  Categoria (geral/E/CD/ME/PET) [geral]: " CAT; CAT=$${CAT:-geral}; \
+		read -p "🏷️  Categoria (geral/E/CD/ME/PET/ES) [geral]: " CAT; CAT=$${CAT:-geral}; \
 		docker exec site python3 scripts/api_prepare_ml.py "$$PURL" "$$CAT" || echo "❌ Erro neste produto"; \
 		read -p "▶  Enter para próximo..."; \
 	done; \

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DEF - Esportes</title>
+  <link rel="stylesheet" href="/static/def-design.css" />
+</head>
+<body>
+  <header class="def-hero">
+    <div class="def-hero-row">
+      <h1 class="def-logo"><span class="accent">DEF</span><span class="dot">.</span></h1>
+      <p class="def-tagline">Esportes — <span class="hostile">Performance sob pressão</span></p>
+    </div>
+    <!-- Barra de Busca -->
+    <div class="search-container">
+      <div class="search-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="search-input" id="searchInput"
+          placeholder="Buscar em Esportes..." autocomplete="off" />
+        <button class="clear-btn" id="clearBtn" onclick="clearSearch()">✕ Limpar</button>
+      </div>
+      <div class="search-results-count" id="resultsCount"></div>
+    </div>
+  </header>
+
+  <div class="def-catalogue">
+    <nav class="nav-buttons">
+      <button class="nav-btn" onclick="window.location.href='/'" style="background: var(--neon-green-dim); color: var(--neon-green);">🏠 Home</button>
+      <button class="nav-btn" onclick="window.location.href='/catalogo'">Todos</button>
+      <button class="nav-btn" onclick="window.location.href='/secao1'">Casa &amp; Decoração</button>
+      <button class="nav-btn" onclick="window.location.href='/secao2'">Moda &amp; Estilo</button>
+      <button class="nav-btn" onclick="window.location.href='/secao3'">Eletrônicos</button>
+      <button class="nav-btn" onclick="window.location.href='/secao4'">PetShop</button>
+      <button class="nav-btn active" onclick="window.location.href='/secao5'">Esportes</button>
+      <button class="nav-btn" onclick="window.location.href='/ai/'">✦ Assistente</button>
+    </nav>
+    <div class="subcategory-buttons">
+      <button class="subcat-btn active" onclick="filterBySubcategory('todos', this)">🏅 Todos</button>
+      <button class="subcat-btn" onclick="filterBySubcategory('futebol', this)">⚽ Futebol</button>
+      <button class="subcat-btn" onclick="filterBySubcategory('corrida', this)">🏃 Corrida</button>
+      <button class="subcat-btn" onclick="filterBySubcategory('academia', this)">🏋️ Academia</button>
+      <button class="subcat-btn" onclick="filterBySubcategory('natacao', this)">🏊 Natação</button>
+      <button class="subcat-btn" onclick="filterBySubcategory('ciclismo', this)">🚴 Ciclismo</button>
+      <button class="subcat-btn" onclick="filterBySubcategory('tenis', this)">🎾 Tênis</button>
+      <button class="subcat-btn" onclick="filterBySubcategory('esportes-radicais', this)">🧗 Radicais</button>
+      <button class="subcat-btn" onclick="filterBySubcategory('acessorios', this)">🎽 Acessórios</button>
+    </div>
+    <div class="sort-buttons">
+      <button class="sort-btn" onclick="sortProducts('price-asc', this)">↓ Mais Barato</button>
+      <button class="sort-btn" onclick="sortProducts('discount', this)">🔥 Maior Promoção</button>
+      <button class="sort-btn" onclick="sortProducts('price-desc', this)">↑ Mais Caro</button>
+    </div>
+    <div class="grid" id="products-container"></div>
+  <script>
+    const FALLBACK_IMG = "/media/fallbacks/aa.png";
+
+    function createProductCard(product) {
+      const card = document.createElement("div");
+      card.className = "card";
+
+      const carousel = document.createElement("div");
+      carousel.className = "carousel";
+      carousel.dataset.index = 0;
+
+      product.images.forEach((img, idx) => {
+        const imgEl = document.createElement("img");
+        if (img.startsWith("/media/")) {
+          imgEl.src = img;
+        } else {
+          try {
+            const url = new URL(img, window.location.origin);
+            const parts = url.pathname.split("/").filter(Boolean);
+            const bucket = parts[0];
+            const filename = parts.slice(1).join("/");
+            imgEl.src = `/media/${bucket}/${filename}`;
+          } catch (e) {
+            console.warn("URL inválida:", img);
+            imgEl.src = FALLBACK_IMG;
+          }
+        }
+
+        imgEl.alt = product.title;
+        imgEl.className = "carousel-image" + (idx === 0 ? "" : " hidden");
+        imgEl.onerror = () => imgEl.src = FALLBACK_IMG;
+        carousel.appendChild(imgEl);
+      });
+
+      if (product.images.length > 1) {
+        const btnPrev = document.createElement("button");
+        btnPrev.innerHTML = "‹";
+        btnPrev.className = "carousel-btn left";
+        btnPrev.onclick = () => prevImage(btnPrev);
+
+        const btnNext = document.createElement("button");
+        btnNext.innerHTML = "›";
+        btnNext.className = "carousel-btn right";
+        btnNext.onclick = () => nextImage(btnNext);
+
+        carousel.appendChild(btnPrev);
+        carousel.appendChild(btnNext);
+      }
+
+      const overlay = document.createElement("div");
+      overlay.className = "overlay";
+
+      const title = document.createElement("div");
+      title.className = "title";
+      title.innerText = product.title;
+
+      const price = document.createElement("span");
+      price.className = "price";
+      price.innerText = product.price;
+
+      const oldPrice = document.createElement("span");
+      oldPrice.className = "old-price";
+      oldPrice.innerText = product.oldPrice || "";
+
+      const discount = document.createElement("span");
+      discount.className = "discount";
+      if (product.oldPrice && parseFloat(product.oldPrice.replace("R$", "").replace(",", ".")) > parseFloat(product.price.replace("R$", "").replace(",", "."))) {
+        const discountVal = Math.round((1 - parseFloat(product.price.replace("R$", "").replace(",", ".")) / parseFloat(product.oldPrice.replace("R$", "").replace(",", "."))) * 100);
+        discount.innerText = discountVal + "% de desconto!";
+      }
+
+      overlay.appendChild(title);
+      overlay.appendChild(price);
+      overlay.appendChild(oldPrice);
+      if (discount.innerText) overlay.appendChild(discount);
+
+      const link = document.createElement("a");
+      link.href = product.link;
+      link.target = "_blank";
+      link.className = "button";
+      link.innerText = "Ver Produto";
+
+      const siteLabel = document.createElement("div");
+      siteLabel.className = "site-label";
+      siteLabel.innerText = "🌐 " + product.bucketName || "Bucket";
+      siteLabel.style.textAlign = "center";
+      siteLabel.style.fontSize = "12px";
+      siteLabel.style.color = "#aaa";
+
+      card.appendChild(carousel);
+      card.appendChild(overlay);
+      card.appendChild(siteLabel);
+      card.appendChild(link);
+
+      return card;
+    }
+
+    function nextImage(btn) {
+      const carousel = btn.closest(".carousel");
+      const images = carousel.querySelectorAll(".carousel-image");
+      let index = parseInt(carousel.dataset.index);
+      images[index].classList.add("hidden");
+      index = (index + 1) % images.length;
+      images[index].classList.remove("hidden");
+      carousel.dataset.index = index;
+    }
+
+    function prevImage(btn) {
+      const carousel = btn.closest(".carousel");
+      const images = carousel.querySelectorAll(".carousel-image");
+      let index = parseInt(carousel.dataset.index);
+      images[index].classList.add("hidden");
+      index = (index - 1 + images.length) % images.length;
+      images[index].classList.remove("hidden");
+      carousel.dataset.index = index;
+    }
+
+    let allProducts = []; // Variável global para armazenar todos os produtos
+    let currentSubcategory = 'todos'; // Subcategoria atual
+    let currentSearchTerm = ''; // Termo de busca atual
+
+    function updateResultsCount(count, total, searchTerm = '') {
+      const resultsDiv = document.getElementById('resultsCount');
+      if (!resultsDiv) return;
+      if (searchTerm) {
+        resultsDiv.textContent = `🔍 ${count} produto${count !== 1 ? 's' : ''} encontrado${count !== 1 ? 's' : ''} para "${searchTerm}"`;
+      } else if (count !== total) {
+        resultsDiv.textContent = `Mostrando ${count} de ${total} produtos`;
+      } else {
+        resultsDiv.textContent = '';
+      }
+    }
+
+    function displayProducts(products) {
+      const container = document.getElementById('products-container');
+      if (!container) return;
+      container.innerHTML = '';
+      if (products.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #666; font-size: 18px; margin-top: 40px;">Nenhum produto encontrado 😢</p>';
+      } else {
+        products.forEach(product => {
+          const card = createProductCard(product);
+          container.appendChild(card);
+        });
+      }
+      updateResultsCount(products.length, allProducts.length, currentSearchTerm);
+    }
+
+    function searchProducts(searchTerm) {
+      currentSearchTerm = searchTerm.trim();
+      const clearBtn = document.getElementById('clearBtn');
+      if (clearBtn) clearBtn.classList.toggle('visible', !!currentSearchTerm);
+      
+      if (currentSearchTerm) {
+        fetch(`/api/products?tag=ES&search=${encodeURIComponent(currentSearchTerm)}`, {
+          headers: { "ngrok-skip-browser-warning": "true" }
+        })
+        .then(res => res.json())
+        .then(data => displayProducts(data.items || data))
+        .catch(err => console.error("Erro ao buscar produtos:", err));
+      } else {
+        filterBySubcategory(currentSubcategory, document.querySelector('.subcat-btn.active'));
+      }
+    }
+
+    function clearSearch() {
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput) searchInput.value = '';
+      currentSearchTerm = '';
+      const clearBtn = document.getElementById('clearBtn');
+      if (clearBtn) clearBtn.classList.remove('visible');
+      filterBySubcategory(currentSubcategory, document.querySelector('.subcat-btn.active'));
+      if (searchInput) searchInput.focus();
+    }
+
+    const SUBCAT_META = {
+      'smartphones': { icon: '📱', label: 'Smartphones' },
+      'computadores':{ icon: '💻', label: 'Computadores' },
+      'audio':       { icon: '🎧', label: 'Áudio' },
+      'tv':          { icon: '📺', label: 'TVs' },
+      'games':       { icon: '🎮', label: 'Games' },
+      'cameras':     { icon: '📷', label: 'Câmeras' },
+      'smartwatch':  { icon: '⌚', label: 'Smartwatch' },
+      'acessorios':  { icon: '🔌', label: 'Acessórios' },
+    };
+    const SUBCAT_ORDER = ['smartphones','computadores','audio','tv','games','cameras','smartwatch','acessorios'];
+
+    function makeSectionDivider(icon, label, count) {
+      const div = document.createElement('div');
+      div.className = 'section-divider';
+      div.innerHTML = `<span class="section-divider-icon">${icon}</span><span class="section-divider-label">${label}</span><span class="section-divider-count">${count} produto${count !== 1 ? 's' : ''}</span>`;
+      return div;
+    }
+
+    function filterBySubcategory(subcategory, clickedButton) {
+      currentSubcategory = subcategory;
+      document.querySelectorAll('.subcat-btn').forEach(btn => btn.classList.remove('active'));
+      if (clickedButton) clickedButton.classList.add('active');
+      const container = document.getElementById('products-container');
+      container.innerHTML = '';
+
+      if (subcategory === 'todos') {
+        let hasAny = false;
+        SUBCAT_ORDER.forEach(sub => {
+          const group = allProducts.filter(p => (p.subcategory || '').toLowerCase() === sub);
+          if (group.length === 0) return;
+          hasAny = true;
+          const meta = SUBCAT_META[sub] || { icon: '📦', label: sub };
+          container.appendChild(makeSectionDivider(meta.icon, meta.label, group.length));
+          group.forEach(p => container.appendChild(createProductCard(p)));
+        });
+        const known = new Set(SUBCAT_ORDER);
+        const others = allProducts.filter(p => !known.has((p.subcategory || '').toLowerCase()));
+        if (others.length > 0) {
+          container.appendChild(makeSectionDivider('📦', 'Outros', others.length));
+          others.forEach(p => container.appendChild(createProductCard(p)));
+          hasAny = true;
+        }
+        if (!hasAny) container.innerHTML = '<p style="text-align: center; color: #666; font-size: 18px; margin-top: 40px;">Nenhum produto encontrado nesta categoria 😢</p>';
+      } else {
+        const filteredProducts = allProducts.filter(p =>
+          (p.subcategory || '').toLowerCase() === subcategory.toLowerCase()
+        );
+        if (filteredProducts.length === 0) {
+          container.innerHTML = '<p style="text-align: center; color: #666; font-size: 18px; margin-top: 40px;">Nenhum produto encontrado nesta categoria 😢</p>';
+        } else {
+          const meta = SUBCAT_META[subcategory] || { icon: '📦', label: subcategory };
+          container.appendChild(makeSectionDivider(meta.icon, meta.label, filteredProducts.length));
+          filteredProducts.forEach(p => container.appendChild(createProductCard(p)));
+        }
+      }
+    }
+
+    function getNumericPrice(priceStr) {
+      return parseFloat(priceStr.replace("R$", "").replace(",", ".").trim());
+    }
+
+    function getDiscountPercentage(product) {
+      if (!product.oldPrice || product.oldPrice === product.price) return 0;
+      const oldPrice = getNumericPrice(product.oldPrice);
+      const currentPrice = getNumericPrice(product.price);
+      if (oldPrice > currentPrice) {
+        return Math.round((1 - currentPrice / oldPrice) * 100);
+      }
+      return 0;
+    }
+
+    function sortProducts(type, clickedButton) {
+      // Remove active class de todos os botões
+      document.querySelectorAll('.sort-btn').forEach(btn => btn.classList.remove('active'));
+      
+      // Adiciona active class ao botão clicado
+      if (clickedButton) clickedButton.classList.add('active');
+
+      let sortedProducts = [...allProducts];
+      
+      switch(type) {
+        case 'price-asc':
+          sortedProducts.sort((a, b) => getNumericPrice(a.price) - getNumericPrice(b.price));
+          break;
+        case 'price-desc':
+          sortedProducts.sort((a, b) => getNumericPrice(b.price) - getNumericPrice(a.price));
+          break;
+        case 'discount':
+          sortedProducts.sort((a, b) => getDiscountPercentage(b) - getDiscountPercentage(a));
+          break;
+      }
+      
+      // Limpa o container e adiciona produtos ordenados
+      const container = document.getElementById("products-container");
+      container.innerHTML = '';
+      sortedProducts.forEach(product => {
+        const card = createProductCard(product);
+        container.appendChild(card);
+      });
+    }
+
+    // Carregar produtos da seção 3 (Eletrônicos)
+    fetch('/api/products?tag=ES', {
+      headers: {
+        "ngrok-skip-browser-warning": "true"
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        allProducts = data.items || data;
+        filterBySubcategory('todos', document.querySelector('.subcat-btn.active'));
+      })
+      .catch(err => console.error('Erro ao carregar produtos:', err));
+    
+    // Event listeners para a busca
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+      let searchTimeout;
+      searchInput.addEventListener('input', function(e) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => searchProducts(e.target.value), 300);
+      });
+      searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          clearTimeout(searchTimeout);
+          searchProducts(e.target.value);
+        }
+      });
+    }
+  </script>
+  </div><!-- /.def-catalogue -->
+</body>
+</html>

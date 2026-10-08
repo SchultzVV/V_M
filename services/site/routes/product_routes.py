@@ -73,6 +73,12 @@ def secao4():
     return render_template("secao4.html")
 
 
+@product_bp.route("/secao5")
+def secao5():
+    # Esportes
+    return render_template("secao5.html")
+
+
 @product_bp.route("/add_product", methods=["POST"])
 def add_product():
     data = request.json
@@ -131,6 +137,12 @@ def auto_categorize_product(title):
     eletronicos_keywords = ['celular', 'smartphone', 'tablet', 'notebook', 'fone', 'carregador', 
                            'cabo', 'eletrônico', 'tv', 'monitor', 'mouse', 'teclado', 'camera', 
                            'smartwatch', 'airfryer', 'fritadeira', 'philips']
+
+    # Esportes
+    esportes_keywords = ['futebol', 'chuteira', 'bola', 'corrida', 'academia', 'musculação',
+                         'musculacao', 'halter', 'kettlebell', 'natação', 'natacao', 'ciclismo',
+                         'bicicleta', 'bike', 'tenis esportivo', 'raquete', 'crossfit', 'yoga',
+                         'pilates', 'suplemento']
     
     if any(keyword in title_lower for keyword in casa_keywords):
         tags.append("CD")
@@ -140,15 +152,18 @@ def auto_categorize_product(title):
         
     if any(keyword in title_lower for keyword in eletronicos_keywords):
         tags.append("E")
+
+    if any(keyword in title_lower for keyword in esportes_keywords):
+        tags.append("ES")
     
     return tags
 
 
 @product_bp.route("/api/homepage")
 def api_homepage():
-    """Retorna 3 produtos de cada tag (CD, ME, E, PET) para a página inicial"""
+    """Retorna 3 produtos de cada tag (CD, ME, E, PET, ES) para a página inicial"""
     try:
-        tags = ["CD", "ME", "E", "PET"]
+        tags = ["CD", "ME", "E", "PET", "ES"]
         result = {}
         
         for tag in tags:
@@ -291,6 +306,7 @@ def sitemap():
         {'path': '/secao2', 'priority': 0.8, 'changefreq': 'daily'},
         {'path': '/secao3', 'priority': 0.8, 'changefreq': 'daily'},
         {'path': '/secao4', 'priority': 0.8, 'changefreq': 'daily'},
+        {'path': '/secao5', 'priority': 0.8, 'changefreq': 'daily'},
     ]
     
     sitemap_xml = seo_service.generate_sitemap_xml(pages)

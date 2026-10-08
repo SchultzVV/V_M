@@ -1,20 +1,21 @@
 import { useSearchParams } from 'react-router-dom'
 import { TAG_CONFIG } from '../data/subtags'
 
-const TAG_ORDER = ['CD', 'ME', 'E', 'PET'] as const
+const TAG_ORDER = ['CD', 'ME', 'E', 'PET', 'ES'] as const
 
 const TAG_ICONS: Record<string, string> = {
   CD: '🏠',
   ME: '✨',
   E: '⚡',
   PET: '🐾',
+  ES: '🏅',
 }
 
 export default function TagHeroGrid() {
   const [, setSearchParams] = useSearchParams()
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
       {TAG_ORDER.map(tagKey => {
         const config = TAG_CONFIG[tagKey]
         const icon = TAG_ICONS[tagKey]
@@ -53,7 +54,7 @@ export default function TagHeroGrid() {
       {/* Ver Todos */}
       <button
         onClick={() => setSearchParams({})}
-        className="col-span-2 md:col-span-1 group relative flex flex-col items-center justify-center gap-2 p-5 bg-black-deep border border-dashed border-gray-steel/60 text-gray-text cursor-pointer transition-all duration-200 hover:bg-neon-green hover:border-neon-green hover:shadow-[0_0_20px_rgba(0,255,65,0.3)] hover:-translate-y-1"
+        className="col-span-2 md:col-span-3 lg:col-span-1 group relative flex flex-col items-center justify-center gap-2 p-5 bg-black-deep border border-dashed border-gray-steel/60 text-gray-text cursor-pointer transition-all duration-200 hover:bg-neon-green hover:border-neon-green hover:shadow-[0_0_20px_rgba(0,255,65,0.3)] hover:-translate-y-1"
       >
         <span className="text-2xl group-hover:text-black transition-colors">📋</span>
         <span className="font-mono text-sm font-bold tracking-[0.2em] uppercase group-hover:text-black transition-colors">

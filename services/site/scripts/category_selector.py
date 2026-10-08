@@ -95,7 +95,7 @@ def ask_user_category(suggested: str = None) -> str:
         suggested: tag sugerida (ex: 'PET') — se fornecida, é exibida como padrão.
 
     Returns:
-        Tag normalizada (ex: 'PET', 'E', 'CD', 'ME', 'geral')
+        Tag normalizada (ex: 'PET', 'E', 'CD', 'ME', 'ES', 'geral')
     """
     print("\n" + "=" * 70)
     print("🏷️  ESCOLHA A CATEGORIA DO PRODUTO")
@@ -105,7 +105,7 @@ def ask_user_category(suggested: str = None) -> str:
         name = CATEGORIES[tag][0]
         print(f"  {i}. {tag} - {name}")
 
-    # Aceita número (1-5) ou código direto (PET, E, CD, ME, geral)
+    # Aceita número (1-N) ou código direto (PET, E, CD, ME, ES, geral)
     num_map = {str(i + 1): tag for i, tag in enumerate(CATEGORY_ORDER)}
     tag_map = {**num_map, **{t: t for t in CATEGORIES}, **{t.lower(): t for t in CATEGORIES}}
 
@@ -118,7 +118,7 @@ def ask_user_category(suggested: str = None) -> str:
         prompt = f"\nDigite o número da categoria [Enter para usar a sugestão]: "
     else:
         suggested_upper = None
-        prompt = "\nDigite o número ou código (1-5, PET/E/CD/ME/geral): "
+        prompt = "\nDigite o número ou código (1-6, PET/E/CD/ME/ES/geral): "
 
     while True:
         choice = input(prompt).strip()
@@ -134,7 +134,7 @@ def ask_user_category(suggested: str = None) -> str:
         selected = tag_map.get(choice) or tag_map.get(choice.upper())
         if selected:
             break
-        print("   ❌ Inválido! Use 1-5 ou PET/E/CD/ME/geral")
+        print("   ❌ Inválido! Use 1-6 ou PET/E/CD/ME/ES/geral")
 
     print(f"✅ Categoria selecionada: {selected}")
     return selected

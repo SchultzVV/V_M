@@ -581,7 +581,7 @@ def create_amazon_json(product_data: dict, product_dir: str, original_url: str, 
     product_slug = slugify(product_data['title'])
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    tag_folders = {"E": "eletronicos", "CD": "casa-decoracao", "ME": "moda-estilo", "PET": "petshop", "geral": "geral"}
+    tag_folders = {"E": "eletronicos", "CD": "casa-decoracao", "ME": "moda-estilo", "PET": "petshop", "ES": "esportes", "geral": "geral"}
     tag_folder = tag_folders.get(tag.upper(), "geral")
     
     if subcategory:

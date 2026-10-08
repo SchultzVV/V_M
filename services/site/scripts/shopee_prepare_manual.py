@@ -86,9 +86,10 @@ def main():
     print("CD - Casa e Decoração")  
     print("ME - Moda e Estilo")
     print("PET - Pet Shop")
+    print("ES - Esportes")
     
-    category = input("\nEscolha a categoria (E/CD/ME/PET): ").strip().upper()
-    if category not in ['E', 'CD', 'ME', 'PET']:
+    category = input("\nEscolha a categoria (E/CD/ME/PET/ES): ").strip().upper()
+    if category not in ['E', 'CD', 'ME', 'PET', 'ES']:
         print("❌ Categoria inválida")
         sys.exit(1)
     
@@ -97,7 +98,8 @@ def main():
         'E': ['smartphone', 'notebook', 'tablet', 'acessorios', 'outros'],
         'CD': ['cozinha', 'quarto', 'banheiro', 'decoracao', 'outros'],
         'ME': ['roupas', 'calcados', 'acessorios', 'bolsas', 'outros'],
-        'PET': ['caes', 'gatos', 'passaros', 'acessorios', 'outros']
+        'PET': ['caes', 'gatos', 'passaros', 'acessorios', 'outros'],
+        'ES': ['futebol', 'corrida', 'academia', 'natacao', 'ciclismo', 'tenis', 'esportes-radicais', 'acessorios', 'outros']
     }
     
     print(f"\nSubcategorias disponíveis: {', '.join(subcategories[category])}")

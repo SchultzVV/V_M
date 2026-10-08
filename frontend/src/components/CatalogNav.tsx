@@ -1,7 +1,7 @@
 import { useSearchParams } from 'react-router-dom'
 import { TAG_CONFIG } from '../data/subtags'
 
-const TAGS = ['PET', 'E', 'CD', 'ME'] as const
+const TAGS = ['PET', 'E', 'CD', 'ME', 'ES'] as const
 
 export default function CatalogNav() {
   const [searchParams, setSearchParams] = useSearchParams()

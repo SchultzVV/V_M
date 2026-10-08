@@ -231,7 +231,7 @@ stage_products.py
 - [Instagram API](docs/instagram/INSTAGRAM_API_OFICIAL.md)
 
 ```bash
-make populate-mf                          # todas as tags (PET, E, CD, ME)
+make populate-mf                          # todas as tags (PET, E, CD, ME, ES)
 make populate-mf TAG=PET                  # só PET
 make populate-mf TAG=PET SUBTAG=gatos     # só PET/gatos
 make populate-mf TAG=PET DRY=1            # dry-run PET
@@ -282,6 +282,16 @@ make populate-mf TAG=ME SUBTAG=acessorios LIMIT=3
 make populate-mf TAG=ME SUBTAG=bolsas LIMIT=3
 make populate-mf TAG=ME SUBTAG=relogios LIMIT=3
 make populate-mf TAG=ME SUBTAG=infantil LIMIT=3
+
+# TAG=ES
+make populate-mf TAG=ES SUBTAG=futebol LIMIT=3
+make populate-mf TAG=ES SUBTAG=corrida LIMIT=3
+make populate-mf TAG=ES SUBTAG=academia LIMIT=3
+make populate-mf TAG=ES SUBTAG=natacao LIMIT=3
+make populate-mf TAG=ES SUBTAG=ciclismo LIMIT=3
+make populate-mf TAG=ES SUBTAG=tenis LIMIT=3
+make populate-mf TAG=ES SUBTAG=esportes-radicais LIMIT=3
+make populate-mf TAG=ES SUBTAG=acessorios LIMIT=3
 ```
 ---
 

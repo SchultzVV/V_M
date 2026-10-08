@@ -57,6 +57,11 @@ def run_migration():
             eletronicos_keywords = ['celular', 'smartphone', 'tablet', 'notebook', 'fone', 'carregador', 
                                    'cabo', 'eletrônico', 'tv', 'monitor', 'mouse', 'teclado', 'camera', 
                                    'smartwatch', 'airfryer', 'fritadeira', 'philips']
+
+            # Esportes
+            esportes_keywords = ['futebol', 'chuteira', 'bola', 'corrida', 'academia', 'musculação',
+                                 'musculacao', 'halter', 'kettlebell', 'natação', 'natacao', 'ciclismo',
+                                 'bike', 'bicicleta', 'tenis de corrida', 'raquete', 'crossfit', 'yoga']
             
             if any(keyword in title for keyword in casa_keywords):
                 tags.append("CD")
@@ -66,6 +71,9 @@ def run_migration():
                 
             if any(keyword in title for keyword in eletronicos_keywords):
                 tags.append("E")
+
+            if any(keyword in title for keyword in esportes_keywords):
+                tags.append("ES")
             
             # Atualizar produto com as tags
             cursor.execute(

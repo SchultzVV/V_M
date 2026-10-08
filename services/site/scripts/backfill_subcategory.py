@@ -36,6 +36,16 @@ SUBTAG_KEYWORDS = {
         'smartwatch':   ['smartwatch', 'mi band', 'galaxy watch'],
         'acessorios':   ['cabo usb', 'carregador turbo', 'base carregamento'],
     },
+    'ES': {
+        'futebol': ['futebol', 'chuteira', 'bola'],
+        'corrida': ['corrida', 'running', 'tenis de corrida'],
+        'academia': ['academia', 'musculacao', 'musculação', 'halter', 'kettlebell'],
+        'natacao': ['natacao', 'natação', 'oculos de natacao'],
+        'ciclismo': ['ciclismo', 'bicicleta', 'bike', 'capacete ciclismo'],
+        'tenis': ['raquete', 'bola de tenis', 'tenis de quadra'],
+        'esportes-radicais': ['skate', 'patins', 'escalada', 'radical'],
+        'acessorios': ['garrafa termica', 'luva esportiva', 'faixa', 'acessorio fitness'],
+    },
     'CD': {
         'area-servico': ['varal'],
         'limpeza':      ['chuveiro', 'lava-roupas', 'banho a seco', 'toalhas umedecidas'],
@@ -87,7 +97,7 @@ s = SessionLocal()
 updated = 0
 skipped = 0
 
-for tag_name in ['PET', 'E', 'CD', 'ME']:
+for tag_name in ['PET', 'E', 'CD', 'ME', 'ES']:
     ps = s.query(Product).filter(
         Product.tags.like(f'%"{tag_name}"%'),
         Product.subcategory == ''
