@@ -1,0 +1,651 @@
+<title>Diagnóstico DEF</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  /* Layout: coluna única de leitura (max 1040px) sobre o design system DEF (brutalista, sem raio, mono + Inter); tabelas, diagramas e código rolam na horizontal dentro do próprio contêiner. */
+  :root {
+    --bg: #0a0a0a;
+    --surface: #1a1a1a;
+    --surface-2: #2a2a2a;
+    --line: #3a3a3a;
+    --fg: #d1d5db;
+    --fg-strong: #f3f4f6;
+    --muted: #9ca3af;
+    --accent: #00ff41;
+    --accent-dim: #00cc33;
+    --accent-ink: #0a0a0a;
+    --ok: #00ff41;
+    --ok-bg: #0d2a14;
+    --warn: #ffb000;
+    --warn-bg: #2e2206;
+    --crit: #ff004d;
+    --crit-bg: #33000f;
+    --none: #9ca3af;
+    --none-bg: #262626;
+    --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    --font-sans: "Inter", system-ui, "Segoe UI", sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); font-size: 16px; line-height: 1.55; padding-inline: 16px; padding-block: 0 72px; }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  h1, h2, h3 { font-family: var(--font-mono); color: var(--fg-strong); text-wrap: balance; line-height: 1.15; margin: 0; letter-spacing: 0.01em; }
+  h1 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 700; text-transform: uppercase; }
+  h2 { font-size: clamp(1.3rem, 2.6vw, 1.7rem); font-weight: 700; text-transform: uppercase; margin-top: 64px; margin-bottom: 10px; padding-top: 14px; border-top: 2px solid var(--accent); }
+  h3 { font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 30px; margin-bottom: 8px; color: var(--accent); }
+  p { margin: 0 0 12px; max-width: 72ch; }
+  a { color: var(--accent); }
+  code, pre, .mono { font-family: var(--font-mono); }
+  code { font-size: 0.86em; background: var(--surface-2); color: var(--fg-strong); padding: 1px 5px; }
+  pre { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); padding: 14px 16px; overflow-x: auto; margin: 12px 0; font-size: 0.84rem; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  .eyebrow { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+  .lead { font-size: 1.08rem; max-width: 70ch; color: var(--fg); }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); margin-top: 16px; }
+  .meta b { color: var(--fg-strong); font-weight: 600; }
+  header.top { padding-block: 44px 24px; border-bottom: 1px solid var(--line); }
+
+  nav.jump { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); padding-block: 8px; margin-inline: -16px; padding-inline: 16px; }
+  nav.jump ul { list-style: none; margin: 0 auto; padding: 0; display: flex; gap: 2px 16px; flex-wrap: wrap; max-width: 1040px; }
+  nav.jump a { text-decoration: none; font-family: var(--font-mono); font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 4px 0; }
+  nav.jump a:hover, nav.jump a:focus-visible { color: var(--accent); outline: none; }
+
+  .chip { display: inline-block; font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 7px; white-space: nowrap; font-weight: 600; border: 1px solid currentColor; }
+  .chip.ok { color: var(--ok); background: var(--ok-bg); }
+  .chip.warn { color: var(--warn); background: var(--warn-bg); }
+  .chip.crit { color: var(--crit); background: var(--crit-bg); }
+  .chip.none { color: var(--none); background: var(--none-bg); }
+
+  .cols3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+  .col { background: var(--surface); border: 1px solid var(--line); padding: 16px; min-width: 0; }
+  .col h3 { margin-top: 0; display: flex; align-items: center; gap: 8px; color: var(--fg-strong); }
+  .col ul { margin: 10px 0 0; padding-left: 18px; }
+  .col li { margin-bottom: 6px; }
+  .col.ok { border-top: 3px solid var(--ok); }
+  .col.warn { border-top: 3px solid var(--warn); }
+  .col.none { border-top: 3px solid var(--none); }
+  @media (max-width: 760px) { .cols3 { grid-template-columns: 1fr; } }
+
+  .rail { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 14px; counter-reset: st; }
+  .stage { background: var(--surface); border: 1px solid var(--line); padding: 12px 14px; min-width: 0; display: grid; gap: 6px; align-content: start; counter-increment: st; }
+  .stage::before { content: counter(st, decimal-leading-zero); font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); letter-spacing: 0.1em; }
+  .stage b { font-family: var(--font-mono); font-size: 0.86rem; color: var(--fg-strong); line-height: 1.3; }
+  .stage p { margin: 0; font-size: 0.86rem; color: var(--muted); }
+  .stage.ok { border-left: 3px solid var(--ok); }
+  .stage.warn { border-left: 3px solid var(--warn); }
+  .stage.crit { border-left: 3px solid var(--crit); }
+  .stage.none { border-left: 3px solid var(--none); }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); background: var(--surface); margin: 12px 0 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+  tr:last-child td { border-bottom: 0; }
+  td code { white-space: nowrap; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  .diagram { background: var(--surface); border: 1px solid var(--line); padding: 12px; overflow-x: auto; margin: 12px 0; }
+  .diagram .cap { font-size: 0.84rem; color: var(--muted); margin: 0 0 6px; }
+  pre.mermaid { background: none; border: 0; padding: 0; margin: 0; }
+
+  ol.steps { padding-left: 0; list-style: none; counter-reset: s; margin: 12px 0; display: grid; gap: 8px; }
+  ol.steps li { counter-increment: s; display: grid; grid-template-columns: 40px 1fr; gap: 10px; background: var(--surface); border: 1px solid var(--line); padding: 12px 14px; min-width: 0; }
+  ol.steps li::before { content: counter(s, decimal-leading-zero); font-family: var(--font-mono); font-weight: 700; font-size: 1.1rem; color: var(--accent); line-height: 1.2; }
+  ol.steps li div { min-width: 0; }
+  ol.steps li b { display: block; margin-bottom: 2px; font-family: var(--font-mono); font-size: 0.9rem; color: var(--fg-strong); }
+  ol.steps li pre { margin: 8px 0 0; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-top: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--line); padding: 16px; min-width: 0; }
+  .card h3 { margin-top: 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--fg-strong); }
+  .card dl { margin: 10px 0 0; display: grid; grid-template-columns: 90px 1fr; gap: 6px 10px; font-size: 0.9rem; }
+  .card dt { color: var(--muted); font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; padding-top: 3px; }
+  .card dd { margin: 0; min-width: 0; }
+
+  .findings { display: grid; gap: 8px; margin-top: 12px; }
+  .finding { display: grid; grid-template-columns: 5px 1fr; gap: 12px; background: var(--surface); border: 1px solid var(--line); }
+  .finding .stripe { background: var(--none); }
+  .finding.crit .stripe { background: var(--crit); }
+  .finding.warn .stripe { background: var(--warn); }
+  .finding .body { padding: 11px 14px 11px 4px; min-width: 0; }
+  .finding b { display: block; margin-bottom: 3px; color: var(--fg-strong); }
+  .finding p { margin: 0; font-size: 0.93rem; max-width: none; }
+  .finding .where { font-family: var(--font-mono); font-size: 0.74rem; color: var(--muted); margin-top: 6px; word-break: break-word; }
+
+  .phases { display: grid; gap: 12px; margin-top: 14px; }
+  .phase { background: var(--surface); border: 1px solid var(--line); padding: 16px 18px; min-width: 0; }
+  .phase header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .phase .tag { font-family: var(--font-mono); font-weight: 700; font-size: 1.4rem; color: var(--accent); }
+  .phase h3 { margin: 0; color: var(--fg-strong); }
+  .phase .est { margin-left: auto; color: var(--muted); font-family: var(--font-mono); font-size: 0.78rem; }
+  .phase ul { margin: 10px 0 0; padding-left: 18px; }
+  .phase li { margin-bottom: 4px; }
+  .phase .done { margin-top: 10px; padding: 8px 12px; background: var(--ok-bg); color: var(--ok); border-left: 3px solid var(--ok); font-size: 0.9rem; }
+
+  .checklist { margin-top: 10px; }
+  .checklist h3 { display: flex; align-items: center; gap: 10px; }
+  .checklist h3 .count { font-family: var(--font-mono); font-size: 0.74rem; color: var(--muted); font-weight: 400; }
+  .checklist ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; }
+  .checklist li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; background: var(--surface); border: 1px solid var(--line); padding: 8px 12px; min-width: 0; }
+  .checklist input { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--accent); cursor: pointer; }
+  .checklist label { cursor: pointer; min-width: 0; }
+  .checklist li.done label { color: var(--muted); text-decoration: line-through; }
+  .note { font-size: 0.86rem; color: var(--muted); }
+  .progress { display: flex; align-items: center; gap: 10px; margin: 8px 0 4px; font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); }
+  .progress .bar { flex: 1; height: 8px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+  .progress .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s ease; }
+  @media (prefers-reduced-motion: reduce) { .progress .bar i { transition: none; } }
+  footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 0.84rem; color: var(--muted); font-family: var(--font-mono); }
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow">DEF · catálogo de sobrevivência pós-sistema · raio-x do repositório</div>
+  <h1>Diagnóstico DEF</h1>
+  <p class="lead">O que roda, o que foi escrito e nunca ligou, o que é mock, o que não existe, e a distância até o pipeline Instagram → menor preço → site → Instagram. Leitura integral do código em 8 de outubro de 2026, com três auditorias paralelas sobre Instagram e recomendação, esteira de produtos e integrações, e infra.</p>
+  <div class="meta">
+    <span>repo <b>~/Desktop/V_M</b></span>
+    <span>remoto <b>SchultzVV/V_M</b></span>
+    <span>branch <b>dev-front</b> @ <b>2ffd05f</b> (2026-05-16)</span>
+    <span>à frente de main <b class="num">44</b> commits</span>
+    <span>árvore <b>suja</b> (22 mod + secao5.html)</span>
+    <span>staging <b class="num">74</b> JSON, <b class="num">59</b> publicados, <b class="num">62</b> com preço zero</span>
+  </div>
+</header>
+
+<nav class="jump" aria-label="Seções">
+  <ul>
+    <li><a href="#resumo">Resumo</a></li>
+    <li><a href="#visao">Visão × real</a></li>
+    <li><a href="#mapa">Mapa</a></li>
+    <li><a href="#inventario">Inventário</a></li>
+    <li><a href="#esteira">Esteira</a></li>
+    <li><a href="#integracoes">Integrações</a></li>
+    <li><a href="#diagnostico">Diagnóstico</a></li>
+    <li><a href="#plano">Plano</a></li>
+    <li><a href="#checklist">Checklist</a></li>
+  </ul>
+</nav>
+
+<section id="resumo">
+  <h2>Resumo</h2>
+  <p>O projeto é muito maior do que o snapshot de março sugeria: dois frontends, oito blueprints, oito agentes, mais de trinta scripts, OCR, três LLMs e sessenta documentos. A esteira de produtos funciona de ponta a ponta para o Mercado Livre. O Instagram está escrito sobre uma biblioteca não oficial que já foi bloqueada, com agentes mock. A recomendação de conteúdo é um scaffold numa branch separada, sem ligação com os produtos.</p>
+  <div class="cols3">
+    <div class="col ok">
+      <h3><span class="chip ok">funciona</span> Hoje</h3>
+      <ul>
+        <li>Mercado Livre completo: OAuth com refresh, API oficial + OCR para preço promo, link de afiliado <code>matt_tool</code>, menor vendedor no catálogo.</li>
+        <li><code>make prepare-ml</code> → <code>organize-tags</code> → <code>stage</code>: produto no site com imagens no MinIO.</li>
+        <li>React SPA atrás de Nginx 443 com busca, paginação, tag e subtag; Jinja em paralelo para <code>/catalogo</code> e <code>/secaoN</code>.</li>
+        <li><code>make populate-mf</code>: agente que enche o site com mais vendidos do ML por tag/subtag.</li>
+        <li>Túnel Cloudflare temporário com reconfiguração automática do callback OAuth.</li>
+        <li>Price oracle e tag classifier com LLM local (Ollama) quando a stack <code>hsmart</code> está de pé.</li>
+      </ul>
+    </div>
+    <div class="col warn">
+      <h3><span class="chip warn">quebrado ou mock</span> Escrito, não confiável</h3>
+      <ul>
+        <li>Instagram: <code>instagrapi</code> (usuário/senha, viola os termos, login já falha); decisor e enriquecedor são mocks; o decisor lê <code>staging/*.json</code> sem recursão e acha zero produtos.</li>
+        <li>Webhook e sync do ML quebram: <code>marketplace_service</code> usa uma instância de banco nunca inicializada.</li>
+        <li><code>tag_classifier --db</code> é um no-op que gasta LLM; não conhece a tag ES.</li>
+        <li>Shopee e Amazon por scraping + OCR, sem API oficial, sem tag de afiliado na Amazon.</li>
+        <li>62 dos 74 JSONs de staging têm <code>R$ 0.00</code>; o stage pula em silêncio.</li>
+        <li>CI sem testes; <code>make up</code> exige Qdrant + Ollama + hsmart; URL fixa do Cloudflare inoperante.</li>
+      </ul>
+    </div>
+    <div class="col none">
+      <h3><span class="chip none">não existe</span> Zero código útil</h3>
+      <ul>
+        <li>Graph API do Instagram (só documentação).</li>
+        <li>Observador de perfil seguido, hashtags ou menções.</li>
+        <li>Recomendação ligada a produtos reais (o scaffold lê o perfil do próprio usuário e nunca preenche embeddings).</li>
+        <li>Menor preço entre plataformas (só ML × vendedores do ML).</li>
+        <li>Fila de posts com aprovação humana; trilha de decisão dos agentes.</li>
+        <li>Autenticação nas rotas de escrita; domínio público estável; cron.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="visao">
+  <h2>Visão × estado real</h2>
+  <p>O pipeline-alvo do PRD, etapa por etapa, com o que o código faz hoje em cada uma.</p>
+  <div class="rail">
+    <div class="stage none"><b>Operador segue perfil</b><span class="chip none">não existe</span><p>Nenhum registro de <code>@username</code>. O scaffold só autentica o próprio usuário.</p></div>
+    <div class="stage none"><b>Observador coleta posts</b><span class="chip none">não existe</span><p>Sem business discovery, hashtags ou menções.</p></div>
+    <div class="stage warn"><b>Recomendador extrai intenções</b><span class="chip warn">scaffold</span><p>Branch <code>dev-recommendations</code>: FastAPI + Kafka, embeddings nunca preenchidos, catálogo fictício.</p></div>
+    <div class="stage warn"><b>Menor preço ML · Shopee · Amazon</b><span class="chip warn">só ML</span><p><code>price_validator</code> compara vendedores do catálogo ML. Nada entre plataformas.</p></div>
+    <div class="stage ok"><b>Ficha oficial</b><span class="chip ok">ML</span><p>API + OCR para o ML. Shopee e Amazon por scraping frágil.</p></div>
+    <div class="stage warn"><b>Composição do post</b><span class="chip warn">mock</span><p>Staging JSON ok; legenda é template fixo sem link de afiliado.</p></div>
+    <div class="stage none"><b>Gate humano</b><span class="chip none">não existe</span><p>Só o <code>organize-tags</code> pergunta a categoria.</p></div>
+    <div class="stage ok"><b>Publicar no site</b><span class="chip ok">funciona</span><p><code>make stage</code>: MinIO + <code>/add_product</code> + React.</p></div>
+    <div class="stage crit"><b>Publicar no Instagram</b><span class="chip crit">bloqueado</span><p><code>instagrapi</code> com login falhando; Graph API não implementada; sem URL pública estável.</p></div>
+    <div class="stage warn"><b>Acompanhar preço e estoque</b><span class="chip warn">manual</span><p>Webhook ML quebrado; <code>update-ml-prices</code> à mão; sem cron.</p></div>
+  </div>
+</section>
+
+<section id="mapa">
+  <h2>Mapa do que roda</h2>
+  <p>Serviços e caminhos reais em desenvolvimento. O site só precisa dos quatro da esquerda e do OCR; a stack de LLM à direita entra por causa do <code>depends_on</code> no compose de dev.</p>
+  <div class="diagram">
+    <p class="cap">Tempo de execução: Nginx 443 na frente, Flask atrás, túnel Cloudflare para fora.</p>
+<pre class="mermaid">
+%%{init: {"theme": "dark", "themeVariables": {"primaryColor": "#1a1a1a", "primaryTextColor": "#d1d5db", "primaryBorderColor": "#00ff41", "lineColor": "#9ca3af", "secondaryColor": "#2a2a2a", "tertiaryColor": "#0a0a0a", "fontFamily": "IBM Plex Mono", "fontSize": "13px"}}}%%
+flowchart LR
+  CF["Cloudflare quick tunnel&lt;br/&gt;*.trycloudflare.com"] --> NG["nginx-react :443&lt;br/&gt;frontend/dist (React)"]
+  NG -->|/api /auth /webhook| SITE["Flask site :5555&lt;br/&gt;8 blueprints"]
+  NG -->|/catalogo /secao1-4 /ai| SITE
+  NG -->|/media| MINIO[("MinIO :9000&lt;br/&gt;bucket por plataforma")]
+  SITE --> PG[("PostgreSQL 15&lt;br/&gt;products")]
+  SITE --> RD[("Redis :6379&lt;br/&gt;cache + histórico agentes")]
+  SITE -->|screenshot → OCR| OCR["info-scrap :8001&lt;br/&gt;(imagem externa)"]
+  SITE -->|tag classifier · price oracle| HS["hsmart :5005&lt;br/&gt;(imagem externa)"]
+  HS --> OL["Ollama :11434&lt;br/&gt;qwen2.5:1.5b"]
+  HS --> QD[("Qdrant :6333&lt;br/&gt;price_history")]
+  SITE -->|/ai/ask · BaseAgent| OAI["OpenAI gpt-4o-mini"]
+  SITE -->|OAuth + API| ML["api.mercadolibre.com"]
+  SITE -. instagrapi, bloqueado .-> IG["Instagram"]
+  OP["Operador&lt;br/&gt;make prepare-* / stage"] --> SITE
+</pre>
+  </div>
+</section>
+
+<section id="inventario">
+  <h2>Inventário verificado</h2>
+
+  <h3>Serviços Docker</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Serviço</th><th>Imagem</th><th>Porta</th><th>Papel</th><th>Compose</th><th>Site precisa?</th></tr></thead>
+      <tbody>
+        <tr><td><code>site</code></td><td>build services/site/Dockerfile (py3.10 + Playwright)</td><td class="num">5555→5000 HTTPS</td><td>Flask</td><td>base + dev</td><td><span class="chip ok">sim</span></td></tr>
+        <tr><td><code>db</code></td><td>postgres:15</td><td class="num">5432</td><td>tabela products</td><td>base</td><td><span class="chip ok">sim</span></td></tr>
+        <tr><td><code>minio</code></td><td>minio/minio</td><td class="num">9000 / 9001</td><td>imagens</td><td>base</td><td><span class="chip ok">sim</span></td></tr>
+        <tr><td><code>redis</code></td><td>redis:7</td><td class="num">6379</td><td>cache, agentes</td><td>base</td><td><span class="chip ok">sim</span></td></tr>
+        <tr><td><code>info-scrap</code></td><td>ghcr.io/schultzvv/info_scrap</td><td class="num">8001→8000</td><td>OCR de preço</td><td>base</td><td><span class="chip warn">p/ prepare</span></td></tr>
+        <tr><td><code>vector_db</code></td><td>qdrant</td><td class="num">6333</td><td>price_history</td><td>dev</td><td><span class="chip none">não</span></td></tr>
+        <tr><td><code>ollama</code></td><td>ollama/ollama</td><td class="num">11434</td><td>LLM local</td><td>dev</td><td><span class="chip none">não</span></td></tr>
+        <tr><td><code>hsmart</code></td><td>ghcr.io/schultzvv/hsmart</td><td class="num">5005</td><td>RAG/LLM p/ agentes</td><td>dev</td><td><span class="chip crit">bloqueia make up</span></td></tr>
+        <tr><td><code>nginx</code></td><td>build nginx/Dockerfile.nginx</td><td class="num">80 / 443</td><td>React + proxy</td><td>react</td><td><span class="chip ok">site público</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Blueprints do Flask</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Blueprint</th><th>Rotas</th><th>Estado</th></tr></thead>
+      <tbody>
+        <tr><td><code>product_bp</code></td><td><code>/</code> <code>/catalogo</code> <code>/secao1..5</code> <code>/produto/&lt;id&gt;</code> <code>/admin</code> · <code>POST /add_product</code> (upsert) · <code>GET /api/homepage</code> <code>/api/products</code> (paginado, tag, subtag, busca) <code>/api/products/&lt;id&gt;</code> · <code>DELETE /api/delete/&lt;id&gt;</code> · sitemap, robots</td><td><span class="chip ok">ok</span> sem auth</td></tr>
+        <tr><td><code>media_bp</code></td><td><code>/media/&lt;bucket&gt;/&lt;path&gt;</code>, <code>/media/ping</code></td><td><span class="chip ok">ok</span> token ignorado</td></tr>
+        <tr><td><code>ai_bp</code></td><td><code>/ai/</code>, <code>POST /ai/ask</code> (keyword no banco + gpt-4o-mini)</td><td><span class="chip ok">ok</span> teste unitário obsoleto</td></tr>
+        <tr><td><code>auth_bp</code></td><td>OAuth ML login/callback/status/refresh/logout · admin login (<code>admin/admin</code>) · token validate</td><td><span class="chip ok">ok</span> defaults inseguros</td></tr>
+        <tr><td><code>webhook_bp</code></td><td><code>POST /webhook/mercadolivre</code>, shopee e amazon (stubs), test, health</td><td><span class="chip crit">quebrado</span> db não inicializado</td></tr>
+        <tr><td><code>sync_bp</code></td><td>ML product/all (mesmo bug), <code>cheapest-all</code> (ok), shopee/amazon (501)</td><td><span class="chip warn">parcial</span></td></tr>
+        <tr><td><code>price_validator_bp</code></td><td><code>POST /validate-prices</code>, health (sem prefixo; docs dizem /price_validator)</td><td><span class="chip ok">ok</span></td></tr>
+        <tr><td><code>instagram_bp</code></td><td>post, post/auto, schedule, workflow, history, test/image, analytics, status, test/agents</td><td><span class="chip crit">fluxo quebrado</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Tabela <code>products</code></h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Observação</th></tr></thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>String(50) uuid</td><td></td></tr>
+        <tr><td><code>platform</code>, <code>external_id</code></td><td>String</td><td>unique juntos; chave do upsert em <code>/add_product</code></td></tr>
+        <tr><td><code>title</code></td><td>String(255)</td><td></td></tr>
+        <tr><td><code>price</code>, <code>old_price</code></td><td><b>String(50)</b></td><td>"R$ 1.234,56"; preço válido = regex SQL <code>~ '[1-9]'</code></td></tr>
+        <tr><td><code>image</code></td><td>Text JSON</td><td>URLs do MinIO, convertidas em <code>/media/...</code> na saída</td></tr>
+        <tr><td><code>link</code></td><td>Text</td><td>afiliado</td></tr>
+        <tr><td><code>tags</code></td><td>Text JSON</td><td><code>["geral","E"]</code>, filtro por LIKE</td></tr>
+        <tr><td><code>subcategory</code></td><td>String(100)</td><td>subtag</td></tr>
+        <tr><td><code>created_at</code>, <code>updated_at</code></td><td>DateTime</td><td></td></tr>
+        <tr><td><code>nome</code>, <code>preco</code>, <code>preco_original</code>, <code>desconto</code>, <code>descricao</code>, <code>imagens</code>, <code>disponivel</code></td><td>aliases de webhook</td><td>duplicam title/price/image; raramente preenchidos</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Três migrações manuais sem versionamento. Duas instâncias de SQLAlchemy no código; só a de <code>models/product.py</code> é inicializada.</p>
+
+  <h3>Agentes de runtime</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Agente</th><th>Faz</th><th>Chamado por</th><th>Estado</th></tr></thead>
+      <tbody>
+        <tr><td><code>ml_populator_agent</code></td><td>ML search por tag/subtag → cheapest → links → pipeline_publish</td><td><code>make populate-mf</code></td><td><span class="chip ok">funciona</span> gera preços zero</td></tr>
+        <tr><td><code>price_oracle_agent</code></td><td>item/catálogo ML + DOM + Qdrant → LLM hsmart decide preço</td><td><code>make price-oracle</code></td><td><span class="chip ok">funciona</span> exige hsmart</td></tr>
+        <tr><td><code>reprice_all</code></td><td>oracle em todos; apaga preço ≤ 0</td><td><code>make reprice-all</code></td><td><span class="chip warn">destrutivo</span></td></tr>
+        <tr><td><code>tag_classifier_agent</code></td><td>keywords → hsmart → Ollama</td><td><code>make tag-classify-db</code>, pipeline</td><td><span class="chip crit">--db no-op</span> sem ES</td></tr>
+        <tr><td><code>product_decision_agent</code></td><td>escolhe produto p/ post</td><td>orquestrador</td><td><span class="chip crit">mock</span> glob sem recursão → 0 produtos</td></tr>
+        <tr><td><code>product_enricher_agent</code></td><td>legenda e hashtags</td><td>orquestrador</td><td><span class="chip warn">mock</span> sem link</td></tr>
+        <tr><td><code>instagram_poster_agent</code></td><td>imagem 1080² + publicação</td><td>orquestrador</td><td><span class="chip crit">instagrapi</span> login falha</td></tr>
+        <tr><td><code>instagram_orchestrator</code></td><td>LangGraph decide → enrich → post</td><td><code>/instagram/post</code></td><td><span class="chip warn">roda com defeitos</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Os arquivos <code>agents/*.agent.md</code> (backend, frontend, techlead, tunelador) são prompts para agentes de IA de desenvolvimento, não código de runtime.</p>
+
+  <h3>Scripts e targets: o que é fluxo principal e o que é redundante</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Target</th><th>Script</th><th>Papel</th><th>Veredito</th></tr></thead>
+      <tbody>
+        <tr><td><code>prepare-ml</code></td><td>prepare_ml_best.py</td><td>ML: API + OCR + imagens + categoria</td><td><span class="chip ok">principal</span></td></tr>
+        <tr><td><code>prepare-shopee</code></td><td>shopee_prepare_best.py (+ take_screenshot_host.py)</td><td>Shopee: api/v4 + Playwright + OCR</td><td><span class="chip warn">frágil</span></td></tr>
+        <tr><td><code>prepare-amazon</code></td><td>amazon_prepare_best.py</td><td>Amazon: Playwright + OCR</td><td><span class="chip warn">scraping</span></td></tr>
+        <tr><td><code>prepare-all</code></td><td>api_prepare_ml.py</td><td>lote interativo; lê <code>list_to_prepare.json</code> que não existe</td><td><span class="chip none">redundante</span></td></tr>
+        <tr><td>—</td><td>auto_prepare_ml.py, generate_staging_json.py, shopee_prepare.py, shopee_prepare_manual.py</td><td>versões anteriores</td><td><span class="chip none">aposentar</span></td></tr>
+        <tr><td><code>organize-tags[-auto]</code></td><td>organize_tags.py</td><td>move JSON por keywords</td><td><span class="chip ok">principal</span></td></tr>
+        <tr><td><code>stage</code> / <code>restage</code></td><td>stage_products.py [--force] + staging_dedup.sh</td><td>MinIO + /add_product</td><td><span class="chip ok">principal</span></td></tr>
+        <tr><td><code>publish</code>, <code>prepare-and-publish</code></td><td>pipeline_publish.py</td><td>links → prepare → organize → stage → preços → tags</td><td><span class="chip ok">automático</span></td></tr>
+        <tr><td><code>update-ml-prices</code></td><td>update_ml_prices.py</td><td>menor vendedor ML</td><td><span class="chip ok">ok</span></td></tr>
+        <tr><td><i>(sem nome)</i></td><td>update_ml_prices_right.py</td><td>API + DOM texto</td><td><span class="chip crit">target perdeu o nome</span> roda dentro de fix-bad-links</td></tr>
+        <tr><td><code>verify-product-cheaper</code></td><td>price_validator/main.py</td><td>menor vendedor → cheaper_products.json</td><td><span class="chip ok">ok</span></td></tr>
+        <tr><td><code>verify-prices</code>, <code>fix-zero-price</code>, <code>fix-bad-links</code></td><td>idem</td><td>reparos de preço e link</td><td><span class="chip warn">removem produtos</span></td></tr>
+        <tr><td><code>check-stage</code></td><td>check_stage_images.py</td><td>regex de formato antigo</td><td><span class="chip crit">sempre falha</span></td></tr>
+        <tr><td><code>migrate-*</code></td><td>migrate_add_tags / webhook_fields / subcategory</td><td>migrações manuais</td><td><span class="chip warn">sem versionamento</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="esteira">
+  <h2>Esteira manual (comandos reais de hoje)</h2>
+  <p>O que uma pessoa faz para subir um produto. O runbook completo com regras de preenchimento está na seção 3 do CLAUDE.md.</p>
+  <ol class="steps">
+    <li><div><b>Subir backend e túnel</b>Sobe db, minio, redis e site sem a stack de LLM, abre o túnel e imprime o link de autorização do Mercado Livre. Depois confira o token.<pre><code>make serve-cloudflare
+make check-tokens</code></pre></div></li>
+    <li><div><b>Preparar o produto</b>Interativo: pede categoria (1 a 6) e subcategoria. Gera <code>staging/&lt;tag&gt;/&lt;sub&gt;/&lt;slug&gt;_&lt;ts&gt;.json</code> e baixa as imagens em <code>uploads/&lt;slug&gt;/</code>.<pre><code>make prepare-ml     URL="https://meli.la/xxxx"
+make prepare-shopee URL="https://s.shopee.com.br/xxxx"
+make prepare-amazon URL="https://amzn.to/xxxx"</code></pre></div></li>
+    <li><div><b>Conferir</b>O preço precisa ter um dígito de 1 a 9, senão o stage pula o arquivo sem avisar. Opcionalmente confira o menor vendedor e reclassifique.<pre><code>make verify-product-cheaper URL="https://meli.la/xxxx"
+make organize-tags</code></pre></div></li>
+    <li><div><b>Publicar no site</b>Upload para o MinIO, <code>POST /add_product</code>, registro em <code>.processed</code>, dedup do staging.<pre><code>make stage</code></pre></div></li>
+    <li><div><b>Ver</b><code>https://localhost</code> pelo Nginx (React) ou <code>https://localhost:5555</code> direto no Flask (Jinja). <code>make links</code> mostra as URLs públicas do túnel.</div></li>
+    <li><div><b>Corrigir ou remover</b><code>/admin</code> (sem senha) ou <code>DELETE /api/delete/&lt;id&gt;</code>. Para atualizar preço: <code>make api-update URL=...</code> ou <code>make update-ml-prices DRY=1</code> antes de rodar sem DRY.</div></li>
+  </ol>
+  <p class="note">Perigosos: <code>make down-purge</code> apaga banco, MinIO e Redis; <code>make reprice-all</code> apaga produtos com preço zero; <code>make prd-down</code> usa <code>-v</code>. Não use <code>make instagram-post</code> em produção.</p>
+</section>
+
+<section id="integracoes">
+  <h2>Integrações, uma por uma</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>Mercado Livre <span class="chip ok">funciona</span></h3>
+      <dl>
+        <dt>Existe</dt><dd>OAuth com refresh automático (<code>services/ml_auth.py</code>), tokens em <code>config/ml_tokens.json</code>; <code>/items</code>, <code>/products</code>, <code>sale_price</code>, <code>/sites/MLB/search</code> (403 cai em scraping); afiliado por <code>matt_tool</code>; menor vendedor via <code>price_validator</code>.</dd>
+        <dt>Quebra</dt><dd>Webhook e <code>/sync/mercadolivre/*</code> usam instância de banco não inicializada. Tokens versionados no git.</dd>
+        <dt>Falta</dt><dd>Registrar o webhook num domínio estável; cron de preço.</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <h3>Shopee <span class="chip warn">frágil</span></h3>
+      <dl>
+        <dt>Existe</dt><dd><code>shopee_prepare_best.py</code>: api/v4 não oficial + Playwright stealth + screenshot tirado no host + OCR; fallback manual.</dd>
+        <dt>Quebra</dt><dd>Detecção de página de login; depende de <code>DISPLAY</code> no host. Webhook stub, sync 501.</dd>
+        <dt>Oficial</dt><dd>Shopee Affiliate Open API (GraphQL, exige credenciais aprovadas).</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <h3>Amazon <span class="chip warn">scraping</span></h3>
+      <dl>
+        <dt>Existe</dt><dd><code>amazon_prepare_best.py</code>: Playwright + OCR.</dd>
+        <dt>Falta</dt><dd>PA-API (exige Associates com vendas qualificadas); tag de afiliado não é gerada; webhook stub.</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <h3>Instagram <span class="chip crit">bloqueado</span></h3>
+      <dl>
+        <dt>Existe</dt><dd>9 rotas, orquestrador LangGraph, gerador de imagem 1080², histórico no Redis, modo simulação.</dd>
+        <dt>Quebra</dt><dd><code>instagrapi</code> com usuário/senha (viola os termos, login já falha); agentes mock; decisor não acha produtos; <code>.posted</code> marcado antes de postar; agendamento sem worker; legenda sem link.</dd>
+        <dt>Oficial</dt><dd>Graph API: conta Business + Página + app Meta, imagem em URL HTTPS pública, container → publish, limite diário, token longo de ~60 dias. Não segue perfis nem lê feed.</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <h3>Recomendação de conteúdo <span class="chip warn">scaffold</span></h3>
+      <dl>
+        <dt>Existe</dt><dd>Branch <code>dev-recommendations</code> (1 commit): FastAPI gateway/auth/ingest/tracking/recommendations, Postgres + Redis + Kafka próprios, OAuth Graph, embeddings OpenAI, score 0,6 similaridade + 0,3 desconto + 0,1 cliques.</dd>
+        <dt>Quebra</dt><dd>Embeddings nunca preenchidos; catálogo fictício; sem ponte com <code>products</code>; lê o perfil do próprio usuário; duplica <code>shared/</code>.</dd>
+        <dt>Aproveitar</dt><dd>Fórmula de score e cliente Graph como referência, dentro do monólito, sem Kafka.</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <h3>LLMs e OCR <span class="chip warn">parcial</span></h3>
+      <dl>
+        <dt>OpenAI</dt><dd><code>gpt-4o-mini</code> em <code>/ai/ask</code> e no <code>BaseAgent</code> (instanciado até pelos mocks).</dd>
+        <dt>Ollama</dt><dd><code>qwen2.5:1.5b</code> no tag classifier; <code>hsmart</code> no price oracle.</dd>
+        <dt>OCR</dt><dd><code>info-scrap</code> lê preço promo em screenshots (ML, Shopee, Amazon).</dd>
+        <dt>Falta</dt><dd>Nenhum LLM escreve descrição ou legenda real.</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section id="diagnostico">
+  <h2>Diagnóstico</h2>
+  <p>Crítico impede operar, expõe segredo ou engana. Importante funciona mas é frágil. Limpeza é peso morto.</p>
+
+  <h3>Crítico</h3>
+  <div class="findings">
+    <div class="finding crit"><div class="stripe"></div><div class="body"><b>Segredos versionados no git</b><p>Tokens OAuth do Mercado Livre em <code>services/site/config/ml_tokens.json</code> (rastreado, 21 commits, com diff pendente rotacionando tokens); chaves privadas em <code>cert.pem.bak</code>, <code>key.pem.bak</code> e <code>legacy/misc/key.pem</code>; usuário e senha do Instagram comentados em <code>docs/instagram/SETUP_INSTAGRAM_BUSINESS.md</code>. Rotacionar e tirar do índice antes de qualquer push.</p><div class="where">services/site/config/ml_tokens.json · services/site/*.pem.bak · legacy/misc/ · docs/instagram/SETUP_INSTAGRAM_BUSINESS.md:191</div></div></div>
+    <div class="finding crit"><div class="stripe"></div><div class="body"><b>Instagram construído sobre instagrapi, já bloqueado</b><p>Login por usuário e senha viola os termos e falha com <code>login_required</code>. Os docs oficiais da Graph API descrevem um plano que não tem uma linha de código.</p><div class="where">services/site/agents/instagram_poster_agent.py:38,66,123 · docs/instagram/INSTAGRAM_STATUS.md</div></div></div>
+    <div class="finding crit"><div class="stripe"></div><div class="body"><b>Fluxo do Instagram não encontra produto e não usa LLM</b><p>Decisor lê <code>staging/*.json</code> sem recursão, mas todos os JSONs estão em subpastas; decisor e enriquecedor são mocks; <code>.posted</code> é gravado antes de postar, mesmo em simulação; <code>BaseAgent</code> instancia <code>ChatOpenAI</code> no construtor, então sem chave tudo em <code>/instagram/*</code> dá 500.</p><div class="where">agents/product_decision_agent.py:43,153-185 · agents/product_enricher_agent.py:77 · agents/__init__.py:28</div></div></div>
+    <div class="finding crit"><div class="stripe"></div><div class="body"><b>Webhook e sync do ML quebram no commit</b><p><code>marketplace_service.py</code> importa a instância <code>db</code> de <code>database.py</code>, que nunca recebe <code>init_app</code>. Qualquer notificação do ML cai em exceção.</p><div class="where">services/site/services/marketplace_service.py:12,81 · services/site/database.py:14 · services/site/main.py:79</div></div></div>
+    <div class="finding crit"><div class="stripe"></div><div class="body"><b>Makefile com target sem nome</b><p>A linha de cabeçalho de <code>update-ml-prices-right</code> foi apagada; a receita ficou colada em <code>fix-bad-links</code>, que agora também roda <code>update_ml_prices_right.py</code>.</p><div class="where">Makefile:804-815 (confirmado com make -n fix-bad-links)</div></div></div>
+    <div class="finding crit"><div class="stripe"></div><div class="body"><b>Staging com 62 de 74 JSONs inválidos</b><p><code>populate-mf</code> gerou produtos com <code>R$ 0.00</code> e <code>disponivel:false</code>; o stage pula em silêncio e o operador não sabe por que o produto não apareceu.</p><div class="where">services/site/staging/** · scripts/stage_products.py:166-170 · scripts/fix_zero_price.py</div></div></div>
+    <div class="finding crit"><div class="stripe"></div><div class="body"><b>Nenhuma rota de escrita tem autenticação</b><p><code>/add_product</code>, <code>/api/delete</code>, <code>/admin</code>, <code>/sync/*</code>, <code>/webhook/*</code> abertos; admin <code>admin/admin</code>; <code>JWT_SECRET</code> default; Flask <code>debug=True</code>; CORS para qualquer <code>*.trycloudflare.com</code>. Tudo isso atrás de um túnel público.</p><div class="where">routes/auth_routes.py:224-229 · main.py:45,105</div></div></div>
+    <div class="finding crit"><div class="stripe"></div><div class="body"><b><code>make up</code> depende da stack de LLM; CI não testa nada</b><p><code>site</code> tem <code>depends_on: hsmart</code>, que puxa Qdrant e Ollama. O workflow tem os testes comentados, roda ngrok no runner e faz <code>include .env</code> que não existe lá.</p><div class="where">docker-compose.dev.yaml:26 · .github/workflows/ci.yml:28-29,60 · Makefile:14</div></div></div>
+  </div>
+
+  <h3>Importante</h3>
+  <div class="findings">
+    <div class="finding warn"><div class="stripe"></div><div class="body"><b>Sem domínio público estável</b><p>Quick tunnel muda a URL e cai em horas; <code>serve-cloudflare-fixed</code> inoperante por <code>CF_HOSTNAME</code> inválido; SEO gera <code>https://seusite.com</code>. Bloqueia Graph API (imagem pública) e webhook ML.</p><div class="where">scripts/tunnel-manager.sh · Makefile:421-512 · services/seo_service.py:10</div></div></div>
+    <div class="finding warn"><div class="stripe"></div><div class="body"><b><code>tag_classifier --db</code> é no-op e não conhece ES</b><p>Filtra por <code>Product.tag</code>/<code>subtag</code> inexistentes, cai no except, processa todos e não grava nada, gastando LLM. A etapa final do <code>pipeline_publish</code> depende dele.</p><div class="where">agents/tag_classifier_agent.py:192,452-497</div></div></div>
+    <div class="finding warn"><div class="stripe"></div><div class="body"><b>Preço como string</b><p>"R$ 1.234,56" no banco; validade por regex SQL; desconto calculado em vários lugares; sem <code>price_cents</code>.</p><div class="where">models/product.py · routes/product_routes.py:208</div></div></div>
+    <div class="finding warn"><div class="stripe"></div><div class="body"><b>Tag ES pela metade e secao5 fora do Nginx</b><p>O regex do Nginx só manda <code>secao[1-4]</code> para o Flask; <code>/secao5</code> cai no React e dá 404. O <code>secao5.html</code> copiou subcategorias de Eletrônicos. React só ganha ES nos componentes no diff não commitado. <code>category_selector</code> testa ES por último ("tênis de corrida" vira ME).</p><div class="where">nginx/nginx-react.conf:181 · templates/secao5.html:230 · scripts/category_selector.py:62-85</div></div></div>
+    <div class="finding warn"><div class="stripe"></div><div class="body"><b>Frontend React chama endpoints que não existem</b><p><code>POST/PUT/DELETE /api/products</code> no admin do React não têm rota no Flask; assets <code>/def-icon.svg</code>, <code>/def-og.png</code>, <code>/def-placeholder.svg</code> não existem; <code>dist/</code> está atrás do <code>src/</code>.</p><div class="where">frontend/src/services/productService.ts:192-212 · frontend/index.html:5,15,21</div></div></div>
+    <div class="finding warn"><div class="stripe"></div><div class="body"><b>Nginx cai se o MinIO não resolver</b><p><code>proxy_pass http://minio:9000/</code> literal: 946 erros <code>host not found in upstream "minio"</code> no log. Certificados vazios também derrubaram o Nginx.</p><div class="where">nginx/nginx-react.conf:159 · logs/nginx/error.log</div></div></div>
+    <div class="finding warn"><div class="stripe"></div><div class="body"><b>Scripts destrutivos sem rede de proteção</b><p><code>reprice_all</code> e <code>verify_prices</code> apagam produtos de verdade (a docstring diz soft delete); <code>prd-down</code> usa <code>-v</code>; <code>down-purge</code> só espera 5 segundos.</p><div class="where">agents/reprice_all.py:125-139 · scripts/verify_prices.py:22 · Makefile:1039</div></div></div>
+    <div class="finding warn"><div class="stripe"></div><div class="body"><b>Testes obsoletos ou duplicados</b><p><code>test_ai_routes.py</code> testa <code>/ingest-url</code> e <code>/query</code>, rotas que não existem mais; <code>test_affiliate_link_generator.py</code> está duplicado em dois diretórios; <code>tests/integration</code> não existe; vitest sem testes.</p><div class="where">tests/unit/ · services/site/tests/unit/</div></div></div>
+    <div class="finding warn"><div class="stripe"></div><div class="body"><b>Shopee e Amazon dependem de scraping</b><p>Screenshot no host com <code>DISPLAY</code>, detecção de login, OCR. Sem API oficial, sem tag de afiliado na Amazon, webhooks stub.</p><div class="where">scripts/shopee_prepare_best.py · scripts/amazon_prepare_best.py · services/marketplace_service.py:292-339</div></div></div>
+    <div class="finding warn"><div class="stripe"></div><div class="body"><b>Documentação promete o que o código não faz</b><p>"100% funcional", "GPT-4 seleciona", "Graph API", "pronto para produção", targets <code>make instagram-test-system</code>, <code>prepare-auto</code>, <code>prepare-publish</code>, prefixo <code>/price_validator</code>: nada disso existe. Três cópias idênticas do conceito de marca.</p><div class="where">docs/instagram/RESUMO_INSTAGRAM.md · docs/DefineMe-*.md · agents/shared/endpoints.md · docs/conceito*.md</div></div></div>
+  </div>
+
+  <h3>Limpeza</h3>
+  <div class="findings">
+    <div class="finding"><div class="stripe"></div><div class="body"><b>Raiz entulhada</b><p>Doze MDs de diagnóstico e solução de incidentes já resolvidos (<code>DIAGNOSTICO_*</code>, <code>SOLUCAO_502_*</code>, <code>IMPLEMENTACAO_*</code>, <code>ORGANIZE_TAGS_*</code> ×4, <code>RESTAGE_*</code>, <code>DEBUG_*</code>), <code>OPCAO_B_SUMMARY.sh</code>, <code>curriculo_agentic.tex</code>, <code>the_roi/</code>, <code>package.json</code> da raiz.</p><div class="where">/</div></div></div>
+    <div class="finding"><div class="stripe"></div><div class="body"><b><code>legacy/</code> e binários</b><p>3,2 MB de backups sem referência; <code>services/site/mc</code> (30 MB); 5 PNGs de fundo idênticos; 300 screenshots de OCR em <code>services/site/fotos/</code>; <code>Dockerfile</code> da raiz copia arquivo inexistente; <code>.render.yaml</code> todo comentado.</p><div class="where">legacy/ · services/site/mc · services/site/fotos/ · Dockerfile:34</div></div></div>
+    <div class="finding"><div class="stripe"></div><div class="body"><b>Scripts redundantes</b><p>Quatro formas de preparar ML, três de Shopee, dois <code>update_ml_prices</code>; <code>SubtagNav.tsx</code> e <code>services/shopee_scraper.py</code> sem uso; <code>scripts/test-tunnel-workflow.sh</code> valida arquivos que não existem.</p><div class="where">services/site/scripts/ · frontend/src/components/SubtagNav.tsx</div></div></div>
+  </div>
+</section>
+
+<section id="plano">
+  <h2>Plano de organização</h2>
+  <p>Seis fases em ordem de dependência. Segurança e base vêm antes de qualquer agente novo; o Instagram oficial só depois de existir domínio estável; a recomendação só depois de o caçador de preço funcionar.</p>
+  <div class="phases">
+    <div class="phase">
+      <header><span class="tag">F0</span><h3>Segurança e base confiável</h3><span class="est">2 a 3 dias</span></header>
+      <ul>
+        <li>Commitar o trabalho da tag ES separado; tirar <code>config/ml_tokens.json</code> do índice, adicionar ao <code>.gitignore</code>, rotacionar tokens e <code>ML_CLIENT_SECRET</code> no DevCenter; remover <code>*.pem.bak</code>, <code>legacy/misc/key.pem</code> e as credenciais do doc do Instagram.</li>
+        <li>Consertar: instância <code>db</code> do <code>marketplace_service</code>; target órfão do Makefile; <code>tag_classifier --db</code> + ES; glob recursivo e ordem do <code>.posted</code> no decisor; <code>secao5</code> no regex do Nginx e nas subcategorias; <code>check_stage_images.py</code>; <code>test_ai_routes.py</code>.</li>
+        <li>Compose: profile <code>llm</code> para vector_db, ollama e hsmart; <code>site</code> sem <code>depends_on: hsmart</code>; resolver dinâmico para o MinIO no Nginx.</li>
+        <li>CI em <code>main</code> e <code>dev-front</code> rodando pytest de verdade e build da imagem; remover ngrok do workflow; corrigir placeholder do compose de produção.</li>
+        <li>Arquivar em <code>docs/archive/</code> os MDs de incidente da raiz; apagar <code>legacy/</code>, <code>mc</code>, PNGs duplicados, cópias do conceito; mover <code>fotos/</code> para fora do repo.</li>
+      </ul>
+      <div class="done">Pronto quando: <code>git grep</code> não acha token; <code>make up</code> sobe só site, db, minio, redis e info-scrap; <code>make test-unit</code> verde local e no CI; webhook ML responde 200 num teste.</div>
+    </div>
+    <div class="phase">
+      <header><span class="tag">F1</span><h3>Operação manual mecânica</h3><span class="est">3 a 5 dias</span></header>
+      <ul>
+        <li>CLI <code>def produto preparar|publicar|listar|remover|checar</code> não-interativa (Typer), chamando os scripts principais com <code>--tag --subtag --plataforma</code>; o interativo vira wrapper.</li>
+        <li>Um script de prepare por plataforma; aposentar <code>api_prepare_ml</code>, <code>auto_prepare_ml</code>, <code>generate_staging_json</code>, <code>shopee_prepare</code>, <code>update_ml_prices</code> antigo.</li>
+        <li>Validação de preço no prepare (recusar zero) e relatório do stage dizendo o que pulou e por quê; limpar os 62 JSONs zerados.</li>
+        <li>Flask-Migrate; migração para <code>price_cents</code>, <code>old_price_cents</code>, <code>currency</code>; front recebe números.</li>
+        <li>Autenticação (JWT já existe) em toda rota de escrita; admin por variável de ambiente; React admin apontando para endpoints que existem (<code>/add_product</code>, <code>/api/delete</code>) ou criando <code>PUT /api/products/&lt;id&gt;</code>.</li>
+        <li><code>make help</code> fiel; <code>docs/</code> reduzido a README, CLAUDE.md, este diagnóstico e um guia por integração.</li>
+      </ul>
+      <div class="done">Pronto quando: uma pessoa sem acesso ao código sobe um produto do zero em até 5 minutos só com comandos documentados, e um agente consegue chamar os mesmos comandos por flags.</div>
+    </div>
+    <div class="phase">
+      <header><span class="tag">F2</span><h3>Menor preço e fontes oficiais</h3><span class="est">1 a 2 semanas</span></header>
+      <ul>
+        <li>PriceHunter: interface única com adaptadores (ML sobre <code>price_validator</code>; Amazon PA-API se elegível, senão manual; Shopee Affiliate API se aprovada, senão manual), normalizando preço + frete + condição.</li>
+        <li>Webhook ML consertado e registrado num domínio estável; PriceWatcher em cron (compose) com soft delete e campo <code>disponivel</code>.</li>
+        <li>Tabela <code>agent_runs</code> registrando entrada, candidatos, escolha e motivo de cada rodada.</li>
+      </ul>
+      <div class="done">Pronto quando: dado um tema, <code>def preco caçar</code> devolve o mais barato entre as três plataformas com ficha oficial, e o preço no site muda sozinho quando o ML notifica.</div>
+    </div>
+    <div class="phase">
+      <header><span class="tag">F3</span><h3>Instagram oficial</h3><span class="est">1 a 2 semanas + aprovação da Meta</span></header>
+      <ul>
+        <li>Pré-requisitos fora do código: domínio próprio no Cloudflare (named tunnel com <code>CF_HOSTNAME</code> válido), conta Business/Creator ligada a uma Página, app Meta com <code>instagram_content_publish</code>.</li>
+        <li><code>InstagramPublisher</code> sobre Graph API (container → publish, carrossel, imagem servida por <code>https://&lt;dominio&gt;/media/...</code>), refresh do token longo agendado, limite diário.</li>
+        <li>Enricher com LLM real (OpenAI já configurado) e legenda com link do site e menção; decisor lendo o banco, não o staging; tabela <code>posts</code> com estados e <code>def post aprovar|rejeitar</code>; marcar como postado só após sucesso.</li>
+        <li>Remover <code>instagrapi</code> das dependências.</li>
+      </ul>
+      <div class="done">Pronto quando: um post aprovado sai no site e no Instagram com link e menção, sem biblioteca não oficial, e aparece em <code>agent_runs</code>.</div>
+    </div>
+    <div class="phase">
+      <header><span class="tag">F4</span><h3>Recomendação de conteúdo</h3><span class="est">2 semanas</span></header>
+      <ul>
+        <li>Observer dentro do monólito: <code>def insta seguir @user</code> apenas registra; coleta por business discovery (alvo Business) e hashtags; entrada manual de post/legenda como fallback.</li>
+        <li>Recomendador reaproveitando a fórmula e os embeddings do scaffold, sobre a tabela <code>products</code> real, sem Kafka; saída = intenções com score e tag → PriceHunter → rascunhos de post.</li>
+        <li>Tracking de cliques nos links do site alimentando o score.</li>
+      </ul>
+      <div class="done">Pronto quando: de um perfil registrado nascem intenções, candidatos e rascunhos que o operador aprova.</div>
+    </div>
+    <div class="phase">
+      <header><span class="tag">F5</span><h3>Loop automático com auditoria</h3><span class="est">contínuo</span></header>
+      <ul>
+        <li>Agendador no compose rodando observer → recomendador → PriceHunter → rascunhos; limites diários configuráveis.</li>
+        <li>Relatório do Auditor por post e alertas quando um token expira ou o túnel cai.</li>
+      </ul>
+      <div class="done">Pronto quando: o ciclo roda sozinho dentro dos limites e todo post tem trilha de decisão legível.</div>
+    </div>
+  </div>
+</section>
+
+<section id="checklist">
+  <h2>Checklist do que falta</h2>
+  <p class="note">As marcações ficam só neste navegador; o estado oficial é o commit. Ao fechar um item, atualize o CLAUDE.md.</p>
+  <div class="progress"><span id="progress-label">0 de 0</span><div class="bar"><i id="progress-fill"></i></div></div>
+
+  <div class="checklist" data-group="F0">
+    <h3>F0 · Segurança e base <span class="count"></span></h3>
+    <ul>
+      <li><input type="checkbox" id="f0-1"><label for="f0-1">Commitar a tag ES separada (sem <code>ml_tokens.json</code>)</label></li>
+      <li><input type="checkbox" id="f0-2"><label for="f0-2"><code>git rm --cached config/ml_tokens.json</code> + <code>.gitignore</code>; rotacionar tokens e <code>ML_CLIENT_SECRET</code></label></li>
+      <li><input type="checkbox" id="f0-3"><label for="f0-3">Remover <code>*.pem.bak</code>, <code>legacy/misc/key.pem</code>, credenciais em <code>SETUP_INSTAGRAM_BUSINESS.md</code></label></li>
+      <li><input type="checkbox" id="f0-4"><label for="f0-4">Consertar instância <code>db</code> em <code>marketplace_service.py</code></label></li>
+      <li><input type="checkbox" id="f0-5"><label for="f0-5">Restaurar o nome do target <code>update-ml-prices-right</code> no Makefile</label></li>
+      <li><input type="checkbox" id="f0-6"><label for="f0-6"><code>tag_classifier --db</code> funcionando e com ES</label></li>
+      <li><input type="checkbox" id="f0-7"><label for="f0-7">Decisor: glob recursivo, <code>.posted</code> só após sucesso, sem OpenAI obrigatório nos mocks</label></li>
+      <li><input type="checkbox" id="f0-8"><label for="f0-8"><code>secao5</code> no regex do Nginx; subcategorias de esporte no template; parênteses em <code>bucketName</code></label></li>
+      <li><input type="checkbox" id="f0-9"><label for="f0-9">Profile <code>llm</code> no compose; <code>site</code> sem <code>depends_on: hsmart</code>; resolver dinâmico p/ MinIO no Nginx</label></li>
+      <li><input type="checkbox" id="f0-10"><label for="f0-10">CI rodando pytest e build de imagem; sem ngrok; placeholder do compose prd corrigido</label></li>
+      <li><input type="checkbox" id="f0-11"><label for="f0-11"><code>test_ai_routes.py</code> atualizado para <code>/ai/ask</code>; teste duplicado removido; <code>check_stage_images.py</code> consertado</label></li>
+      <li><input type="checkbox" id="f0-12"><label for="f0-12">Arquivar MDs de incidente; apagar <code>legacy/</code>, <code>mc</code>, PNGs duplicados, cópias do conceito; tirar <code>fotos/</code> do repo</label></li>
+      <li><input type="checkbox" id="f0-13"><label for="f0-13">Apagar <code>Dockerfile</code> da raiz e <code>.render.yaml</code> (ou consertar)</label></li>
+    </ul>
+  </div>
+
+  <div class="checklist" data-group="F1">
+    <h3>F1 · Operação manual <span class="count"></span></h3>
+    <ul>
+      <li><input type="checkbox" id="f1-1"><label for="f1-1">CLI <code>def produto preparar|publicar|listar|remover|checar</code> não-interativa</label></li>
+      <li><input type="checkbox" id="f1-2"><label for="f1-2">Um prepare por plataforma; aposentar scripts redundantes</label></li>
+      <li><input type="checkbox" id="f1-3"><label for="f1-3">Validação de preço no prepare; stage reporta o que pulou; limpar os 62 JSONs zerados</label></li>
+      <li><input type="checkbox" id="f1-4"><label for="f1-4">Flask-Migrate e migração para <code>price_cents</code></label></li>
+      <li><input type="checkbox" id="f1-5"><label for="f1-5">Auth nas rotas de escrita; admin e <code>JWT_SECRET</code> por env; <code>debug=False</code> fora de dev</label></li>
+      <li><input type="checkbox" id="f1-6"><label for="f1-6">React admin apontando para endpoints existentes; assets <code>/def-*</code> criados</label></li>
+      <li><input type="checkbox" id="f1-7"><label for="f1-7"><code>make help</code> fiel; docs reduzidos e consistentes</label></li>
+    </ul>
+  </div>
+
+  <div class="checklist" data-group="F2">
+    <h3>F2 · Menor preço e fontes oficiais <span class="count"></span></h3>
+    <ul>
+      <li><input type="checkbox" id="f2-1"><label for="f2-1">Interface PriceHunter + adaptador ML sobre <code>price_validator</code></label></li>
+      <li><input type="checkbox" id="f2-2"><label for="f2-2">Amazon: decidir PA-API ou manual; gerar tag de afiliado</label></li>
+      <li><input type="checkbox" id="f2-3"><label for="f2-3">Shopee: pedir Affiliate Open API; scraping só como fallback explícito</label></li>
+      <li><input type="checkbox" id="f2-4"><label for="f2-4">Webhook ML registrado em domínio estável; PriceWatcher em cron; soft delete</label></li>
+      <li><input type="checkbox" id="f2-5"><label for="f2-5">Tabela <code>agent_runs</code></label></li>
+    </ul>
+  </div>
+
+  <div class="checklist" data-group="F3">
+    <h3>F3 · Instagram oficial <span class="count"></span></h3>
+    <ul>
+      <li><input type="checkbox" id="f3-1"><label for="f3-1">Domínio próprio no Cloudflare; <code>serve-cloudflare-fixed</code> funcionando; <code>PUBLIC_BASE_URL</code></label></li>
+      <li><input type="checkbox" id="f3-2"><label for="f3-2">Conta Business + Página + app Meta aprovado</label></li>
+      <li><input type="checkbox" id="f3-3"><label for="f3-3"><code>InstagramPublisher</code> sobre Graph API; remover <code>instagrapi</code></label></li>
+      <li><input type="checkbox" id="f3-4"><label for="f3-4">Enricher com LLM real; legenda com link e menção</label></li>
+      <li><input type="checkbox" id="f3-5"><label for="f3-5">Tabela <code>posts</code> com estados; <code>def post aprovar|rejeitar</code></label></li>
+      <li><input type="checkbox" id="f3-6"><label for="f3-6">Refresh do token longo agendado; limite diário</label></li>
+    </ul>
+  </div>
+
+  <div class="checklist" data-group="F4">
+    <h3>F4 · Recomendação de conteúdo <span class="count"></span></h3>
+    <ul>
+      <li><input type="checkbox" id="f4-1"><label for="f4-1"><code>def insta seguir @user</code> registra perfil; observer por business discovery e hashtags</label></li>
+      <li><input type="checkbox" id="f4-2"><label for="f4-2">Recomendador no monólito sobre <code>products</code>, embeddings preenchidos, sem Kafka</label></li>
+      <li><input type="checkbox" id="f4-3"><label for="f4-3">Intenções → PriceHunter → rascunhos de post</label></li>
+      <li><input type="checkbox" id="f4-4"><label for="f4-4">Tracking de cliques alimentando o score</label></li>
+    </ul>
+  </div>
+
+  <div class="checklist" data-group="F5">
+    <h3>F5 · Loop com auditoria <span class="count"></span></h3>
+    <ul>
+      <li><input type="checkbox" id="f5-1"><label for="f5-1">Agendador no compose com limites diários</label></li>
+      <li><input type="checkbox" id="f5-2"><label for="f5-2">Relatório do Auditor por post; alertas de token e túnel</label></li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  Gerado a partir da leitura integral de ~/Desktop/V_M em 2026-10-08 (dev-front @ 2ffd05f). O CLAUDE.md na raiz é a fonte de verdade; esta página é o retrato do momento e deve ser regenerada ao fechar cada fase.
+</footer>
+</div>
+
+<script>
+(function () {
+  var KEY = 'def-diagnostico-checklist';
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.checklist input[type=checkbox]'));
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { saved = {}; }
+
+  function persist() {
+    var state = {};
+    boxes.forEach(function (b) { if (b.checked) state[b.id] = 1; });
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* sem armazenamento: segue sem salvar */ }
+  }
+
+  function render() {
+    var total = boxes.length, done = 0;
+    boxes.forEach(function (b) {
+      var li = b.closest('li');
+      if (li) li.classList.toggle('done', b.checked);
+      if (b.checked) done++;
+    });
+    document.querySelectorAll('.checklist').forEach(function (group) {
+      var gb = group.querySelectorAll('input[type=checkbox]');
+      var gd = 0;
+      gb.forEach(function (b) { if (b.checked) gd++; });
+      var c = group.querySelector('.count');
+      if (c) c.textContent = gd + ' / ' + gb.length;
+    });
+    var label = document.getElementById('progress-label');
+    var fill = document.getElementById('progress-fill');
+    if (label) label.textContent = done + ' de ' + total + ' concluídos';
+    if (fill) fill.style.width = (total ? Math.round(done / total * 100) : 0) + '%';
+  }
+
+  boxes.forEach(function (b) {
+    if (saved[b.id]) b.checked = true;
+    b.addEventListener('change', function () { persist(); render(); });
+  });
+  render();
+})();
+</script>
