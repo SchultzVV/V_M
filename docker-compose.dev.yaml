@@ -1,6 +1,5 @@
-version: "3.9"
-
 services:
+  # Backend Flask
   site:
     build:
       context: ./services/site
@@ -8,27 +7,32 @@ services:
       args:
         REQUIREMENTS: requirements-dev.txt
     container_name: site
+    env_file:
+      - .env
     environment:
-      - FLASK_ENV=development
-      - LOG_LEVEL=DEBUG
-      - DATABASE_URL=postgresql://user:password@db:5432/produtos_db
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minio
-      - MINIO_SECRET_KEY=minio123
-    env_file: .env
+      FLASK_ENV: development
+      LOG_LEVEL: DEBUG
+      DATABASE_URL: postgresql://user:password@db:5432/produtos_db
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+    command: ["python", "main.py"]
     volumes:
       - ./services/site:/app
-      - ./uploads:/app/../uploads
-    command: ["python", "main.py"]
-    depends_on:
-      - db
-      - minio
-      - hsmart
+      - ./uploads:/uploads
     ports:
       - "5555:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      hsmart:
+        condition: service_started
     networks:
       - backend
 
+  # PostgreSQL
   db:
     image: postgres:15
     container_name: postgres-dev
@@ -37,76 +41,100 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: produtos_db
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
     networks:
       - backend
 
+  # MinIO (ver comentario em docker-compose.yaml sobre a imagem)
   minio:
-    image: minio/minio:latest
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
     container_name: minio-dev
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+    user: "0"
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minio123
-    command: server /data --console-address ":9001"
+      MINIO_DATA_DIR: /data
+      MINIO_BROWSER: "on"
+      MINIO_CONSOLE_PORT_NUMBER: "9001"
     volumes:
       - minio_data:/data
-    networks:
-      - backend
-
-  vector_db:
-    image: qdrant/qdrant
-    container_name: vector_db
     ports:
-      - "6333:6333"
-    volumes:
-      - ./vector_db:/qdrant/storage
-    restart: always
+      - "9000:9000"
+      - "9001:9001"
     networks:
       - backend
 
+  # Redis
   redis:
     image: redis:7
     container_name: redis
+    restart: always
     ports:
       - "6379:6379"
-    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
     networks:
       - backend
 
+  # Qdrant
+  vector_db:
+    image: qdrant/qdrant
+    container_name: vector_db
+    restart: always
+    volumes:
+      - ./vector_db:/qdrant/storage
+    ports:
+      - "6333:6333"
+    networks:
+      - backend
+
+  # Ollama
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
-    ports:
-      - "11434:11434"
+    restart: always
     volumes:
       - ollama_data:/root/.ollama
-    restart: always
+    ports:
+      - "11434:11434"
     networks:
       - backend
 
+  # Serviço de IA
   hsmart:
     image: ghcr.io/schultzvv/hsmart:latest
     container_name: hsmart
+    restart: always
+    env_file:
+      - .env
+    environment:
+      QDRANT_HOST: vector_db
+      QDRANT_PORT: "6333"
+      OLLAMA_HOST: http://ollama:11434
+      LLM_PROVIDER: ollama
+      DEBUG: "${DEBUG:-false}"
     ports:
       - "5005:5005"
     depends_on:
-      - vector_db
-      - redis
-      - ollama
-    restart: always
-    env_file: .env
-    environment:
-      - QDRANT_HOST=vector_db
-      - QDRANT_PORT=6333
-      - OLLAMA_HOST=http://ollama:11434
-      - LLM_PROVIDER=ollama
-      - DEBUG=${DEBUG}
+      vector_db:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_started
     networks:
       - backend
 
