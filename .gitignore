@@ -54,3 +54,9 @@ build/
 
 # ── Imagens avulsas de teste ─────────────────────────────────────
 services/site/image_example.png
+
+# Segredos de runtime (CLAUDE.md §7) — nunca versionar
+services/site/config/ml_tokens.json
+services/site/config/instagram_session.json
+config/instagram_session.json
+*.pem.bak
