@@ -1,0 +1,38 @@
+# cp terraform.tfvars.example terraform.tfvars  (NÃO versionar o .tfvars)
+project_id  = "def-prd-123456"
+region      = "southamerica-east1" # ou us-central1 (mais barato)
+environment = "prd"
+domain      = "def.com.br"
+extra_domains = ["www.def.com.br"]
+
+enable_lb         = true  # false = só *.run.app (Firebase Hosting/Cloudflare na frente)
+web_min_instances = 0     # 1 = sem cold start (~US$ 20-25/mês)
+db_tier           = "db-f1-micro"
+redis_mode        = "none"    # "memorystore" (+US$ 35-50/mês)
+ocr_mode          = "sidecar" # "service" se o sidecar não encerrar com o job
+enable_llm        = false     # Vertex AI no lugar de Ollama/hsmart
+image_tag         = "latest"  # CI passa o SHA
+
+# info_scrap privado no ghcr.io? (senão deixe vazio)
+ghcr_username = ""
+ghcr_token    = ""
+
+# segredos (ou deixe vazio e rode `gcloud secrets versions add` depois)
+openai_api_key   = ""
+ml_app_id        = ""
+ml_client_secret = ""
+ml_seller_id     = ""
+jwt_secret       = "" # vazio = aleatório
+admin_username   = "def_admin"
+admin_password   = "" # vazio = aleatório
+media_token      = "" # vazio = aleatório
+
+extra_env = {
+  # AFFILIATE_URL               = "..."
+  # MERCADO_LIVRE_AFFILIATE_ID  = "..."
+}
+
+github_repository  = "SchultzVV/V_M"
+billing_account    = "" # "XXXXXX-XXXXXX-XXXXXX" para o orçamento
+budget_monthly_usd = 60
+alert_email        = ""

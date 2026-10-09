@@ -1,0 +1,46 @@
+{
+  "Comment": "DEF run-job: executa um job ECS (Fargate Spot) pelo nome. Input: {\"job\": \"stage\", \"args\": [\"python3\", \"scripts/stage_products.py\", \"--force\"]} (args opcional) ou, vindo do Pipe SQS, {\"data\": {...}}.",
+  "StartAt": "Unwrap",
+  "States": ${jsonencode(merge({
+    Unwrap = {
+      Type = "Choice"
+      Choices = [
+        { Variable = "$.data.job", IsPresent = true, Next = "UnwrapData" }
+      ]
+      Default = "HasArgs"
+    }
+    UnwrapData = {
+      Type      = "Pass"
+      InputPath = "$.data"
+      Next      = "HasArgs"
+    }
+    HasArgs = {
+      Type = "Choice"
+      Choices = [
+        {
+          And = [
+            { Variable = "$.args", IsPresent = true },
+            { Variable = "$.args", IsNull = false }
+          ]
+          Next = "ByJobCustom"
+        }
+      ]
+      Default = "ByJobDefault"
+    }
+    ByJobCustom = {
+      Type    = "Choice"
+      Choices = [for name in job_names : { Variable = "$.job", StringEquals = name, Next = "Run-${name}-custom" }]
+      Default = "UnknownJob"
+    }
+    ByJobDefault = {
+      Type    = "Choice"
+      Choices = [for name in job_names : { Variable = "$.job", StringEquals = name, Next = "Run-${name}-default" }]
+      Default = "UnknownJob"
+    }
+    UnknownJob = {
+      Type  = "Fail"
+      Error = "UnknownJob"
+      Cause = "O campo job nao corresponde a nenhum job conhecido"
+    }
+  }, run_states))}
+}

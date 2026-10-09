@@ -1,0 +1,40 @@
+# Copie para terraform.tfvars (não versionado) e preencha.
+subscription_id = "00000000-0000-0000-0000-000000000000"
+environment     = "prd"
+location        = "eastus" # ou brazilsouth (~40% mais caro)
+
+domain               = "www.def.com.br" # subdomínio (CNAME). Deixe "" na 1ª aplicação
+enable_custom_domain = false            # true no 2º apply, depois de criar TXT+CNAME
+
+image_site = "ghcr.io/schultzvv/def-site"
+image_web  = "ghcr.io/schultzvv/def-web"
+image_tag  = "latest"
+image_ocr  = "ghcr.io/schultzvv/info_scrap:latest"
+# ghcr_username = "schultzvv"
+# ghcr_pat      = "ghp_..."   # read:packages, só se as imagens forem privadas
+enable_acr = false
+
+web_min_replicas = 0 # 1 = sem cold start (+~US$ 10/mês)
+redis_mode       = "none"
+enable_llm       = false
+
+db_sku      = "B_Standard_B1ms"
+operator_ip = "" # seu IP público para a migração (pg_dump/psql)
+
+schedules = {
+  nightly       = { cron_utc = "0 6 * * *", enabled = true }     # 03:00 BRT
+  publish       = { cron_utc = "15 */6 * * *", enabled = false }
+  "populate-mf" = { cron_utc = "0 7 * * 1", enabled = false }
+}
+
+# Segredos iniciais (ou deixe vazio e preencha no Key Vault depois)
+openai_api_key   = ""
+ml_app_id        = ""
+ml_client_secret = ""
+ml_seller_id     = ""
+admin_username   = "operador"
+admin_password   = "" # vazio = gerado; leia no Key Vault
+
+alert_email        = "voce@exemplo.com"
+budget_monthly_usd = 60
+github_repo        = "SchultzVV/V_M"

@@ -1,0 +1,25 @@
+# ============================================================
+# Imagem "web": React (build Vite) + Nginx HTTP:8080 fazendo proxy
+# para o Flask em sidecar (127.0.0.1:5000). Usada no Cloud Run (GCP)
+# e no Azure Container Apps. Na AWS o React vai para S3/CloudFront.
+# Build (contexto = raiz do repo):
+#   docker build -f infra/docker/Dockerfile.web -t def-web:latest .
+# ============================================================
+FROM node:22-alpine AS build
+WORKDIR /src
+COPY frontend/package*.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend/ ./
+RUN npm run build
+
+FROM nginx:1.27-alpine
+RUN rm -f /etc/nginx/conf.d/default.conf
+COPY infra/docker/nginx.cloud.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=build /src/dist /app/dist
+# só estas variáveis são expandidas pelo envsubst (preserva $host, $uri...)
+ENV NGINX_ENVSUBST_FILTER="^(PORT|BACKEND|MEDIA_ORIGIN)$" \
+    PORT=8080 \
+    BACKEND=127.0.0.1:5000 \
+    MEDIA_ORIGIN=https://storage.googleapis.com
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -q --spider http://127.0.0.1:8080/health || exit 1

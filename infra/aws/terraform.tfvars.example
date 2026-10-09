@@ -1,0 +1,43 @@
+# Copie para terraform.tfvars (NÃO versionar) e preencha.
+region      = "us-east-1"
+environment = "prd"
+domain      = "def.com.br"
+
+# Rede / custo
+nat_mode       = "fck-nat" # fck-nat | gateway | none
+jobs_public_ip = true
+redis_mode     = "none" # none | serverless
+
+# Banco
+db_instance_class   = "db.t4g.micro"
+deletion_protection = true
+
+# Imagens (tag = SHA do commit no CI)
+image_tag = "latest"
+image_ocr = "ghcr.io/schultzvv/info_scrap:latest"
+# ghcr_username = "SchultzVV"
+# ghcr_pat      = "ghp_..."
+
+# Web
+lambda_memory_mb     = 1024
+lambda_timeout_s     = 30
+lambda_url_auth_type = "AWS_IAM" # NONE se o webhook do ML precisar postar sem x-amz-content-sha256
+
+# LLM gerenciado (opcional)
+enable_llm = false
+
+# Segredos (vazio = gerado ou CHANGE_ME; rotacione depois via SSM)
+openai_api_key   = ""
+ml_app_id        = ""
+ml_client_secret = ""
+ml_seller_id     = ""
+admin_username   = "admin"
+admin_password   = ""
+
+# CI/CD
+github_repo     = "SchultzVV/V_M"
+github_branches = ["main"]
+
+# Alertas
+budget_monthly_usd = 60
+alert_email        = ""

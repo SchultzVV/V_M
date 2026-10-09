@@ -1,0 +1,79 @@
+# Exemplo de workflow (copie para .github/workflows/deploy-aws.yml).
+# Autentica por OIDC na role criada em infra/aws/cicd.tf — sem chaves estáticas.
+name: Deploy AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_SITE: def-site
+  ECR_SITE_LAMBDA: def-site-lambda
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }} # output github_deploy_role_arn
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+
+      - name: Build imagens (base → site → lambda)
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          docker build -t def-site:base --build-arg REQUIREMENTS=requirements-prd.txt services/site
+          docker build -f infra/docker/Dockerfile.site --build-arg BASE_IMAGE=def-site:base \
+            -t $REGISTRY/$ECR_SITE:${{ github.sha }} -t $REGISTRY/$ECR_SITE:latest .
+          docker build -f infra/aws/docker/Dockerfile.lambda --build-arg BASE_IMAGE=$REGISTRY/$ECR_SITE:${{ github.sha }} \
+            -t $REGISTRY/$ECR_SITE_LAMBDA:${{ github.sha }} -t $REGISTRY/$ECR_SITE_LAMBDA:latest .
+          docker push --all-tags $REGISTRY/$ECR_SITE
+          docker push --all-tags $REGISTRY/$ECR_SITE_LAMBDA
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.13.3"
+
+      - name: Terraform apply (atualiza Lambda e task definitions com a nova tag)
+        working-directory: infra/aws
+        env:
+          TF_VAR_image_tag: ${{ github.sha }}
+          TF_VAR_domain: ${{ vars.SITE_DOMAIN }}
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TFSTATE_BUCKET }}" \
+            -backend-config="region=${{ env.AWS_REGION }}"
+          terraform apply -input=false -auto-approve
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build React
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Publica React no S3 + invalida CloudFront
+        working-directory: infra/aws
+        run: |
+          BUCKET=$(terraform output -json buckets | jq -r .frontend)
+          DIST=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Aliases.Items, '${{ vars.SITE_DOMAIN }}')].Id" --output text)
+          aws s3 sync ../../frontend/dist "s3://$BUCKET" --delete --cache-control "public,max-age=31536000,immutable" --exclude index.html
+          aws s3 cp ../../frontend/dist/index.html "s3://$BUCKET/index.html" --cache-control "no-cache"
+          aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"

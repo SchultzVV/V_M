@@ -1,0 +1,20 @@
+# ============================================================
+# Imagem "site" para a nuvem: camada fina sobre a imagem atual
+# (services/site/Dockerfile) que troca `python main.py` (debug=True,
+# HTTPS self-signed) por gunicorn em HTTP na porta $PORT.
+# A MESMA imagem roda o serviço web (sidecar do nginx) e os jobs
+# (prepare/stage/update-prices...), só mudando o comando.
+# Build:
+#   docker build -t def-site:base --build-arg REQUIREMENTS=requirements-prd.txt services/site
+#   docker build -f infra/docker/Dockerfile.site --build-arg BASE_IMAGE=def-site:base -t def-site:latest .
+# ============================================================
+ARG BASE_IMAGE=def-site:base
+FROM ${BASE_IMAGE}
+RUN pip install --no-cache-dir "gunicorn>=23,<24"
+ENV PORT=5000 \
+    FLASK_ENV=production \
+    DEBUG=false \
+    PYTHONUNBUFFERED=1
+WORKDIR /app
+# web: gunicorn; jobs sobrescrevem o comando (ex.: python3 scripts/stage_products.py)
+CMD ["sh", "-c", "exec gunicorn -b 0.0.0.0:${PORT} -w 2 --threads 4 --timeout 120 main:app"]

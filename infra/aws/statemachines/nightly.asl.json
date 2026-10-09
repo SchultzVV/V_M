@@ -1,0 +1,36 @@
+{
+  "Comment": "DEF nightly: update-ml-prices -> verify-prices -> tag-classify, em sequencia, cada um como task ECS Fargate Spot. Uma falha nao impede o proximo passo (fica em $.errors).",
+  "StartAt": "UpdateMlPrices",
+  "States": {
+    "UpdateMlPrices": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "Parameters": ${jsonencode(params["update-ml-prices"])},
+      "Retry": ${jsonencode(retry)},
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.errors.update_ml_prices", "Next": "VerifyPrices" }
+      ],
+      "ResultPath": "$.results.update_ml_prices",
+      "Next": "VerifyPrices"
+    },
+    "VerifyPrices": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "Parameters": ${jsonencode(params["verify-prices"])},
+      "Retry": ${jsonencode(retry)},
+      "Catch": [
+        { "ErrorEquals": ["States.ALL"], "ResultPath": "$.errors.verify_prices", "Next": "TagClassify" }
+      ],
+      "ResultPath": "$.results.verify_prices",
+      "Next": "TagClassify"
+    },
+    "TagClassify": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "Parameters": ${jsonencode(params["tag-classify"])},
+      "Retry": ${jsonencode(retry)},
+      "ResultPath": "$.results.tag_classify",
+      "End": true
+    }
+  }
+}

@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Infra cloud DEF</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  /* Layout: coluna única de leitura (max 1100px) sobre o design system DEF (brutalista, sem raio, mono + Inter), um bloco por nuvem com o mesmo esqueleto: diagrama → recursos → gatilhos → custo → comandos. Tema único escuro, por escolha de marca. */
+  :root {
+    --bg: #0a0a0a;
+    --surface: #1a1a1a;
+    --surface-2: #2a2a2a;
+    --line: #3a3a3a;
+    --fg: #d1d5db;
+    --fg-strong: #f3f4f6;
+    --muted: #9ca3af;
+    --accent: #00ff41;
+    --accent-dim: #00cc33;
+    --accent-ink: #0a0a0a;
+    --ok: #00ff41;  --ok-bg: #0d2a14;
+    --warn: #ffb000; --warn-bg: #2e2206;
+    --crit: #ff004d; --crit-bg: #33000f;
+    --none: #9ca3af; --none-bg: #262626;
+    --gcp: #4f8cff; --aws: #ff9900; --az: #2bb3ff;
+    --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    --font-sans: "Inter", system-ui, "Segoe UI", sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-sans); font-size: 16px; line-height: 1.55; padding-inline: 16px; padding-block: 0 72px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1, h2, h3, h4 { font-family: var(--font-mono); color: var(--fg-strong); text-wrap: balance; line-height: 1.15; margin: 0; letter-spacing: 0.01em; }
+  h1 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 700; text-transform: uppercase; }
+  h2 { font-size: clamp(1.3rem, 2.6vw, 1.7rem); font-weight: 700; text-transform: uppercase; margin-top: 64px; margin-bottom: 10px; padding-top: 14px; border-top: 2px solid var(--accent); }
+  h3 { font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 30px; margin-bottom: 8px; color: var(--accent); }
+  h4 { font-size: 0.9rem; font-weight: 600; margin-top: 18px; margin-bottom: 6px; color: var(--fg-strong); }
+  p { margin: 0 0 12px; max-width: 76ch; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; max-width: 80ch; }
+  li { margin-bottom: 5px; }
+  li::marker { color: var(--accent); }
+  a { color: var(--accent); }
+  code, pre, .mono { font-family: var(--font-mono); }
+  code { font-size: 0.86em; background: var(--surface-2); color: var(--fg-strong); padding: 1px 5px; }
+  pre { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--accent); padding: 14px 16px; overflow-x: auto; margin: 12px 0; font-size: 0.82rem; line-height: 1.45; }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  pre.diagram { border-left-color: var(--line); color: var(--fg-strong); font-size: 0.78rem; line-height: 1.35; }
+  .eyebrow { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+  .lead { font-size: 1.08rem; max-width: 72ch; color: var(--fg); }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); margin-top: 16px; }
+  .meta b { color: var(--fg-strong); font-weight: 600; }
+  header.top { padding-block: 44px 24px; border-bottom: 1px solid var(--line); }
+
+  nav.jump { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); padding-block: 8px; margin-inline: -16px; padding-inline: 16px; }
+  nav.jump ul { list-style: none; margin: 0 auto; padding: 0; display: flex; gap: 2px 16px; flex-wrap: wrap; max-width: 1100px; }
+  nav.jump a { text-decoration: none; font-family: var(--font-mono); font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 4px 0; }
+  nav.jump a:hover, nav.jump a:focus-visible { color: var(--accent); outline: none; }
+
+  .chip { display: inline-block; font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 7px; white-space: nowrap; font-weight: 600; border: 1px solid currentColor; vertical-align: middle; }
+  .chip.ok { color: var(--ok); background: var(--ok-bg); }
+  .chip.warn { color: var(--warn); background: var(--warn-bg); }
+  .chip.crit { color: var(--crit); background: var(--crit-bg); }
+  .chip.none { color: var(--none); background: var(--none-bg); }
+  .chip.gcp { color: var(--gcp); } .chip.aws { color: var(--aws); } .chip.az { color: var(--az); }
+
+  .cols3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+  .cols2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+  .col { background: var(--surface); border: 1px solid var(--line); padding: 16px; min-width: 0; }
+  .col h3 { margin-top: 0; display: flex; align-items: center; gap: 8px; color: var(--fg-strong); flex-wrap: wrap; }
+  .col ul { padding-left: 18px; margin-bottom: 0; }
+  .col .big { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 700; color: var(--accent); margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+  .col .sub { font-size: 0.8rem; color: var(--muted); font-family: var(--font-mono); }
+  .col.gcp { border-top: 3px solid var(--gcp); } .col.aws { border-top: 3px solid var(--aws); } .col.az { border-top: 3px solid var(--az); }
+
+  .tbl { overflow-x: auto; margin: 14px 0 22px; border: 1px solid var(--line); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.86rem; min-width: 640px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  th { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: var(--surface); position: sticky; top: 0; }
+  tr:last-child td { border-bottom: 0; }
+  td.num, th.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.k { font-family: var(--font-mono); color: var(--fg-strong); white-space: nowrap; }
+  tr.total td { background: var(--surface); color: var(--fg-strong); font-weight: 600; }
+  .note { border: 1px solid var(--line); border-left: 3px solid var(--warn); background: var(--surface); padding: 12px 16px; margin: 14px 0; max-width: 80ch; }
+  .note.ok { border-left-color: var(--ok); }
+  .note.crit { border-left-color: var(--crit); }
+  .steps { counter-reset: s; list-style: none; padding-left: 0; max-width: 80ch; }
+  .steps li { position: relative; padding-left: 44px; margin-bottom: 12px; }
+  .steps li::before { counter-increment: s; content: counter(s, decimal-leading-zero); position: absolute; left: 0; top: 1px; font-family: var(--font-mono); font-weight: 700; color: var(--accent); }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; font-size: 0.9rem; margin: 10px 0 16px; max-width: 80ch; }
+  .kv dt { font-family: var(--font-mono); color: var(--muted); }
+  .kv dd { margin: 0; }
+  footer { margin-top: 64px; padding-top: 14px; border-top: 1px solid var(--line); font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); }
+  @media (max-width: 760px) {
+    .cols3, .cols2 { grid-template-columns: 1fr; }
+    h2 { margin-top: 44px; }
+    .kv { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">DEF · infraestrutura · 2026-10-09</div>
+  <h1>Plano de infra cloud</h1>
+  <p class="lead">Três planos Terraform para tirar o DEF do túnel Cloudflare e colocá-lo em nuvem: Google Cloud, AWS e Azure. Mesmo desenho nos três: site serverless que escala a zero, a esteira de produtos rodando como <em>jobs</em> de container disparados por cron e por evento, banco gerenciado, object storage no lugar do MinIO, segredos no cofre e deploy por GitHub Actions sem chave estática.</p>
+  <div class="meta">
+    <span>código: <b>infra/gcp · infra/aws · infra/azure</b></span>
+    <span>base: <b>dev-front</b> (CLAUDE.md §2)</span>
+    <span>validação: <b>terraform validate OK</b> nos 3 (google 7.46 · aws 6.x · azurerm 4.81)</span>
+    <span>moeda: <b>US$/mês, estimativa</b></span>
+  </div>
+</header>
+
+<nav class="jump" aria-label="Seções">
+  <ul>
+    <li><a href="#resumo">Resumo</a></li>
+    <li><a href="#mapa">Hoje → nuvem</a></li>
+    <li><a href="#principios">Princípios</a></li>
+    <li><a href="#gcp">GCP</a></li>
+    <li><a href="#aws">AWS</a></li>
+    <li><a href="#azure">Azure</a></li>
+    <li><a href="#custos">Custos</a></li>
+    <li><a href="#comparacao">Comparação</a></li>
+    <li><a href="#deploy">Deploy</a></li>
+    <li><a href="#delta">Δ código</a></li>
+    <li><a href="#roteiro">Roteiro</a></li>
+  </ul>
+</nav>
+
+<!-- ===================================================================== -->
+<h2 id="resumo">Resumo executivo</h2>
+<p>O stack já é todo container (Flask + Playwright, Nginx + React, OCR em imagem pronta), então a mudança não é reescrever: é trocar o <code>docker compose</code> por serviços gerenciados e trocar o <code>make</code> manual por gatilhos. A recomendação é começar pelo <strong>GCP</strong>: Cloud Run Jobs aceita a imagem atual sem adaptação, monta buckets como pasta (o <code>staging/</code> continua sendo uma pasta) e tem a menor lista de mudanças de código. A <strong>AWS</strong> tem o menor custo no cenário recomendado, mas pede o adaptador Lambda, um NAT e cuidado com o webhook atrás do CloudFront. A <strong>Azure</strong> tem a melhor paridade de jobs (cron e evento nativos), mas o Blob não fala S3 e isso obriga um adaptador de storage.</p>
+
+<div class="cols3">
+  <div class="col gcp">
+    <h3><span class="chip gcp">GCP</span> Recomendado <span class="chip ok">menor Δ código</span></h3>
+    <div class="big">~US$ 40</div>
+    <div class="sub">recomendado · ~US$ 20 mínimo (sem LB)</div>
+    <ul>
+      <li>Cloud Run (nginx + Flask sidecar) · Cloud Run Jobs</li>
+      <li>Cloud Scheduler → <code>jobs.run</code> com <em>overrides</em></li>
+      <li>Pub/Sub → Eventarc → Workflows → Job</li>
+      <li>Cloud SQL micro · GCS com API S3 (HMAC) · GCS FUSE como volume</li>
+    </ul>
+  </div>
+  <div class="col aws">
+    <h3><span class="chip aws">AWS</span> Menor custo recomendado <span class="chip warn">mais peças</span></h3>
+    <div class="big">~US$ 34</div>
+    <div class="sub">recomendado · ~US$ 25 mínimo (≈ 10 no 1º ano de conta nova)</div>
+    <ul>
+      <li>Lambda (container + Web Adapter) + CloudFront · React em S3</li>
+      <li>ECS Fargate <em>Spot</em> para jobs · EventBridge Scheduler</li>
+      <li>SQS → EventBridge Pipes → Step Functions → RunTask</li>
+      <li>RDS t4g.micro · S3 · EFS · fck-nat (NAT barato)</li>
+    </ul>
+  </div>
+  <div class="col az">
+    <h3><span class="chip az">Azure</span> Paridade de jobs <span class="chip crit">Blob ≠ S3</span></h3>
+    <div class="big">~US$ 37</div>
+    <div class="sub">recomendado · ~US$ 25 mínimo</div>
+    <ul>
+      <li>Container Apps (nginx + Flask sidecar), domínio e cert grátis</li>
+      <li>Container Apps Jobs com cron e KEDA (Storage Queue)</li>
+      <li>PostgreSQL Flexible B1ms · Blob + Files + Queue</li>
+      <li>Key Vault + identidade gerenciada · GHCR como registry</li>
+    </ul>
+  </div>
+</div>
+
+<h3>Decisões que valem para os três</h3>
+<ul>
+  <li><strong>Uma imagem, vários papéis.</strong> <code>infra/docker/Dockerfile.site</code> é uma camada fina sobre a imagem atual que troca <code>python main.py</code> por gunicorn. O serviço web e todos os jobs usam a mesma imagem; só o comando muda.</li>
+  <li><strong>Nginx + Flask no mesmo pod.</strong> <code>Dockerfile.web</code> builda o React e sobe o Nginx em <code>:8080</code> fazendo proxy para <code>127.0.0.1:5000</code>. É o mesmo roteamento de <code>nginx/nginx-react.conf</code> (+ <code>secao5</code>), sem TLS, que passa a terminar no balanceador. Na AWS o React vai para S3/CloudFront e o Flask fica sozinho no Lambda.</li>
+  <li><strong>OCR só quando precisa.</strong> O <code>info-scrap</code> roda como sidecar dentro do job (GCP, AWS) ou como app interno que escala a zero (Azure). Custo ocioso zero.</li>
+  <li><strong>Pastas viram volumes.</strong> <code>staging/</code>, <code>uploads/</code> e <code>config/ml_tokens.json</code> são montados em <code>/app/...</code> a partir de GCS FUSE, EFS ou Azure Files. Os scripts continuam lendo e gravando pasta.</li>
+  <li><strong>Gatilhos, não cron no host.</strong> Cron gerenciado (fuso <code>America/Sao_Paulo</code>) e fila de eventos para o webhook do ML. Jobs destrutivos (<code>reprice-all</code>) existem, mas nunca entram no cron por padrão.</li>
+  <li><strong>Sem segredo no git.</strong> Secret Manager, SSM Parameter Store ou Key Vault; o Terraform cria o cofre e ignora rotação feita por fora. CI autentica por OIDC (Workload Identity, IAM role ou credencial federada), sem chave JSON.</li>
+  <li><strong>Orçamento com alarme</strong> (50/90/100 % de US$ 60) e alerta de erro 5xx/job falho em cada nuvem.</li>
+  <li><strong>LLM e vetores sem Ollama.</strong> Qdrant, Ollama e hsmart não sobem na nuvem: <code>pgvector</code> no Postgres gerenciado e, se <code>enable_llm=true</code>, Vertex AI, Bedrock ou Azure OpenAI. O OpenAI <code>gpt-4o-mini</code> já em uso continua funcionando como está.</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2 id="mapa">O que roda hoje → o que vira na nuvem</h2>
+<p>Mapeamento serviço a serviço do <code>docker-compose.yaml</code> (+ dev e react) para cada nuvem. Linhas em cinza são a stack LLM opcional, que fica fora do deploy padrão (profile <code>llm</code> da F0).</p>
+<div class="tbl"><table>
+  <thead><tr><th>Compose hoje</th><th>GCP</th><th>AWS</th><th>Azure</th></tr></thead>
+  <tbody>
+    <tr><td class="k">site (Flask :5000)</td><td>Cloud Run service <code>def-prd-web</code>, container <code>site</code> (sidecar)</td><td>Lambda <code>def-prd-site</code> (imagem + Lambda Web Adapter), Function URL atrás do CloudFront</td><td>Container App <code>ca-def-prd-web</code>, container <code>site</code> (sidecar)</td></tr>
+    <tr><td class="k">nginx + frontend/dist</td><td>container <code>web</code> no mesmo serviço (porta de ingresso 8080) + LB global + Cloud CDN</td><td>S3 <code>frontend</code> + CloudFront (função SPA → <code>index.html</code>)</td><td>container <code>web</code> no mesmo app + ingress externo + cert gerenciado</td></tr>
+    <tr><td class="k">db (postgres:15)</td><td>Cloud SQL PostgreSQL 16 <code>db-f1-micro</code>, socket <code>/cloudsql</code></td><td>RDS PostgreSQL 16 <code>db.t4g.micro</code>, sub-rede privada</td><td>PostgreSQL Flexible Server <code>B_Standard_B1ms</code>, TLS obrigatório</td></tr>
+    <tr><td class="k">minio (imagens)</td><td>GCS <code>def-prd-media</code> público, acessado pela API S3 (HMAC) pelo cliente MinIO atual</td><td>S3 <code>def-prd-media</code> privado atrás do CloudFront (<code>/media/*</code>)</td><td>Blob container <code>media</code> público; <strong>exige adaptador</strong> (sem API S3)</td></tr>
+    <tr><td class="k">staging/ uploads/ config/</td><td>bucket <code>def-prd-appdata</code> montado via GCS FUSE (<code>only-dir</code>)</td><td>EFS com access points <code>staging</code>, <code>uploads</code>, <code>config</code></td><td>Azure Files (3 shares) ligados ao environment</td></tr>
+    <tr><td class="k">redis</td><td>opcional: Memorystore Basic 1 GB (<code>redis_mode=memorystore</code>)</td><td>opcional: ElastiCache Serverless Valkey (<code>redis_mode=serverless</code>)</td><td>opcional: Azure Cache for Redis C0 (<code>redis_mode=managed</code>)</td></tr>
+    <tr><td class="k">info-scrap (OCR :8000)</td><td>sidecar <code>ocr</code> nos jobs que usam OCR</td><td>sidecar <code>ocr</code> (<code>essential=false</code>) nas task definitions</td><td>Container App interno <code>ca-def-prd-ocr</code>, min 0</td></tr>
+    <tr><td class="k">make prepare/stage/update…</td><td>Cloud Run Jobs (1 por target)</td><td>ECS task definitions (1 por target), Fargate Spot</td><td>Container Apps Jobs (1 por target)</td></tr>
+    <tr><td class="k">cron (não existe)</td><td>Cloud Scheduler → <code>jobs.run</code>; Workflows para encadear</td><td>EventBridge Scheduler → RunTask; Step Functions para encadear</td><td><code>schedule_trigger_config</code> no job (UTC); job <code>nightly</code> encadeia</td></tr>
+    <tr><td class="k">webhook ML → job</td><td>Pub/Sub → Eventarc → Workflows <code>run-job</code> → Job com args</td><td>SQS → EventBridge Pipes → Step Functions <code>run-job</code> → RunTask com override</td><td>Storage Queue → KEDA (<code>azure-queue</code>) → Job <code>api-update-ml</code></td></tr>
+    <tr><td class="k">túnel Cloudflare</td><td>IP global do LB + cert gerenciado (DNS no Cloudflare, só DNS)</td><td>CloudFront + ACM (DNS no Cloudflare, CNAME)</td><td>FQDN do Container App + cert gerenciado (TXT <code>asuid</code> + CNAME)</td></tr>
+    <tr><td class="k">.env</td><td>Secret Manager</td><td>SSM Parameter Store (SecureString)</td><td>Key Vault (RBAC) + identidade gerenciada</td></tr>
+    <tr><td class="k">ghcr.io (CI atual)</td><td>Artifact Registry <code>def</code> + repositório remoto <code>ghcr</code> (proxy do GHCR; Cloud Run não puxa do GHCR direto)</td><td>ECR <code>def-site</code>, <code>def-site-lambda</code>; OCR puxado do GHCR com credencial opcional</td><td>GHCR (padrão) ou ACR Basic (<code>enable_acr</code>)</td></tr>
+    <tr><td class="k">GitHub Actions</td><td>Workload Identity Federation + SA <code>def-prd-deploy</code></td><td>OIDC provider + role <code>def-prd-github-deploy</code></td><td>App Entra + credencial federada + Contributor no RG</td></tr>
+    <tr><td class="k" style="color:var(--muted)">vector_db / ollama / hsmart</td><td style="color:var(--muted)">pgvector no Cloud SQL · Vertex AI (<code>enable_llm</code>)</td><td style="color:var(--muted)">pgvector no RDS · Bedrock (<code>enable_llm</code>)</td><td style="color:var(--muted)">pgvector no Flexible · Azure OpenAI <code>gpt-4o-mini</code> (<code>enable_llm</code>)</td></tr>
+  </tbody>
+</table></div>
+
+<!-- ===================================================================== -->
+<h2 id="principios">Princípios de desenho</h2>
+<div class="cols2">
+  <div class="col">
+    <h3>Serverless onde cabe</h3>
+    <ul>
+      <li>Web escala a zero (Cloud Run, Lambda, Container Apps). Tráfego de catálogo de afiliados é baixo e cacheável; CDN na frente.</li>
+      <li>Jobs pagam por minuto de execução. A esteira roda ~1 h/dia: custa centavos.</li>
+      <li>Banco é o único componente sempre ligado. Menor instância que aguenta Postgres 16 com <code>pgvector</code>.</li>
+      <li>Redis vira opcional: o site não depende dele, só os agentes e o oracle.</li>
+    </ul>
+  </div>
+  <div class="col">
+    <h3>Estado da arte de gatilhos</h3>
+    <ul>
+      <li>Cron gerenciado chama a API de execução do job passando <em>overrides</em> de argumentos: um job <code>prepare-ml</code>, N URLs.</li>
+      <li>Evento = mensagem JSON <code>{"job":"api-update-ml","args":[...]}</code>. O orquestrador (Workflows / Step Functions / KEDA) resolve o job e espera terminar.</li>
+      <li>Encadeamento noturno (preços → verificação → tags) como fluxo declarativo, com retry e log por etapa.</li>
+      <li>Tudo em Terraform: adicionar um job é adicionar uma entrada no mapa <code>local.jobs</code>.</li>
+    </ul>
+  </div>
+</div>
+
+<pre class="diagram">
+                 ┌──────────── trigger ────────────┐
+  cron (BRT) ───►│ Scheduler / EventBridge / cron  │
+  webhook ML ───►│ fila → orquestrador (Workflows, │──► Job "api-update-ml"  args=[script, url]
+  operador  ────►│ Step Functions, KEDA)           │──► Job "prepare-ml"     args=[script, url]
+                 └─────────────────────────────────┘──► Job "nightly": update-ml-prices → verify-prices → tag-classify
+                                                            │
+        ┌─────────── mesma imagem def-site ──────────────┐  │  volumes: /app/staging /app/uploads /app/config
+        │ site (gunicorn :5000)  │  jobs (python3 script) │◄─┘  sidecar ocr :8000 só nos jobs com OCR
+        └────────────────────────┴────────────────────────┘
+                 │                          │
+      ┌──────────┴──────────┐     ┌─────────┴─────────┐
+      │ Postgres gerenciado │     │ object storage     │◄── /media/* servido pela CDN / nginx
+      └─────────────────────┘     └────────────────────┘
+</pre>
+
+<!-- ===================================================================== -->
+<h2 id="gcp"><span class="chip gcp">Plano 1</span> Google Cloud — Cloud Run + Cloud Run Jobs</h2>
+<p>É o encaixe mais direto: Cloud Run aceita múltiplos containers (nginx + Flask), monta buckets como diretório (GCS FUSE) e os Cloud Run Jobs rodam a imagem atual com Playwright sem nenhum empacotamento extra. Região padrão <code>southamerica-east1</code> (São Paulo); <code>us-central1</code> sai ~25 % mais barato.</p>
+
+<pre class="diagram">
+  Cloudflare DNS (só DNS) ──► IP global ──► HTTPS LB + Cloud CDN + cert gerenciado
+                                               │ serverless NEG
+                                               ▼
+                               Cloud Run service def-prd-web (min 0, max 3)
+                               ┌──────────────┬───────────────────────────┐
+                               │ web (nginx)  │ site (gunicorn, Flask)    │── /cloudsql socket ──► Cloud SQL PG16 db-f1-micro
+                               │ :8080        │ :5000  /app/config (FUSE) │── HMAC S3 API ───────► GCS def-prd-media (público)
+                               └──────────────┴───────────────────────────┘                        GCS def-prd-appdata (staging/uploads/config)
+  Cloud Scheduler (America/Sao_Paulo) ──► run.googleapis.com/v2/.../jobs/X:run {overrides.args}
+  Pub/Sub def-prd-events ──► Eventarc ──► Workflows run-job ──► Cloud Run Job (args) ──► espera terminar
+  Scheduler 03:00 ──► Workflows nightly ──► update-ml-prices → verify-prices → tag-classify
+  Cloud Run Jobs: update-ml-prices · verify-prices* · publish* · stage · prepare-ml* · populate-mf* · reprice-all · tag-classify · api-update-ml   (* = sidecar ocr)
+</pre>
+
+<h3>Recursos (infra/gcp)</h3>
+<div class="tbl"><table>
+  <thead><tr><th>Arquivo</th><th>Recursos principais</th><th>Papel</th></tr></thead>
+  <tbody>
+    <tr><td class="k">apis.tf</td><td><code>google_project_service</code> ×16</td><td>habilita Run, SQL, Secret Manager, Scheduler, Workflows, Eventarc, Pub/Sub, LB, Billing…</td></tr>
+    <tr><td class="k">registry.tf</td><td>Artifact Registry <code>def</code> (limpeza: 10 tags) + repositório remoto <code>ghcr</code></td><td>imagens <code>def-site</code> e <code>def-web</code>; proxy para <code>ghcr.io/schultzvv/info_scrap</code></td></tr>
+    <tr><td class="k">database.tf</td><td>Cloud SQL PG16, banco <code>produtos_db</code>, usuário <code>def_app</code></td><td>zonal, backup 7 dias, sem IP autorizado (só conector)</td></tr>
+    <tr><td class="k">storage.tf</td><td>GCS <code>media</code> (público) e <code>appdata</code> (privado), HMAC key</td><td>imagens via API S3; pastas via GCS FUSE</td></tr>
+    <tr><td class="k">web.tf</td><td>Cloud Run v2 service, 2 containers, volume Cloud SQL + GCS</td><td>site público; ingress interno quando atrás do LB</td></tr>
+    <tr><td class="k">jobs.tf</td><td>Cloud Run v2 Jobs a partir de <code>local.jobs</code> (9 jobs)</td><td>1 vCPU / 2 GiB, timeout 1 h, sidecar OCR com startup probe e <code>depends_on</code> em 5 jobs; <code>ocr_mode=service</code> como alternativa</td></tr>
+    <tr><td class="k">triggers.tf + workflows/</td><td>Scheduler ×N, Pub/Sub + DLQ, Eventarc, Workflows <code>run-job</code> e <code>nightly</code></td><td>cron com overrides; evento → job com args; encadeamento</td></tr>
+    <tr><td class="k">lb.tf</td><td>IP global, cert gerenciado, NEG serverless, backend com CDN, redirect 80→443</td><td>domínio próprio; desligável com <code>enable_lb=false</code></td></tr>
+    <tr><td class="k">secrets.tf / iam.tf</td><td>Secret Manager ×11, SAs <code>run</code>, <code>trigger</code>, <code>deploy</code></td><td>menor privilégio; rotação por <code>gcloud secrets versions add</code></td></tr>
+    <tr><td class="k">redis.tf / llm.tf</td><td>Memorystore + VPC (opcional) · Vertex AI (opcional)</td><td>ligados por variável</td></tr>
+    <tr><td class="k">cicd.tf + ci/</td><td>Workload Identity Federation, SA de deploy, workflow exemplo</td><td>GitHub Actions sem chave</td></tr>
+    <tr><td class="k">monitoring.tf</td><td>Budget 50/90/100 %, uptime check <code>/health</code>, alerta por e-mail</td><td>custo e disponibilidade</td></tr>
+    <tr><td class="k">bootstrap/</td><td>bucket <code>tfstate</code></td><td>state remoto (GCS backend)</td></tr>
+  </tbody>
+</table></div>
+
+<h3>Gatilhos</h3>
+<dl class="kv">
+  <dt>cron</dt><dd>Cloud Scheduler com <code>oauth_token</code> da SA <code>def-prd-trigger</code> chamando <code>jobs/&lt;job&gt;:run</code>. O corpo pode levar <code>overrides.containerOverrides[].args</code>, então o mesmo job <code>prepare-ml</code> atende qualquer URL.</dd>
+  <dt>evento</dt><dd>Mensagem no tópico <code>def-prd-events</code> → Eventarc → Workflow <code>run-job</code>, que decodifica o JSON, chama o conector <code>run.v2.jobs.run</code> e espera. Falhas vão para a DLQ.</dd>
+  <dt>cadeia noturna</dt><dd>Workflow <code>nightly</code> às 03:00 BRT: <code>update-ml-prices</code> → <code>verify-prices</code> → <code>tag-classify</code>, sequencial, cada etapa aguardando a anterior.</dd>
+  <dt>manual</dt><dd><code>gcloud run jobs execute def-prd-prepare-ml --args=scripts/prepare_ml_best.py,https://meli.la/xxx --wait</code></dd>
+</dl>
+
+<h3>Custo estimado</h3>
+<div class="tbl"><table>
+  <thead><tr><th>Item</th><th>Dimensionamento</th><th class="num">Mínimo</th><th class="num">Recomendado</th></tr></thead>
+  <tbody>
+    <tr><td>Cloud Run web</td><td>min 0, 1 vCPU/512 Mi + 1 vCPU/1 Gi, ~50 mil req/mês (free tier cobre)</td><td class="num">0–3</td><td class="num">0–3</td></tr>
+    <tr><td>Cloud Run Jobs</td><td>~30 h/mês, 1 vCPU/2 GiB + sidecar OCR (≈ 2 vCPU/3 GiB por execução)</td><td class="num">4–8</td><td class="num">4–8</td></tr>
+    <tr><td>Cloud SQL PG16</td><td><code>db-f1-micro</code> zonal, 10 GB SSD, backup 7 d, em São Paulo (us-central1 ≈ −25 %)</td><td class="num">11–15</td><td class="num">11–15</td></tr>
+    <tr><td>GCS</td><td>5 GB imagens + appdata, egress pequeno</td><td class="num">1</td><td class="num">1</td></tr>
+    <tr><td>LB global + CDN + cert</td><td>regra de encaminhamento US$ 0,025/h; sem LB: URL <code>run.app</code> ou Firebase Hosting (grátis)</td><td class="num">0</td><td class="num">19</td></tr>
+    <tr><td>Scheduler · Workflows · Pub/Sub · Secret Manager · Artifact Registry · Logging</td><td>dentro das cotas gratuitas</td><td class="num">0–1</td><td class="num">0–1</td></tr>
+    <tr><td style="color:var(--muted)">Memorystore Redis Basic 1 GB (opcional)</td><td style="color:var(--muted)">US$ 0,049/h</td><td class="num" style="color:var(--muted)">—</td><td class="num" style="color:var(--muted)">+36</td></tr>
+    <tr class="total"><td>Total</td><td>sem Redis; min 1 instância somaria +20–25</td><td class="num">≈ 20</td><td class="num">≈ 40</td></tr>
+  </tbody>
+</table></div>
+
+<div class="note">O LB global é o único item "fixo" caro. Alternativa a custo zero: <code>enable_lb=false</code> e Firebase Hosting com <em>rewrite</em> para o Cloud Run (domínio + TLS + CDN grátis); o README do módulo descreve. Domain mapping direto do Cloud Run não cobre <code>southamerica-east1</code>.</div>
+
+<h3>Pontos de atenção</h3>
+<ul>
+  <li>Sidecar OCR em job: o container <code>site</code> declara <code>depends_on = ["ocr"]</code> e o sidecar tem startup probe TCP (obrigatório). A documentação do Google não afirma explicitamente que o sidecar é encerrado quando o principal termina; por isso existe <code>ocr_mode = "service"</code>, que sobe um Cloud Run interno <code>def-prd-ocr</code> (min 0) com Direct VPC egress.</li>
+  <li>Há um problema conhecido do Cloud Run com multi-container + conexão Cloud SQL embutida (volume <code>/cloudsql</code>); o README descreve o caminho alternativo por IP privado se aparecer.</li>
+  <li>O primeiro <code>apply</code> falha no Cloud Run se as imagens ainda não existem: aplicar com <code>-target</code> APIs e registry, fazer push, depois o apply completo.</li>
+  <li>GCS FUSE grava o arquivo inteiro a cada <code>write</code>: ótimo para JSONs de staging e tokens, ruim para milhares de arquivos pequenos. Para <code>uploads/</code> grandes, prefira enviar direto ao bucket de mídia.</li>
+  <li>Nomes de bucket são globais: o código precisa parar de criar um bucket por plataforma (<code>mercadolivre</code>, <code>shopee</code>…) e usar <code>MINIO_BUCKET</code> com prefixo (ver <a href="#delta">Δ código</a>).</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2 id="aws"><span class="chip aws">Plano 2</span> AWS — Lambda + CloudFront + ECS Fargate Spot</h2>
+<p>O plano mais barato no mínimo e o mais "serverless puro": o Flask roda em Lambda a partir da imagem atual com o <strong>Lambda Web Adapter</strong> (sem reescrever rotas), o React vai para S3 com CloudFront na frente e os jobs rodam em Fargate Spot (até 70 % mais barato) sem nenhum cluster ligado. Região padrão <code>us-east-1</code>; <code>sa-east-1</code> tem tudo, mas custa ~30–40 % mais.</p>
+
+<pre class="diagram">
+  Cloudflare DNS (CNAME) ──► CloudFront + ACM + HSTS
+        ├─ default  ──► S3 frontend (OAC) + função SPA (/produto/123 → /index.html)
+        ├─ /media/* ──► S3 media (OAC) + função que tira o prefixo /media
+        └─ /api /auth /webhook /ai /instagram /sync /validate-prices /add_product /catalogo /secao* /sitemap.xml /robots.txt
+                   ──► Lambda def-prd-site (imagem + Web Adapter, 1 GB, 30 s) ──► RDS PG16 t4g.micro (privada)
+                                 │ VPC privada + fck-nat (egress p/ ML, OpenAI)   ──► EFS /mnt/config (ml_tokens.json)
+                                 └─ S3 media via cliente MinIO (chave IAM)
+  EventBridge Scheduler (America/Sao_Paulo) ──► ECS RunTask (FARGATE_SPOT) {containerOverrides.command}
+  SQS def-prd-events ──► EventBridge Pipes ──► Step Functions run-job ──► ecs:runTask.sync (override) ──► DLQ se falhar
+  Scheduler 03:00 ──► Step Functions nightly ──► update-ml-prices → verify-prices → tag-classify
+  ECS tasks (sub-rede pública, IP público, sem NAT): mesma lista de jobs, sidecar ocr essential=false, EFS staging/uploads/config
+</pre>
+
+<h3>Recursos (infra/aws)</h3>
+<div class="tbl"><table>
+  <thead><tr><th>Arquivo</th><th>Recursos principais</th><th>Papel</th></tr></thead>
+  <tbody>
+    <tr><td class="k">network.tf</td><td>VPC 10.20.0.0/16, 2 AZ, sub-redes públicas/privadas, IGW, fck-nat (t4g.nano) ou NAT Gateway, endpoint S3, SGs</td><td>egress barato para o Lambda; jobs em sub-rede pública dispensam NAT</td></tr>
+    <tr><td class="k">database.tf</td><td>RDS PostgreSQL 16 <code>db.t4g.micro</code>, 20 GB gp3, 7 dias de backup</td><td>único recurso sempre ligado</td></tr>
+    <tr><td class="k">storage.tf / efs.tf</td><td>S3 <code>media</code>, <code>frontend</code>, <code>tfstate</code>; EFS + 3 access points</td><td>imagens, React, state; pastas compartilhadas</td></tr>
+    <tr><td class="k">web_lambda.tf + docker/Dockerfile.lambda</td><td>Lambda imagem, Function URL (<code>lambda_url_auth_type</code> = <code>AWS_IAM</code> com OAC ou <code>NONE</code> com header <code>x-origin-verify</code>), EFS, log 14 d</td><td>Flask inteiro sem mudar rotas; readiness em <code>/webhook/health</code></td></tr>
+    <tr><td class="k">cdn.tf + cloudfront/*.js</td><td>Distribuição com 3 origens (OAC), ACM em us-east-1, funções SPA e <code>/media</code>, política de cache curta para <code>/api/*</code></td><td>domínio, TLS, cache</td></tr>
+    <tr><td class="k">jobs_ecs.tf</td><td>Cluster com FARGATE + FARGATE_SPOT, task definitions de <code>local.jobs</code>, roles</td><td>jobs com sidecar OCR e EFS</td></tr>
+    <tr><td class="k">triggers.tf + statemachines/</td><td>Scheduler group + schedules, SQS + DLQ, Pipes, Step Functions <code>run-job</code> e <code>nightly</code></td><td>cron, evento e encadeamento</td></tr>
+    <tr><td class="k">secrets.tf / iam.tf</td><td>SSM SecureString <code>/def/prd/*</code>, usuário IAM só para o cliente MinIO</td><td>segredos; rotação por <code>aws ssm put-parameter</code></td></tr>
+    <tr><td class="k">cache.tf / llm.tf</td><td>ElastiCache Serverless Valkey (opcional) · política Bedrock (opcional)</td><td>ligados por variável</td></tr>
+    <tr><td class="k">cicd.tf + ci/</td><td>OIDC GitHub + role de deploy; workflow exemplo</td><td>build → ECR → Lambda/ECS → S3 sync → invalidation</td></tr>
+    <tr><td class="k">monitoring.tf</td><td>Budget 50/90/100 %, alarmes Lambda errors, DLQ &gt; 0, disco RDS</td><td>custo e saúde</td></tr>
+    <tr><td class="k">bootstrap/</td><td>bucket S3 versionado</td><td>state remoto com <code>use_lockfile</code> (sem DynamoDB)</td></tr>
+  </tbody>
+</table></div>
+
+<h3>Gatilhos</h3>
+<dl class="kv">
+  <dt>cron</dt><dd>EventBridge Scheduler (fuso <code>America/Sao_Paulo</code>, janela flexível 15 min) com alvo ECS RunTask em FARGATE_SPOT e <code>containerOverrides.command</code> quando há argumentos.</dd>
+  <dt>evento</dt><dd>Webhook publica em SQS → EventBridge Pipes embrulha o corpo como <code>{"data": …}</code> e entrega à Step Functions <code>run-job</code>, que escolhe a task definition e roda <code>ecs:runTask.sync</code> com o comando vindo do input. 3 falhas → DLQ → alarme.</dd>
+  <dt>cadeia noturna</dt><dd>Step Functions <code>nightly</code> (Standard) encadeia as três tasks com <code>.sync</code>; cada etapa aparece no console com log.</dd>
+  <dt>manual</dt><dd><code>aws stepfunctions start-execution --input '{"job":"prepare-ml","args":["scripts/prepare_ml_best.py","https://meli.la/xxx"]}'</code> ou <code>aws ecs run-task</code> com override.</dd>
+</dl>
+
+<h3>Custo estimado</h3>
+<div class="tbl"><table>
+  <thead><tr><th>Item</th><th>Dimensionamento</th><th class="num">Mínimo</th><th class="num">Recomendado</th></tr></thead>
+  <tbody>
+    <tr><td>Lambda web</td><td>1 GB, ~50 mil req/mês (free tier permanente: 1 M req + 400 mil GB-s)</td><td class="num">0–2</td><td class="num">0–2</td></tr>
+    <tr><td>CloudFront + S3</td><td>1 TB/mês grátis; 5 GB de imagens</td><td class="num">1</td><td class="num">1</td></tr>
+    <tr><td>RDS PG16</td><td><code>db.t4g.micro</code> single-AZ, 20 GB gp3 (grátis 12 meses em conta nova)</td><td class="num">14</td><td class="num">14</td></tr>
+    <tr><td>EFS</td><td>~1 GB, bursting</td><td class="num">1</td><td class="num">1</td></tr>
+    <tr><td>fck-nat + IPv4 público</td><td>t4g.nano US$ 3 + endereço US$ 3,65; NAT Gateway sairia ≈ 33 + tráfego</td><td class="num">7</td><td class="num">7</td></tr>
+    <tr><td>ECS Fargate Spot (jobs)</td><td>~30 h/mês, 1 vCPU/2 GB, IP público por task-hora</td><td class="num">1–2</td><td class="num">1–2</td></tr>
+    <tr><td>Scheduler · SQS · Pipes · Step Functions · SSM · ECR · CloudWatch</td><td>cotas gratuitas; ECR ~3 GB; logs</td><td class="num">1–2</td><td class="num">2–3</td></tr>
+    <tr><td style="color:var(--muted)">ElastiCache Serverless Valkey (opcional)</td><td style="color:var(--muted)">mínimo 100 MB</td><td class="num" style="color:var(--muted)">—</td><td class="num" style="color:var(--muted)">+7</td></tr>
+    <tr class="total"><td>Total</td><td>sem Redis / com Valkey serverless (+ Route 53 opcional)</td><td class="num">≈ 25</td><td class="num">≈ 34</td></tr>
+  </tbody>
+</table></div>
+
+<h3>Pontos de atenção</h3>
+<ul>
+  <li><strong>NAT é obrigatório para o Lambda</strong> (chamadas ao ML e à OpenAI saem da VPC). O fck-nat resolve por ~US$ 7; o NAT Gateway gerenciado custaria ~US$ 33 + US$ 0,045/GB. Os jobs fogem disso rodando em sub-rede pública com IP público.</li>
+  <li><strong>Cold start</strong> do Flask em container ~3–5 s na primeira requisição depois de ociosidade. O cache de 60 s do CloudFront em <code>/api/*</code> e o <code>/health</code> da CDN amortecem; <em>provisioned concurrency</em> resolveria por ~US$ 12/mês.</li>
+  <li>No Lambda o sistema de arquivos é somente leitura (exceto <code>/tmp</code>); o <code>/app/config</code> vira link para o EFS. Só os jobs escrevem em <code>staging/</code>.</li>
+  <li><code>REDIS_URL</code> no ElastiCache Serverless é TLS (<code>rediss://</code>); o cliente Python já suporta.</li>
+  <li><strong>Function URL atrás do CloudFront:</strong> com OAC (<code>AWS_IAM</code>) todo POST/PUT precisa do header <code>x-amz-content-sha256</code>, que o webhook do ML não manda. Para a F2, usar <code>lambda_url_auth_type = "NONE"</code> e conferir no Flask o header secreto <code>x-origin-verify</code> que o CloudFront injeta (Δ código pequeno).</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2 id="azure"><span class="chip az">Plano 3</span> Azure — Container Apps + Container Apps Jobs</h2>
+<p>Azure Container Apps é, dos três, o que mais parece o <code>docker compose</code>: app com dois containers, jobs com <code>cron</code> e gatilho por fila (KEDA) nativos, volume Azure Files por mount e domínio com certificado gerenciado grátis. O preço disso é o storage: o Blob não tem API S3, então o cliente MinIO precisa de um adaptador. Região padrão <code>eastus</code>; <code>brazilsouth</code> tem tudo e custa ~40 % mais.</p>
+
+<pre class="diagram">
+  Cloudflare DNS (TXT asuid + CNAME) ──► Container App ca-def-prd-web (ingress externo, cert gerenciado, min 0 / max 3)
+                                          ┌──────────────┬────────────────────────────┐
+                                          │ web (nginx)  │ site (gunicorn, Flask)     │──► PostgreSQL Flexible B1ms (TLS, pgvector)
+                                          │ :8080        │ :5000  /app/config (Files) │──► Blob "media" (público) via adaptador
+                                          └──────────────┴────────────────────────────┘    Key Vault ◄── identidade gerenciada
+  ca-def-prd-ocr (interno, min 0) ◄── INFO_SCRAP_URL dos jobs
+  Jobs (caj-def-prd-*): schedule_trigger (cron UTC) · manual_trigger · event_trigger (KEDA azure-queue "events")
+     nightly 06:00 UTC = 03:00 BRT: update-ml-prices → verify-prices → tag-classify
+     api-update-ml: KEDA vê mensagem na fila → job sobe → run_from_queue.py tira 1 msg e executa os args
+  Azure Files: staging / uploads / config montados em /app/...   ·   Log Analytics (5 GB grátis)   ·   Budget 50/90/100 %
+</pre>
+
+<h3>Recursos (infra/azure)</h3>
+<div class="tbl"><table>
+  <thead><tr><th>Arquivo</th><th>Recursos principais</th><th>Papel</th></tr></thead>
+  <tbody>
+    <tr><td class="k">core.tf</td><td>Resource group, Log Analytics (1 GB/dia de teto), Container Apps Environment (Consumption)</td><td>base; sem VNet por padrão</td></tr>
+    <tr><td class="k">storage.tf</td><td>Storage account: blob <code>media</code> (público), 3 file shares, fila <code>events</code>, link dos shares ao environment</td><td>imagens, pastas compartilhadas, eventos</td></tr>
+    <tr><td class="k">database.tf</td><td>PostgreSQL Flexible Server PG16 <code>B_Standard_B1ms</code>, 32 GB, firewall "Azure services", extensão VECTOR</td><td>banco; TLS obrigatório</td></tr>
+    <tr><td class="k">keyvault.tf / identity.tf</td><td>Key Vault RBAC com 11 segredos; identidade <code>id-def-prd-app</code> com Secrets User, Blob/Queue Contributor</td><td>segredos referenciados por <code>key_vault_secret_id</code></td></tr>
+    <tr><td class="k">web.tf</td><td>Container App com 2 containers, volume <code>config</code>, probes <code>/health</code>, domínio + cert gerenciado nativo do provider (sem azapi)</td><td>site público; domínio em 2 applies</td></tr>
+    <tr><td class="k">ocr.tf</td><td>Container App interno <code>ca-def-prd-ocr</code>, min 0</td><td>OCR sob demanda</td></tr>
+    <tr><td class="k">jobs.tf + scripts/run_from_queue.py</td><td>Container Apps Jobs de <code>local.jobs</code> (10); <code>nightly</code> com cron; <code>api-update-ml</code> com KEDA por identidade</td><td>esteira por cron e por evento; trocar o trigger recria o job</td></tr>
+    <tr><td class="k">registry.tf</td><td>GHCR (padrão, segredo PAT) ou ACR Basic</td><td>reaproveita o registry atual</td></tr>
+    <tr><td class="k">cache.tf / llm.tf</td><td>Azure Cache for Redis C0 (opcional) · Azure OpenAI + deployment <code>gpt-4o-mini</code> (opcional)</td><td>ligados por variável</td></tr>
+    <tr><td class="k">cicd.tf + ci/</td><td>App Entra + credencial federada GitHub + Contributor no RG; workflow exemplo</td><td><code>az containerapp update --image</code></td></tr>
+    <tr><td class="k">monitoring.tf</td><td>Budget do RG 50/90/100 %, action group, alerta 5xx e job falho</td><td>custo e saúde</td></tr>
+    <tr><td class="k">bootstrap/</td><td>RG + storage + container <code>tfstate</code></td><td>state remoto (<code>use_azuread_auth</code>)</td></tr>
+  </tbody>
+</table></div>
+
+<h3>Gatilhos</h3>
+<dl class="kv">
+  <dt>cron</dt><dd><code>schedule_trigger_config</code> direto no job (expressão em UTC: 03:00 BRT = <code>0 6 * * *</code>). O job <code>nightly</code> encadeia os três scripts num <code>sh -c "a && b && c"</code>.</dd>
+  <dt>evento</dt><dd>KEDA scaler <code>azure-queue</code> sobe o job <code>api-update-ml</code> quando há mensagem na fila <code>events</code>. Como o KEDA não entrega o payload, o <code>run_from_queue.py</code> tira uma mensagem, executa <code>python3 &lt;args&gt;</code> e a apaga no sucesso.</dd>
+  <dt>manual</dt><dd><code>az containerapp job start -n caj-def-prd-prepare-ml -g rg-def-prd --args scripts/prepare_ml_best.py https://meli.la/xxx</code></dd>
+</dl>
+
+<h3>Custo estimado</h3>
+<div class="tbl"><table>
+  <thead><tr><th>Item</th><th>Dimensionamento</th><th class="num">Mínimo</th><th class="num">Recomendado</th></tr></thead>
+  <tbody>
+    <tr><td>Container Apps web</td><td>0,75 vCPU / 1,5 GiB; min 0 (grátis até 180 mil vCPU-s) · min 1 com preço ocioso</td><td class="num">3</td><td class="num">12</td></tr>
+    <tr><td>Container Apps Jobs + OCR</td><td>~30 h/mês, 1 vCPU/2 GiB; OCR min 0</td><td class="num">3</td><td class="num">3</td></tr>
+    <tr><td>PostgreSQL Flexible</td><td><code>B1ms</code> + 32 GB (brazilsouth ≈ 22)</td><td class="num">16</td><td class="num">16</td></tr>
+    <tr><td>Storage (blob + files + queue)</td><td>5 GB imagens, 3 shares de 5 GB</td><td class="num">2</td><td class="num">2</td></tr>
+    <tr><td>Log Analytics · Key Vault · alertas</td><td>5 GB/mês grátis; operações de KV; alertas de métrica</td><td class="num">1</td><td class="num">4</td></tr>
+    <tr><td>Domínio + cert gerenciado</td><td>grátis no Container Apps; Front Door Standard custaria ≈ 35</td><td class="num">0</td><td class="num">0</td></tr>
+    <tr><td style="color:var(--muted)">Azure Cache for Redis C0 (opcional)</td><td style="color:var(--muted)">250 MB</td><td class="num" style="color:var(--muted)">—</td><td class="num" style="color:var(--muted)">+16</td></tr>
+    <tr><td style="color:var(--muted)">ACR Basic (opcional)</td><td style="color:var(--muted)">GHCR é grátis</td><td class="num" style="color:var(--muted)">—</td><td class="num" style="color:var(--muted)">+5</td></tr>
+    <tr class="total"><td>Total</td><td>sem Redis (com Redis + ACR + Azure OpenAI ≈ 60)</td><td class="num">≈ 25</td><td class="num">≈ 37</td></tr>
+  </tbody>
+</table></div>
+
+<h3>Pontos de atenção</h3>
+<ul>
+  <li><strong>Adaptador de storage é obrigatório</strong>: <code>services/minio_client.py</code>, <code>routes/media_routes.py</code> e <code>scripts/stage_products.py</code> falam S3. Com <code>azure-storage-blob</code> o Δ é pequeno (upload + URL pública), mas existe.</li>
+  <li>Azure Files é SMB: ótimo para dezenas de JSONs, lento para milhares de arquivos pequenos.</li>
+  <li>Com <code>min_replicas=0</code> a primeira requisição espera ~5–10 s; o OCR interno também parte de zero (~10–20 s na primeira chamada do job).</li>
+  <li>Domínio em dois passos: <code>apply</code> com <code>enable_custom_domain=false</code>, criar o TXT <code>asuid</code> e o CNAME com os valores das saídas, depois <code>apply</code> de novo. Domínio apex (sem <code>www</code>) exige <code>az containerapp hostname bind --validation-method TXT</code> à mão.</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2 id="custos">Custos lado a lado</h2>
+<p>Premissas iguais nas três: ~50 mil requisições/mês, 5 GB de imagens, jobs somando ~1 h/dia, uma região dos EUA (São Paulo custa 25–40 % a mais em banco e compute), preços de lista 2025/26 sem impostos e sem créditos de boas-vindas. São estimativas para comparar ordem de grandeza, não cotação.</p>
+<div class="tbl"><table>
+  <thead><tr><th>Componente</th><th class="num">GCP</th><th class="num">AWS</th><th class="num">Azure</th><th>Observação</th></tr></thead>
+  <tbody>
+    <tr><td>Web (escala a zero)</td><td class="num">0–3</td><td class="num">0–2</td><td class="num">0–3</td><td>free tiers cobrem o tráfego atual</td></tr>
+    <tr><td>Jobs da esteira</td><td class="num">4–8</td><td class="num">1–2</td><td class="num">3</td><td>Fargate Spot é o mais barato por hora</td></tr>
+    <tr><td>Postgres gerenciado</td><td class="num">11–15</td><td class="num">14</td><td class="num">16</td><td>menor SKU com PG16 + pgvector</td></tr>
+    <tr><td>Object storage + pastas</td><td class="num">1</td><td class="num">2</td><td class="num">2</td><td>EFS e Files cobram por GB usado</td></tr>
+    <tr><td>Entrada (domínio, TLS, CDN)</td><td class="num">0 / 19</td><td class="num">1</td><td class="num">0</td><td>LB global do GCP é o único fixo caro</td></tr>
+    <tr><td>Rede de saída</td><td class="num">0</td><td class="num">7</td><td class="num">0</td><td>só o Lambda em VPC precisa de NAT</td></tr>
+    <tr><td>Cron · fila · orquestração · segredos · logs</td><td class="num">0–1</td><td class="num">1</td><td class="num">1</td><td>tudo dentro de cota gratuita</td></tr>
+    <tr><td style="color:var(--muted)">Redis (opcional)</td><td class="num" style="color:var(--muted)">+36</td><td class="num" style="color:var(--muted)">+7</td><td class="num" style="color:var(--muted)">+16</td><td style="color:var(--muted)">Valkey serverless é o único realmente pequeno</td></tr>
+    <tr class="total"><td>Mínimo (sem Redis)</td><td class="num">≈ 20</td><td class="num">≈ 25</td><td class="num">≈ 25</td><td>GCP sem LB · AWS com fck-nat · Azure min 0</td></tr>
+    <tr class="total"><td>Recomendado</td><td class="num">≈ 40</td><td class="num">≈ 34</td><td class="num">≈ 37</td><td>GCP com LB+CDN · AWS com Valkey · Azure com réplica mínima 1</td></tr>
+    <tr><td>Hoje (túnel + máquina local)</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td>mas sem URL estável, sem cron, sem backup, depende do PC ligado</td></tr>
+  </tbody>
+</table></div>
+
+<!-- ===================================================================== -->
+<h2 id="comparacao">Comparação qualitativa</h2>
+<div class="tbl"><table>
+  <thead><tr><th>Critério</th><th>GCP</th><th>AWS</th><th>Azure</th></tr></thead>
+  <tbody>
+    <tr><td class="k">Encaixe com o código atual</td><td><span class="chip ok">alto</span> containers como estão; cliente MinIO fala com o GCS; pastas viram volume sem mudar script</td><td><span class="chip warn">médio</span> Lambda Web Adapter + symlink de config; S3 nativo</td><td><span class="chip warn">médio</span> containers como estão; Blob exige adaptador</td></tr>
+    <tr><td class="k">Mudanças de código</td><td>gunicorn, <code>MINIO_SECURE</code>, bucket único, <code>INFO_SCRAP_URL</code>, webhook → Pub/Sub</td><td>as mesmas + fila SQS, <code>ProxyFix</code>, header <code>x-origin-verify</code> e FS somente leitura</td><td>as mesmas + adaptador Blob + <code>run_from_queue.py</code></td></tr>
+    <tr><td class="k">Jobs com gatilho</td><td>Cloud Run Jobs + Scheduler com overrides + Workflows</td><td>ECS RunTask + Scheduler + Pipes + Step Functions (mais peças, mais poder)</td><td>cron e KEDA nativos no próprio job (mais simples)</td></tr>
+    <tr><td class="k">Custo mínimo / recomendado</td><td>≈ 20 (sem LB) / ≈ 40</td><td>≈ 25 / ≈ 34</td><td>≈ 25 / ≈ 37</td></tr>
+    <tr><td class="k">Domínio + TLS sem custo fixo</td><td>só via Firebase Hosting; LB custa 19</td><td>sim (CloudFront + ACM)</td><td>sim (cert gerenciado)</td></tr>
+    <tr><td class="k">Latência para o Brasil</td><td>região em São Paulo com todos os serviços</td><td><code>sa-east-1</code> disponível, +30–40 %; CDN em SP</td><td><code>brazilsouth</code> disponível, +40 %</td></tr>
+    <tr><td class="k">Cold start do site</td><td>~2–4 s (Cloud Run)</td><td>~3–5 s (Lambda container)</td><td>~5–10 s (Container Apps min 0)</td></tr>
+    <tr><td class="k">LLM gerenciado</td><td>Vertex AI (Gemini)</td><td>Bedrock</td><td>Azure OpenAI (mesmo <code>gpt-4o-mini</code>)</td></tr>
+    <tr><td class="k">Maturidade do provider Terraform</td><td>alta (google 7.46)</td><td>alta (aws 6.x)</td><td>alta (azurerm 4.81), cert gerenciado nativo</td></tr>
+    <tr><td class="k">Para quem</td><td><strong>padrão</strong>: menor atrito, região local</td><td>quem quer o menor custo e já conhece AWS</td><td>quem tem créditos Azure ou quer Azure OpenAI</td></tr>
+  </tbody>
+</table></div>
+
+<!-- ===================================================================== -->
+<h2 id="deploy">Pipeline de build e deploy</h2>
+<p>O mesmo fluxo nas três nuvens, só mudando registry e comando de atualização. Os workflows de exemplo estão em <code>infra/&lt;cloud&gt;/ci/</code> (fora de <code>.github/</code> de propósito: o <code>ci.yml</code> atual ainda usa ngrok e GHCR).</p>
+<pre class="diagram">
+  push main ──► GitHub Actions (OIDC, sem chave)
+     1. docker build services/site/Dockerfile ─────────────────► def-site:base   (py3.10 + Playwright, requirements-prd)
+     2. docker build infra/docker/Dockerfile.site (FROM base) ─► def-site:SHA    (gunicorn, PORT)
+     3. docker build infra/docker/Dockerfile.web ──────────────► def-web:SHA     (React + nginx)     [GCP, Azure]
+        npm run build → aws s3 sync → cloudfront invalidation                                        [AWS]
+     4. push → Artifact Registry | ECR | GHCR/ACR
+     5. terraform apply -var image_tag=SHA   (ou gcloud run … update | aws lambda update-function-code | az containerapp update)
+</pre>
+
+<h3>Estrutura de pastas</h3>
+<pre><code>infra/
+├── README.md                 visão geral + Δ código comuns
+├── docker/
+│   ├── Dockerfile.site       camada gunicorn sobre services/site/Dockerfile
+│   ├── Dockerfile.web        React build + nginx :8080 (proxy p/ 127.0.0.1:5000)
+│   └── nginx.cloud.conf.template
+├── gcp/     versions providers variables locals apis registry database storage secrets iam
+│            web jobs triggers lb redis llm cicd monitoring outputs backend · workflows/{run_job,nightly}.yaml · bootstrap/ · ci/ · README.md
+├── aws/     … network database cache storage efs registry secrets iam web_lambda cdn jobs_ecs triggers
+│            statemachines llm cicd monitoring … · statemachines/ · cloudfront/ · docker/Dockerfile.lambda · bootstrap/ · ci/ · README.md
+└── azure/   … core storage database cache keyvault identity registry web ocr jobs llm cicd monitoring …
+             scripts/run_from_queue.py · bootstrap/ · ci/ · README.md</code></pre>
+
+<h3>Comandos</h3>
+<pre><code>cd infra/gcp            # ou aws | azure
+cp terraform.tfvars.example terraform.tfvars      # domínio, imagens, segredos, e-mail de alerta
+(cd bootstrap &amp;&amp; terraform init &amp;&amp; terraform apply)   # bucket/conta do state
+terraform init                                     # backend remoto (ver backend.tf)
+terraform plan -out=plan.out &amp;&amp; terraform apply plan.out
+terraform output                                   # IP/FQDN, registros DNS, nomes dos jobs, comandos prontos</code></pre>
+
+<!-- ===================================================================== -->
+<h2 id="delta">Δ código necessário (antes do primeiro deploy)</h2>
+<p>Nenhum dos três planos roda a árvore atual sem retoques. Todos são pequenos e já estão alinhados com a F0/F1 do <code>CLAUDE.md</code>; a maioria vale para as três nuvens.</p>
+<div class="tbl"><table>
+  <thead><tr><th>#</th><th>Mudança</th><th>Onde</th><th>Nuvens</th><th>Tamanho</th></tr></thead>
+  <tbody>
+    <tr><td class="num">1</td><td>gunicorn em HTTP na porta <code>$PORT</code> no lugar de <code>app.run(debug=True, ssl_context=…)</code></td><td>já resolvido em <code>infra/docker/Dockerfile.site</code>; <code>main.py</code> intocado</td><td>todas</td><td><span class="chip ok">feito</span></td></tr>
+    <tr><td class="num">2</td><td><code>secure=False</code> hardcoded no cliente MinIO → <code>MINIO_SECURE</code> por env (GCS/S3 só aceitam HTTPS); passar <code>region</code> na AWS</td><td><code>services/minio_client.py</code>, <code>routes/media_routes.py</code>, <code>scripts/stage_products.py</code></td><td>GCP, AWS</td><td><span class="chip ok">pequeno</span></td></tr>
+    <tr><td class="num">3</td><td>Um bucket só (<code>MINIO_BUCKET</code>) com prefixo <code>&lt;plataforma&gt;/</code> em vez de criar bucket por plataforma (nomes globais, já tomados)</td><td><code>stage_products.py</code>, <code>media_routes.py</code>, URLs em <code>image</code> no banco</td><td>todas</td><td><span class="chip ok">pequeno</span></td></tr>
+    <tr><td class="num">4</td><td>Adaptador de storage para Azure Blob (upload, URL pública, leitura em <code>/media</code>)</td><td>mesmos três arquivos, atrás de uma interface <code>Storage</code></td><td>Azure</td><td><span class="chip warn">médio</span></td></tr>
+    <tr><td class="num">5</td><td><code>http://info-scrap:8000</code> hardcoded → <code>INFO_SCRAP_URL</code> (já lido por <code>verify_prices.py</code>)</td><td><code>prepare_ml_best.py</code>, <code>shopee_prepare_best.py</code>, <code>amazon_prepare_best.py</code>, <code>prepare_full.py</code></td><td>todas</td><td><span class="chip ok">pequeno</span></td></tr>
+    <tr><td class="num">6</td><td>Webhook do ML publica <code>{"job":"api-update-ml","args":[…]}</code> na fila em vez de processar inline (e consertar a instância <code>db</code>, F0)</td><td><code>routes/webhook_routes.py</code>, <code>services/marketplace_service.py</code></td><td>todas</td><td><span class="chip ok">pequeno</span></td></tr>
+    <tr><td class="num">7</td><td><code>REDIS_URL</code> ausente não pode derrubar o site (só agentes/oracle usam); TLS <code>rediss://</code> quando gerenciado</td><td><code>agents/__init__.py</code>, <code>routes/instagram_routes.py</code>, <code>price_validator/ml_api.py</code></td><td>todas</td><td><span class="chip ok">pequeno</span></td></tr>
+    <tr><td class="num">8</td><td><code>run_from_queue.py</code> na imagem + <code>azure-identity</code>/<code>azure-storage-queue</code></td><td><code>infra/azure/scripts/</code> → <code>Dockerfile.site</code></td><td>Azure</td><td><span class="chip ok">pequeno</span></td></tr>
+    <tr><td class="num">8b</td><td>Conferir o header <code>x-origin-verify</code> injetado pelo CloudFront (modo <code>NONE</code> da Function URL) e aplicar <code>ProxyFix</code> para <code>X-Forwarded-*</code></td><td><code>main.py</code> (middleware de 10 linhas)</td><td>AWS</td><td><span class="chip ok">pequeno</span></td></tr>
+    <tr><td class="num">9</td><td>Scripts interativos de prepare precisam de <code>FORCE_CATEGORY</code> (já suportado); nada de <code>input()</code> em job</td><td><code>prepare_*</code>, <code>organize_tags.py --auto</code></td><td>todas</td><td><span class="chip ok">já existe</span></td></tr>
+    <tr><td class="num">10</td><td>Tirar <code>config/ml_tokens.json</code> do git (F0) e apontar o DevCenter para o novo <code>ML_REDIRECT_URI</code></td><td>git + Mercado Livre DevCenter</td><td>todas</td><td><span class="chip crit">segurança</span></td></tr>
+  </tbody>
+</table></div>
+
+<!-- ===================================================================== -->
+<h2 id="roteiro">Roteiro de implantação</h2>
+<ol class="steps">
+  <li><strong>F0 primeiro.</strong> Tirar segredos do git, rotacionar <code>ML_CLIENT_SECRET</code>, consertar o <code>db</code> do webhook. Nada disso depende de nuvem.</li>
+  <li><strong>Aplicar os Δ 2, 3, 5, 6, 7</strong> e rodar <code>make test-unit</code>. Testar local com <code>docker compose</code> apontando <code>MINIO_SECURE=false</code>.</li>
+  <li><strong>Escolher a nuvem</strong> (padrão: GCP) e preencher <code>terraform.tfvars</code>: domínio, e-mail de alerta, conta de billing, segredos. Nada de valor sensível commitado.</li>
+  <li><strong>Bootstrap do state</strong> e <code>terraform apply</code>. Primeira aplicação cria banco, buckets, cofre, jobs, cron (desligados), CDN/LB. ~15 min.</li>
+  <li><strong>Build e push</strong> das imagens (<code>def-site</code>, <code>def-web</code>) pelo workflow de exemplo ou à mão; <code>terraform apply -var image_tag=…</code>.</li>
+  <li><strong>Migrar dados.</strong> <code>pg_dump</code> → import; <code>mc mirror</code> → <code>gcloud storage rsync</code> / <code>aws s3 sync</code> / <code>azcopy</code>; copiar <code>staging/</code>, <code>uploads/</code>, <code>ml_tokens.json</code> para o volume. Reescrever as URLs de imagem no banco para o novo bucket (script de uma linha SQL).</li>
+  <li><strong>DNS no Cloudflare</strong> (só DNS, sem proxy laranja) e <code>ML_REDIRECT_URI</code> novo no DevCenter. Refazer o login OAuth do ML uma vez.</li>
+  <li><strong>Fumaça:</strong> <code>/health</code>, <code>/api/products?limit=3</code>, uma imagem em <code>/media/…</code>, <code>prepare-ml</code> manual com uma URL, <code>stage</code>, conferir no site.</li>
+  <li><strong>Ligar o cron</strong> (<code>schedules.nightly.enabled=true</code>) e observar 2–3 noites nos logs. <code>publish</code> e <code>populate-mf</code> continuam desligados até a F2 (preço numérico, soft delete).</li>
+  <li><strong>Desligar o túnel</strong> e o PC: <code>serve-cloudflare</code> vira comando de desenvolvimento. Atualizar <code>CLAUDE.md</code> §2.2 e §3.</li>
+</ol>
+
+<div class="note ok">O que fica fora, de propósito: Kafka e os microserviços de recomendação (F4, dentro do monólito), Instagram por <code>instagrapi</code> (proibido), GPU para Ollama (Vertex/Bedrock/Azure OpenAI no lugar), multi-região, e qualquer automação de follow/like/DM.</div>
+
+<footer>DEF · plano de infra cloud · gerado em 2026-10-09 a partir de CLAUDE.md, docker-compose.*, Makefile e nginx/nginx-react.conf · valores em US$/mês, estimativas de lista · código em infra/</footer>
+
+</div>
+</body>
+</html>

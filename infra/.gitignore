@@ -1,0 +1,13 @@
+# Terraform (vale para gcp/, aws/, azure/ e bootstrap/)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+plan.out
+crash.log
+terraform.tfvars
+*.auto.tfvars
+backend.hcl
+override.tf
+*_override.tf
+__pycache__/

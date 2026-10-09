@@ -1,0 +1,22 @@
+# ============================================================
+# Site Flask como Lambda (container image + Lambda Web Adapter).
+# Parte da imagem "site" de nuvem (infra/docker/Dockerfile.site).
+# Build (contexto = raiz do repo):
+#   docker build -t def-site:base --build-arg REQUIREMENTS=requirements-prd.txt services/site
+#   docker build -f infra/docker/Dockerfile.site --build-arg BASE_IMAGE=def-site:base -t def-site:latest .
+#   docker build -f infra/aws/docker/Dockerfile.lambda --build-arg BASE_IMAGE=def-site:latest -t def-site-lambda:latest .
+# ============================================================
+ARG BASE_IMAGE=def-site:latest
+FROM ${BASE_IMAGE}
+
+# Lambda Web Adapter: transforma eventos da Function URL em HTTP para o gunicorn
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
+
+# ml_tokens.json vive no EFS montado em /mnt/config (o resto do FS é read-only no Lambda)
+RUN mkdir -p /mnt/config && rm -rf /app/config && ln -s /mnt/config /app/config
+
+ENV PORT=8080 \
+    AWS_LWA_PORT=8080 \
+    AWS_LWA_READINESS_CHECK_PATH=/webhook/health
+
+CMD ["sh", "-c", "exec gunicorn -b 0.0.0.0:8080 -w 2 --threads 4 --timeout 25 main:app"]

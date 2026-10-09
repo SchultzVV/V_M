@@ -1,0 +1,5 @@
+resource_group_name  = "rg-def-tfstate"
+storage_account_name = "stdeftfstateXXXXXX"
+container_name       = "tfstate"
+key                  = "def-prd.tfstate"
+use_azuread_auth     = true

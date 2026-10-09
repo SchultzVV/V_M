@@ -1,0 +1,64 @@
+# ============================================================
+# Nginx para a nuvem (Cloud Run / Container Apps / ECS):
+#  - escuta HTTP em ${PORT} (TLS termina no balanceador/ingress gerenciado)
+#  - serve o React (frontend/dist) e faz proxy das rotas Flask para ${BACKEND}
+#    (sidecar no mesmo pod: 127.0.0.1:5000)
+#  - /media/<bucket>/<obj> vai direto ao object storage (${MEDIA_ORIGIN}),
+#    sem passar pelo Flask
+# Variáveis expandidas pelo envsubst da imagem oficial (ver Dockerfile.web).
+# Rotas Flask: espelham nginx/nginx-react.conf + secao5 (CLAUDE.md §2.3).
+# ============================================================
+
+server {
+    listen ${PORT};
+    server_name _;
+
+    gzip on;
+    gzip_types text/plain text/css application/javascript application/json text/xml application/xml image/svg+xml;
+    gzip_comp_level 6;
+    gzip_vary on;
+    gzip_min_length 1000;
+
+    client_max_body_size 50M;
+    root /app/dist;
+
+    # health do ingress (Cloud Run / ACA / ALB)
+    location = /health { access_log off; add_header Content-Type text/plain; return 200 "OK"; }
+
+    # ---- Flask (sidecar) ------------------------------------------------
+    location ~ ^/(api|auth|webhook|ai|instagram|sync|validate-prices|add_product)(/|$) {
+        proxy_pass http://${BACKEND};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header Connection "";
+        proxy_connect_timeout 30s;
+        proxy_read_timeout 120s;
+    }
+    location ~ ^/(catalogo|secao[1-5]|sitemap\.xml|robots\.txt)(/|$) {
+        proxy_pass http://${BACKEND};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    # ---- Imagens: direto no bucket (GCS / S3 / Blob) ---------------------
+    # MEDIA_ORIGIN ex.: https://storage.googleapis.com  |  https://<bucket>.s3.amazonaws.com
+    #                   https://<conta>.blob.core.windows.net
+    location ^~ /media/ {
+        proxy_pass ${MEDIA_ORIGIN}/;
+        proxy_ssl_server_name on;
+        proxy_set_header Host $proxy_host;
+        proxy_cache_valid 200 1h;
+        add_header Cache-Control "public, max-age=86400";
+    }
+
+    # ---- React SPA --------------------------------------------------------
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map)$ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+    location / { try_files $uri $uri/ /index.html; }
+}
